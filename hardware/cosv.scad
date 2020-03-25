@@ -17,7 +17,9 @@ $fn=60;
 //bearing_bushing();
 //bearing_washer();
 //flow_sensor();
-laser_arm_mount();
+//laser_arm_mount();
+//bldc_motor_standoff();
+laser_bldc_motor_standoff();
 //laser_base_t();
 //laser_base_b();
 // generates the path for the cam.
@@ -110,6 +112,8 @@ motor_mount_x=15.5;
 motor_mount_offset=6.25;
 motor_pilot_r=12/2+clearance-kerf;
 motor_bolt_r=3/2+clearance/4-kerf;
+motor_body_y_offset=-7;
+motor_r=37/2;
 
 // Nema 23
 //motor_bolt_r=4/2+clearance/4;
@@ -311,6 +315,15 @@ module base_t(h=cam_thickness,explode=0) {
 module base_b(h=cam_thickness) {
 	difference() {
 		base_t(h=h);
+		motor_holes(h=h);
+	}
+}
+module laser_bldc_motor_standoff() {
+	projection(cut=true) bldc_motor_standoff();
+}
+module bldc_motor_standoff(h=cam_thickness*2) {
+	difference() {
+		translate([0,-cam_y_offset-motor_body_y_offset,h/2]) cylinder(r=motor_r,h=h,center=true);
 		motor_holes(h=h);
 	}
 }

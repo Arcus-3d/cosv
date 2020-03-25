@@ -5,7 +5,7 @@ $fn=30;
 //cam();
 //arm_l();
 //paddle();
-base_b();
+//base_b();
 //base_t();
 //washers();
 //arm_mount();
@@ -14,6 +14,8 @@ base_b();
 //bearing_bushing();
 //bearing_washer();
 //flow_sensor();
+//laser_base_t();
+laser_base_b();
 // generates the path for the cam.
 path_step=15; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 
@@ -27,8 +29,8 @@ extra=0.02;
 nozzle_r=0.4/2;
 
 // line width for laser cutting.  Affects hole sizes
-kerf=0;
-//kerf=0.2;
+//kerf=0;
+kerf=0.025;
 
 // bag dimensions and position
 bvm_r=125/2;
@@ -57,6 +59,7 @@ comp_rot=90;
 arm_w=6*nozzle_r*2;
 
 // paddle internal ribs and top thickness
+paddle_scale=1.5;
 paddle_t=3*nozzle_r*2;
 paddle_rib_w=3*nozzle_r*2;
 
@@ -89,19 +92,20 @@ port_r=4/2;
 ////// motor selection
 
 // small worm gear motor
-//motor_shaft_r=6/2;
-//motor_mount_y=33;
-//motor_mount_x=18;
-//motor_mount_offset=9;
-//motor_pilot_r=6/2+clearance-kerf;
+motor_shaft_r=6/2;
+motor_mount_y=33;
+motor_mount_x=18;
+motor_mount_offset=9;
+motor_pilot_r=6/2+clearance-kerf;
+motor_bolt_r=3/2+clearance/4-kerf;
 
 // BLDC gear motor
-motor_shaft_r=6/2-kerf;
-motor_mount_y=26.75;
-motor_mount_x=15.5;
-motor_mount_offset=6.25;
-motor_pilot_r=12/2+clearance-kerf;
-motor_bolt_r=3/2+clearance/4-kerf;
+//motor_shaft_r=6/2-kerf;
+//motor_mount_y=26.75;
+//motor_mount_x=15.5;
+//motor_mount_offset=6.25;
+//motor_pilot_r=12/2+clearance-kerf;
+//motor_bolt_r=3/2+clearance/4-kerf;
 
 // Nema 23
 //motor_bolt_r=4/2+clearance/4;
@@ -110,9 +114,17 @@ motor_bolt_r=3/2+clearance/4-kerf;
 //motor_mount_y=47.1;
 //motor_mount_x=47.1;
 //motor_mount_offset=47.1/2;
-//motor_pilot_r=38.1/2+clearance-kerf
+//motor_pilot_r=38.1/2+clearance-kerf;
 
-
+module laser_base_t() {
+	projection(cut=true) base_plate();
+}
+module laser_base_b() {
+	projection(cut=true) difference() {
+		base_plate();
+		motor_holes();
+	}
+}
 module assembly_view(explode=0,cam_angle=0) {
 	if (1) translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,0]) {
 	//if (0) {
@@ -235,7 +247,7 @@ module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
 			hull() {
 				for (x=[-1,1]) for (y=[1]) translate([x*x_pos,y*(y_pos),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
 				for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bearing_or/2-clearance/4,h=h,center=true);
-				#for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
+				for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
 				for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=bvm_c*2,h=h,center=true);
 			}
 			hull() {
@@ -243,7 +255,7 @@ module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
 				for (x=[-1,1]) translate([x*x_pos,y_pos*0.85,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
 			}
 		}
-		base_bolts(h=h);
+		base_holes(h=h);
 	}
 }
 				
@@ -267,7 +279,7 @@ module base_plate(h=cam_thickness,explode=0) {
 			}
 			chest_bar(h=h);
 		}
-		base_bolts(h=h);
+		base_holes(h=h);
 	}
 		
 }
@@ -289,7 +301,7 @@ module base_t(h=cam_thickness,explode=0) {
 module base_b(h=cam_thickness) {
 	difference() {
 		base_t(h=h);
-		motor_bolts(h=h);
+		motor_holes(h=h);
 	}
 }
 			
@@ -298,7 +310,7 @@ module motor_mount(h=cam_thickness,r=motor_bolt_r+bvm_c*2){
 }
 
 
-module motor_bolts(h=cam_thickness) {
+module motor_holes(h=cam_thickness) {
 	translate([0,-cam_y_offset,h/2]) {
 		cylinder(r=motor_pilot_r+clearance,h=h+extra,center=true);
 		for (x=[-1,1]) for(y=[0,1]) translate([x*motor_mount_x/2,-motor_mount_offset+motor_mount_y*y,0]) {
@@ -307,13 +319,14 @@ module motor_bolts(h=cam_thickness) {
 	}
 }
 
-module base_bolts(h=cam_thickness) {
+module base_holes(h=cam_thickness) {
 	for (x=[-1,1]) translate([x*arm_x_offset,0,h/2]) {
 		cylinder(r=bolt_r,h=h+extra,center=true);
 	}
 	if (0) for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) {
 		cylinder(r=bolt_r,h=h+extra,center=true);
 	}
+	translate([0,-cam_y_offset-cam_bearing_offset,h/2]) cylinder(r=bolt_r*1.5,h=h+extra,center=true);
 	for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=bolt_r,h=h+extra,center=true);
 }
 
@@ -346,14 +359,14 @@ module bag_mount() {
 module paddle() {
 	difference() {
 		union() {
-			intersection() {
+			scale([paddle_scale,paddle_scale,1]) intersection() {
 				translate([0,0,-bvm_r/2+bvm_r/6]) sphere(r=bvm_r/2,center=true);
 				translate([0,0,bvm_r/2]) cylinder(r=bvm_r/3,h=bvm_r,center=true);
 			}
 		}
 		union() {
 			difference() {
-				intersection() {
+				scale([paddle_scale,paddle_scale,1]) intersection() {
 					translate([0,0,-bvm_r/2+bvm_r/6-paddle_t-extra]) sphere(r=bvm_r/2,center=true);
 					translate([0,0,bvm_r/2-extra]) cylinder(r=bvm_r/3-paddle_t,h=bvm_r,center=true);
 				}

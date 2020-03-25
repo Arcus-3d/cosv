@@ -11,7 +11,6 @@ $fn=60;
 //paddle();
 //base_b();
 //base_t();
-//washers();
 //chest_bar();
 //bag_mount();
 //bearing_bushing();
@@ -19,7 +18,9 @@ $fn=60;
 //flow_sensor();
 //laser_arm_mount();
 //bldc_motor_standoff();
-laser_bldc_motor_standoff();
+//laser_bearing_washer();
+laser_cam();
+//laser_bldc_motor_standoff();
 //laser_base_t();
 //laser_base_b();
 // generates the path for the cam.
@@ -98,7 +99,7 @@ port_r=4/2;
 ////// motor selection
 
 // small worm gear motor
-//motor_shaft_r=6/2;
+//motor_shaft_r=6/2-kerf;
 //motor_mount_y=33;
 //motor_mount_x=18;
 //motor_mount_offset=9;
@@ -117,7 +118,7 @@ motor_r=37/2;
 
 // Nema 23
 //motor_bolt_r=4/2+clearance/4;
-//motor_shaft_r=6.35/2;
+//motor_shaft_r=6.35/2-kerf;
 //motor_shaft_r=8/2;
 //motor_mount_y=47.1;
 //motor_mount_x=47.1;
@@ -126,6 +127,12 @@ motor_r=37/2;
 
 module laser_base_t() {
 	projection(cut=true) base_plate();
+}
+module laser_bearing_washer() {
+	projection(cut=true) bearing_washer();
+}
+module laser_cam() {
+	projection(cut=true) cam_plate();
 }
 module laser_arm_mount() {
 	projection(cut=true) arm_mount();

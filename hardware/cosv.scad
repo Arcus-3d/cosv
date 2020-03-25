@@ -5,7 +5,7 @@
 
 // circle complexity.  Turn down for working, up to like 60 for rendering
 $fn=60;
-//cam();
+cam();
 //laser_callibration_square(w=10);
 //arm_l();
 //paddle();
@@ -19,7 +19,9 @@ $fn=60;
 //laser_arm_mount();
 //bldc_motor_standoff();
 //laser_bearing_washer();
-laser_cam();
+//laser_cam();
+//laser_bearing_bushing();
+//laser_cam_center();
 //laser_bldc_motor_standoff();
 //laser_base_t();
 //laser_base_b();
@@ -36,8 +38,8 @@ extra=0.02;
 nozzle_r=0.4/2;
 
 // line width for laser cutting.  Affects hole sizes
-//kerf=0;
-kerf=0.025;
+kerf=0;
+//kerf=0.025;
 
 // bag dimensions and position
 bvm_r=125/2;
@@ -107,7 +109,7 @@ port_r=4/2;
 //motor_bolt_r=3/2+clearance/4-kerf;
 
 // BLDC gear motor
-motor_shaft_r=6/2-kerf;
+motor_shaft_r=8/2-kerf;
 motor_mount_y=26.75;
 motor_mount_x=15.5;
 motor_mount_offset=6.25;
@@ -134,8 +136,14 @@ module laser_bearing_washer() {
 module laser_cam() {
 	projection(cut=true) cam_plate();
 }
+module laser_cam_center() {
+	projection(cut=true) cam_center();
+}
 module laser_arm_mount() {
 	projection(cut=true) arm_mount();
+}
+module laser_bearing_bushing() {
+	projection(cut=true) bearing_bushing();
 }
 module laser_base_b() {
 	projection(cut=true) difference() {

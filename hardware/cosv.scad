@@ -231,11 +231,17 @@ module flow_sensor() {
 
 module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
 	difference() {
-		hull() {
-			for (x=[-1,1]) for (y=[1]) translate([x*x_pos,y*(y_pos),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
-			for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bearing_or/2-clearance/4,h=h,center=true);
-			for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
-			for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=bvm_c*2,h=h,center=true);
+		union() {
+			hull() {
+				for (x=[-1,1]) for (y=[1]) translate([x*x_pos,y*(y_pos),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
+				for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bearing_or/2-clearance/4,h=h,center=true);
+				#for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
+				for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=bvm_c*2,h=h,center=true);
+			}
+			hull() {
+				for (x=[-1,1]) translate([x*(x_pos*1.2),y_pos,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
+				for (x=[-1,1]) translate([x*x_pos,y_pos*0.85,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
+			}
 		}
 		base_bolts(h=h);
 	}

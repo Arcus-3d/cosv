@@ -17,8 +17,8 @@ base_b();
 // generates the path for the cam.
 path_step=15; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 
-assembly_view(cam_angle=$t*180,explode=0);
-cam_assembly(explode=10);
+//assembly_view(cam_angle=$t*180,explode=0);
+//cam_assembly(explode=10);
 
 
 clearance=0.4;
@@ -39,7 +39,7 @@ bvm_c=nozzle_r*2*8;
 bvm_y_offset=15;
 
 //
-chest_bar_l=bvm_r*2.5;
+chest_bar_l=bvm_r*2;
 // bearing choice.  Some things don't scale right yet if you change this.
 bearing_or=22/2-kerf;
 bearing_ir=8/2+kerf;
@@ -60,6 +60,11 @@ arm_w=6*nozzle_r*2;
 paddle_t=3*nozzle_r*2;
 paddle_rib_w=3*nozzle_r*2;
 
+// how far the arm rotates with a full comp_rot
+arm_rot=30; 
+// how far apart the arm bearings are from centerline
+arm_x_offset=16;
+
 // mechanical dimensions for the cam action
 cam_bearing_offset=15+nozzle_r*2;
 cam_l=cam_bearing_offset*2+bearing_or*2;
@@ -67,11 +72,9 @@ cam_thickness=2;
 cam_h=bearing_h+cam_thickness*2+clearance;
 cam_y_offset=bearing_or+cam_l/2;
 cam_pre_rot=-0;
+x_pos=arm_x_offset+cam_l/2.5;
+y_pos=-cam_y_offset-cam_l/2.5;
 
-// how far the arm rotates with a full comp_rot
-arm_rot=30; 
-// how far apart the arm bearings are from centerline
-arm_x_offset=16;
 
 // volume sensing pitot tube dimensions
 // outer tube.  This is the dia of the mask, generally
@@ -229,16 +232,12 @@ module flow_sensor() {
 module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
 	difference() {
 		hull() {
-			for (x=[-1,1]) for (y=[1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),y*(-cam_y_offset-cam_l/2),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
-			for (x=[-1,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),-cam_y_offset-cam_l/2,h/2]) cylinder(r=bearing_or/2-clearance/4,h=h,center=true);
-			for (x=[-1,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),-cam_y_offset-cam_l/2,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
-			for (x=[-1,1]) translate([x*chest_bar_l/2,-cam_y_offset-cam_l/2-bvm_c*2,h/2]) cylinder(r=bvm_c*2,h=h,center=true);
+			for (x=[-1,1]) for (y=[1]) translate([x*x_pos,y*(y_pos),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
+			for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bearing_or/2-clearance/4,h=h,center=true);
+			for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
+			for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=bvm_c*2,h=h,center=true);
 		}
-		#hull() for (x=[-1,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4-bolt_r-bvm_c*3-clearance/4),-cam_y_offset-cam_l/2,h/2]) {
-			cylinder(r=bolt_r+bvm_c,h=h+extra*2,center=true);
-			translate([0,bolt_r+bvm_c,0]) cube([bolt_r*2+bvm_c*2,bolt_r*2+bvm_c*2,h+extra*2],center=true);
-		}
-		//base_bolts(h=h);
+		base_bolts(h=h);
 	}
 }
 				
@@ -247,18 +246,18 @@ module base_plate(h=cam_thickness,explode=0) {
 		union() {
 			arm_mount(h=h);
 			hull() {
-				for (x=[-1,1]) for (y=[0,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),y*(-cam_y_offset-cam_l/2),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
+				for (x=[-1,1]) for (y=[0,1]) translate([x*x_pos,y*y_pos,h/2]) cylinder(r=bearing_or/2,h=h,center=true);
 				motor_mount(h=h);
 			}
 			for (x=[-1,1]) hull() {
 				translate([x*(arm_x_offset),0,h/2]) cylinder(r=bearing_or,h=h,center=true);
 				translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,h/2]) rotate([0,0,x*60]) translate([0,-bvm_r-bvm_c*3,0]) cylinder(r=bvm_c,h=h,center=true);
-				translate([x*(arm_x_offset+cam_l/2+bearing_or/4),0,h/2]) cylinder(r=bearing_or/2,h=h,center=true);
+				translate([x*x_pos,0,h/2]) cylinder(r=bearing_or/2,h=h,center=true);
 			}
 			for (x=[-1,1]) hull() {
 				translate([x*(bearing_h),bvm_y_offset+bearing_or-bvm_c,h/2]) cylinder(r=bvm_c,h=h,center=true);
 				translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,h/2]) rotate([0,0,x*33]) translate([0,-bvm_r-bvm_c*3,0]) cylinder(r=bvm_c,h=h,center=true);
-				translate([x*(arm_x_offset+cam_l/2+bearing_or/4),0,h/2]) cylinder(r=bearing_or/2,h=h,center=true);
+				translate([x*x_pos,0,h/2]) cylinder(r=bearing_or/2,h=h,center=true);
 			}
 			chest_bar(h=h);
 		}
@@ -306,10 +305,10 @@ module base_bolts(h=cam_thickness) {
 	for (x=[-1,1]) translate([x*arm_x_offset,0,h/2]) {
 		cylinder(r=bolt_r,h=h+extra,center=true);
 	}
-	for (x=[-1,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),-cam_y_offset-cam_l/2,h/2]) {
+	if (0) for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) {
 		cylinder(r=bolt_r,h=h+extra,center=true);
 	}
-	for (x=[-1,1]) translate([x*chest_bar_l/2,-cam_y_offset-cam_l/2-bvm_c*2,h/2]) cylinder(r=bolt_r,h=h+extra,center=true);
+	for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=bolt_r,h=h+extra,center=true);
 }
 
 module bag_mount() {
@@ -359,7 +358,7 @@ module paddle() {
 				}
 			}
 		}
-		#if (1) hull() {
+		if (1) hull() {
 			for (z=[0,bvm_c*1.5]) translate([0,0,z]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/2,h=bearing_h+clearance/4,center=true);
 		}
 	}
@@ -404,6 +403,7 @@ module bearing(outer=bearing_or*2,inner=bearing_ir*2,width=bearing_h) {
 }
 
 module arm_model() {
+	y_pos=-cam_y_offset-cam_l/2;
 	difference() {
 		union() {
 			// end_mounts
@@ -413,7 +413,7 @@ module arm_model() {
 			}
 			// outer rib
 			if (1) hull() {
-				translate([arm_x_offset-bearing_or*1.5+arm_w*2,-cam_y_offset-cam_l/2,bearing_h/2]) cylinder(r=arm_w,h=bearing_h,center=true);
+				translate([arm_x_offset-bearing_or*1.5+arm_w*2,y_pos,bearing_h/2]) cylinder(r=arm_w,h=bearing_h,center=true);
 				translate([arm_x_offset,bvm_r+bearing_or+arm_w+bvm_y_offset,bearing_h/2]) rotate([0,0,-70]) translate([0,-bvm_r-arm_w*3.44,0]) cylinder(r=arm_w,h=bearing_h,center=true);
 			}
 			// middle rib

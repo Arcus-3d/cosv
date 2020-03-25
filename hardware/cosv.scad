@@ -1,23 +1,27 @@
+//COSV - Cam Open Source Ventilator
+// Project home: https://hackaday.io/project/170507
+// Project files: https://github.com/Arcus-3d/cosv
+// Project author: Daren Schwenke
 
-
-
-$fn=30;
+// circle complexity.  Turn down for working, up to like 60 for rendering
+$fn=60;
 //cam();
+//laser_callibration_square(w=10);
 //arm_l();
 //paddle();
 //base_b();
 //base_t();
 //washers();
-//arm_mount();
 //chest_bar();
 //bag_mount();
 //bearing_bushing();
 //bearing_washer();
 //flow_sensor();
+laser_arm_mount();
 //laser_base_t();
-laser_base_b();
+//laser_base_b();
 // generates the path for the cam.
-path_step=15; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
+path_step=2; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 
 //assembly_view(cam_angle=$t*180,explode=0);
 //cam_assembly(explode=10);
@@ -92,20 +96,20 @@ port_r=4/2;
 ////// motor selection
 
 // small worm gear motor
-motor_shaft_r=6/2;
-motor_mount_y=33;
-motor_mount_x=18;
-motor_mount_offset=9;
-motor_pilot_r=6/2+clearance-kerf;
-motor_bolt_r=3/2+clearance/4-kerf;
+//motor_shaft_r=6/2;
+//motor_mount_y=33;
+//motor_mount_x=18;
+//motor_mount_offset=9;
+//motor_pilot_r=6/2+clearance-kerf;
+//motor_bolt_r=3/2+clearance/4-kerf;
 
 // BLDC gear motor
-//motor_shaft_r=6/2-kerf;
-//motor_mount_y=26.75;
-//motor_mount_x=15.5;
-//motor_mount_offset=6.25;
-//motor_pilot_r=12/2+clearance-kerf;
-//motor_bolt_r=3/2+clearance/4-kerf;
+motor_shaft_r=6/2-kerf;
+motor_mount_y=26.75;
+motor_mount_x=15.5;
+motor_mount_offset=6.25;
+motor_pilot_r=12/2+clearance-kerf;
+motor_bolt_r=3/2+clearance/4-kerf;
 
 // Nema 23
 //motor_bolt_r=4/2+clearance/4;
@@ -119,11 +123,17 @@ motor_bolt_r=3/2+clearance/4-kerf;
 module laser_base_t() {
 	projection(cut=true) base_plate();
 }
+module laser_arm_mount() {
+	projection(cut=true) arm_mount();
+}
 module laser_base_b() {
 	projection(cut=true) difference() {
 		base_plate();
 		motor_holes();
 	}
+}
+module laser_callibration_square(w=10) {
+	projection(cut=true) cube([w,w,w],center=true);
 }
 module assembly_view(explode=0,cam_angle=0) {
 	if (1) translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,0]) {

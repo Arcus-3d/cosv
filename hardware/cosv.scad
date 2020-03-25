@@ -18,16 +18,19 @@ base_b();
 path_step=15; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 
 assembly_view(cam_angle=$t*180,explode=0);
-//cam_assembly(explode=10);
+cam_assembly(explode=10);
 
 
 clearance=0.4;
 extra=0.02;
+// nozzle size for 3D printing.  Generates parts that are exactly a multiple of this width for strength
 nozzle_r=0.4/2;
 
-kerf_r=0;
-//kerf_r=0.2;
+// line width for laser cutting.  Affects hole sizes
+kerf=0;
+//kerf=0.2;
 
+// bag dimensions and position
 bvm_r=125/2;
 bvm_br=70/2;
 bvm_tr=45/2;
@@ -35,30 +38,67 @@ bvm_l=200;
 bvm_c=nozzle_r*2*8;
 bvm_y_offset=15;
 
+//
 chest_bar_l=bvm_r*2.5;
-
-bearing_or=22/2;
-bearing_ir=8/2;
+// bearing choice.  Some things don't scale right yet if you change this.
+bearing_or=22/2-kerf;
+bearing_ir=8/2+kerf;
 bearing_h=7;
+// a little washer to clearance the bearing
 bearing_washer_h=clearance/2;
-bolt_r=3/2+clearance/4;
 
+// assembly bolt size
+bolt_r=3/2+clearance/4-kerf;
+
+// compression rotation angle.  You can generate uneven compression/release profiles with this for a weaker motor, or to have hardware ratio of inhale/exhale and a static motor.
 comp_rot=90;
 
+// arm width
 arm_w=6*nozzle_r*2;
+
+// paddle internal ribs and top thickness
 paddle_t=3*nozzle_r*2;
 paddle_rib_w=3*nozzle_r*2;
 
+// mechanical dimensions for the cam action
 cam_bearing_offset=15+nozzle_r*2;
 cam_l=cam_bearing_offset*2+bearing_or*2;
 cam_thickness=2;
 cam_h=bearing_h+cam_thickness*2+clearance;
 cam_y_offset=bearing_or+cam_l/2;
 cam_pre_rot=-0;
-cover_thickness=1.2;
 
-arm_rot=30; // how far we will be rotating the arms to compress the bag.
+// how far the arm rotates with a full comp_rot
+arm_rot=30; 
+// how far apart the arm bearings are from centerline
 arm_x_offset=16;
+
+// volume sensing pitot tube dimensions
+// outer tube.  This is the dia of the mask, generally
+tube_or=22.2/2;
+tube_ir=tube_or-nozzle_r*2*5;
+tube_l=60;
+// inner pitot tube
+pitot_r=5.5/2;
+pitot_t=nozzle_r*2*2;
+port_r=4/2;
+
+////// motor selection
+
+// small worm gear motor
+//motor_shaft_r=6/2;
+//motor_mount_y=33;
+//motor_mount_x=18;
+//motor_mount_offset=9;
+//motor_pilot_r=6/2+clearance-kerf;
+
+// BLDC gear motor
+motor_shaft_r=6/2-kerf;
+motor_mount_y=26.75;
+motor_mount_x=15.5;
+motor_mount_offset=6.25;
+motor_pilot_r=12/2+clearance-kerf;
+motor_bolt_r=3/2+clearance/4-kerf;
 
 // Nema 23
 //motor_bolt_r=4/2+clearance/4;
@@ -67,31 +107,7 @@ arm_x_offset=16;
 //motor_mount_y=47.1;
 //motor_mount_x=47.1;
 //motor_mount_offset=47.1/2;
-//motor_pilot_r=38.1/2
-
-tube_or=22.2/2;
-tube_ir=tube_or-nozzle_r*2*5;
-tube_l=60;
-pitot_r=5.5/2;
-pitot_t=nozzle_r*2*2;
-port_r=4/2;
-
-
-// small worm gear motor
-//motor_shaft_r=6/2;
-//motor_mount_y=33;
-//motor_mount_x=18;
-//motor_mount_offset=9;
-//motor_pilot_r=6/2+clearance;
-
-// BLDC gear motor
-motor_shaft_r=6/2;
-motor_mount_y=26.75;
-motor_mount_x=15.5;
-motor_mount_offset=6.25;
-motor_pilot_r=12/2+clearance;
-motor_bolt_r=3/2+clearance/4;
-
+//motor_pilot_r=38.1/2+clearance-kerf
 
 
 module assembly_view(explode=0,cam_angle=0) {
@@ -214,7 +230,7 @@ module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
 	difference() {
 		hull() {
 			for (x=[-1,1]) for (y=[1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),y*(-cam_y_offset-cam_l/2),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
-			for (x=[-1,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),-cam_y_offset-cam_l/2,h/2]) cylinder(r=bearing_or/2-clearance/4-cover_thickness,h=h,center=true);
+			for (x=[-1,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),-cam_y_offset-cam_l/2,h/2]) cylinder(r=bearing_or/2-clearance/4,h=h,center=true);
 			for (x=[-1,1]) translate([x*(arm_x_offset+cam_l/2+bearing_or/4),-cam_y_offset-cam_l/2,h/2]) cylinder(r=bolt_r+bvm_c,h=h,center=true);
 			for (x=[-1,1]) translate([x*chest_bar_l/2,-cam_y_offset-cam_l/2-bvm_c*2,h/2]) cylinder(r=bvm_c*2,h=h,center=true);
 		}

@@ -5,7 +5,7 @@
 
 // circle complexity.  Turn down for working, up to like 60 for rendering
 $fn=60;
-//cam();
+cam();
 //laser_callibration_square(w=10);
 //arm_l();
 //paddle();
@@ -25,7 +25,7 @@ $fn=60;
 //laser_bldc_motor_standoff();
 //laser_base_t();
 //laser_base_b();
-laser_paddle();
+//laser_paddle();
 //laser_arm();
 // generates the path for the cam.
 path_step=5; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
@@ -40,8 +40,8 @@ extra=0.02;
 nozzle_r=0.4/2;
 
 // line width for laser cutting.  Affects hole sizes
-//kerf=0;
-kerf=0.025;
+kerf=0;
+//kerf=0.025;
 
 // bag dimensions and position
 bvm_r=125/2;
@@ -162,6 +162,11 @@ module laser_base_b() {
 module laser_callibration_square(w=10) {
 	projection(cut=true) cube([w,w,w],center=true);
 }
+module laser_bldc_motor_standoff() {
+	projection(cut=true) bldc_motor_standoff();
+}
+
+// now a little screwed up since I split the parts into layers
 module assembly_view(explode=0,cam_angle=0) {
 	if (1) translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,0]) {
 	//if (0) {
@@ -277,7 +282,7 @@ module flow_sensor() {
 		
 	}
 }
-
+// not right anymore...
 module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
 	difference() {
 		union() {
@@ -341,9 +346,6 @@ module base_b(h=cam_thickness) {
 		motor_holes(h=h);
 	}
 }
-module laser_bldc_motor_standoff() {
-	projection(cut=true) bldc_motor_standoff();
-}
 module bldc_motor_standoff(h=cam_thickness*2) {
 	difference() {
 		translate([0,-cam_y_offset-motor_body_y_offset,h/2]) cylinder(r=motor_r,h=h,center=true);
@@ -376,13 +378,13 @@ module base_holes(h=cam_thickness) {
 	for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=bolt_r,h=h+extra,center=true);
 }
 
-module bag_mount() {
+module bag_mount(w=arm_w) {
 	union() {
 		translate([bvm_r+bearing_h/2,0,bearing_h/2]) scale([1,bvm_l/1.7/bvm_r,1]) {
 			union() {
 				intersection() {
 					difference() {
-						translate([0,1.2,0]) cylinder(r=bvm_r+bearing_h/2,h=bearing_h,$fn=$fn*2,center=true);
+						translate([0,1.2,0]) cylinder(r=bvm_r+w,h=bearing_h,$fn=$fn*2,center=true);
 						cylinder(r=bvm_r,h=bearing_h+extra*2,$fn=$fn*2,center=true);
 					}
 					intersection() {
@@ -549,10 +551,10 @@ module cam(h=cam_thickness,explode=0) {
 		translate([0,0,-explode]) cam_plate();
 		translate([0,0,h-extra]) {
 			for (y=[-1,1]) translate([0,cam_bearing_offset*y,0]) {
-				translate([0,0,explode]) bearing_bushing(h=bearing_h/2+extra*2);
+				translate([0,0,explode+bearing_washer_h]) bearing_bushing(h=bearing_h/2+extra*2);
 				bearing_washer();
 			}
-			translate([0,0,explode]) cam_center();
+			translate([0,0,explode+bearing_washer_h]) cam_center();
 			cam_center(h=bearing_washer_h);
 			
 		}

@@ -15,7 +15,7 @@ $fn=60;
 //bag_mount();
 //bearing_bushing();
 //bearing_washer();
-//flow_sensor_for_pcb();
+flow_sensor_for_pcb();
 //laser_arm_mount();
 //bldc_motor_standoff();
 //laser_bearing_washer();
@@ -26,7 +26,7 @@ $fn=60;
 //laser_base_t();
 //laser_base_b();
 //laser_paddle();
-laser_arm();
+//laser_arm();
 // generates the path for the cam.
 path_step=2; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 

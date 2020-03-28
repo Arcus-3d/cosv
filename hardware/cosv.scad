@@ -4,8 +4,8 @@
 // Project author: Daren Schwenke
 
 // circle complexity.  Turn down for working, up to like 60 for rendering
-$fn=60;
-cam();
+$fn=30;
+//cam();
 //laser_callibration_square(w=10);
 //arm_l();
 //paddle();
@@ -15,7 +15,7 @@ cam();
 //bag_mount();
 //bearing_bushing();
 //bearing_washer();
-//flow_sensor();
+flow_sensor_for_pcb();
 //laser_arm_mount();
 //bldc_motor_standoff();
 //laser_bearing_washer();
@@ -92,13 +92,98 @@ y_pos=-cam_y_offset-cam_l/2.5;
 
 // volume sensing pitot tube dimensions
 // outer tube.  This is the dia of the mask, generally
-tube_or=22.2/2;
+tube_or=22/2;
+tube_taper=0.75;
 tube_ir=tube_or-nozzle_r*2*5;
-tube_l=60;
+pcb_x=16+clearance/2;
+pcb_y=40+clearance/2;
+pcb_t=1.5;
+pcb_c_t=3;
+pcb_b=1.6;
+pcb_port_z_offset=8;
+pcb_port_z_spacing=4;
+pcb_port_x_spacing=4;
+tube_d=22;
+tube_l=tube_d*2+(pcb_y-tube_d)+pcb_b*4;
 // inner pitot tube
-pitot_r=5.5/2;
+pitot_r=5/2;
 pitot_t=nozzle_r*2*2;
-port_r=4/2;
+port_r=4.25/2;
+
+module flow_sensor_for_pcb() {
+	t=tube_or-tube_ir;
+	difference() {
+		if (1) union() {
+			translate([0,0,tube_d/2]) cylinder(r2=tube_or+tube_taper,r1=tube_or,h=tube_d,center=true);
+			hull() {
+				translate([0,0,tube_l-(pcb_y+pcb_b*2)/2]) cylinder(r=tube_or+t,h=pcb_y+pcb_b*2,center=true);
+				translate([0,tube_or+t+pcb_t/2+pcb_c_t/2,tube_l-(pcb_y+pcb_b*2)/2]) cube([pcb_x+pcb_b*2,pcb_t+pcb_c_t,pcb_y+pcb_b*2],center=true);
+				translate([0,0,tube_l/2]) cylinder(r=tube_or+tube_taper,h=tube_l-tube_d*2,center=true);
+			}
+		}
+		difference() {
+			if (1) union() {
+				translate([0,0,tube_l/2]) cylinder(r=tube_ir,h=tube_l+extra*2,center=true);
+				translate([0,0,tube_l-tube_d/2]) cylinder(r2=tube_or,r1=tube_or-tube_taper,h=tube_d+extra,center=true);
+				difference() {
+					translate([0,tube_or+t+pcb_c_t/2,tube_l-(pcb_y+pcb_b*2)/2+pcb_port_z_offset]) cube([pcb_x,pcb_c_t+extra,pcb_y-pcb_port_z_offset*2],center=true);
+					difference() {
+						union() {
+							translate([0,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+24]) rotate([90,0,0]) cylinder(r=bolt_r-clearance/2+nozzle_r*6,h=t*3.75,center=true);
+							translate([0,tube_or+pcb_c_t/2,tube_l-pcb_y-pcb_b+pcb_port_z_offset+24]) rotate([45,0,0]) cube([nozzle_r*2,pcb_c_t*2*1.44,pcb_c_t*2*1.44],center=true);
+						}
+						translate([0,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+24]) rotate([90,0,0]) cylinder(r=bolt_r-clearance/2,h=t*3.75+extra,center=true);
+					}
+				}
+				for (x=[0]) for (z=[0,24]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=bolt_r-clearance/2,h=t*3.75,center=true);
+				translate([0,tube_or+t+pcb_t/2+pcb_c_t,tube_l-(pcb_y+pcb_b*2)/2]) cube([pcb_x,pcb_t+extra,pcb_y],center=true);
+				for (x=[-1]) for (z=[-1,1]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=port_r,h=t*3.75,center=true);
+				for (x=[1]) for (z=[-1]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=port_r,h=t*3.75,center=true);
+				for (x=[1]) for (z=[1]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) {
+					translate([0,t/2,0]) rotate([90,0,0]) cylinder(r=port_r,h=t*2,center=true);
+					translate([tube_or/2,0,0]) scale([1,1,2.5]) rotate([0,90,0]) cylinder(r1=port_r/2,r2=port_r,h=tube_or,center=true);
+				}
+			}
+			rotate([0,0,20]) translate([0,0,tube_l-pcb_y-pcb_b+pcb_port_z_offset]) {
+				intersection() {
+					union() {
+						for (r=[1,0]) mirror([0,0,r]) translate([0,tube_or,tube_or+pcb_port_z_spacing]) rotate([0,90,0]) difference() {
+							union() {
+								rotate_extrude() translate([tube_or,0]) circle(r=pitot_r+pitot_t,center=true);
+								translate([tube_ir/2+4,(-tube_or-t)/2,0]) cube([tube_ir+4,tube_or+t+pitot_r+pitot_t-pcb_b,pitot_t],center=true);
+							}
+							rotate_extrude() translate([tube_or,0]) circle(r=pitot_r,center=true);
+						}
+					}
+					translate([0,(tube_or+t-pitot_r-pitot_t-pcb_b)/2,0]) cube([tube_ir,tube_or+t+pitot_r+pitot_t-pcb_b,(tube_ir+4)*2],center=true);
+				}
+			}
+		}
+	}
+}
+module flow_sensor() {
+	translate([0,0,tube_l/2]) difference() {
+		if (1) union() {
+			cylinder(r=tube_or,h=tube_l,center=true);
+			rotate([90,0,0]) hull() for (z=[1,-1]) translate([0,z*8,-tube_or/1.5]) cylinder(r=tube_or/2,h=tube_or/1.15,center=true);
+		}
+		difference() {
+			cylinder(r=tube_ir,h=tube_l+extra,center=true);
+			for (r=[1,0]) mirror([0,0,r]) scale([1,1,2.1]) translate([0,tube_ir,-tube_l/4.3]) rotate([0,90,0]) intersection() {
+				difference() {
+					union() {
+						translate([0,-pitot_r-pitot_t+clearance/4,0]) cube([tube_l*2/4.3,tube_ir*2,pitot_t],center=true);
+						rotate_extrude() translate([tube_ir,0]) circle(r=pitot_r+pitot_t,center=true);
+					}
+					rotate_extrude() translate([tube_ir,0]) circle(r=pitot_r,center=true);
+				}
+				cube([tube_l,tube_or*3,tube_ir],center=true);
+			}
+		}
+		for (z=[-1,0,1]) translate([0,tube_ir+4,z*8]) rotate([90,0,0]) translate([0,0,0]) cylinder(r=port_r,h=8*2,center=true);
+		
+	}
+}
 
 ////// motor selection
 
@@ -259,29 +344,6 @@ module arm_mount(h=cam_thickness) {
 	arm_mount_plate(h=h);
 }
 
-module flow_sensor() {
-	translate([0,0,tube_l/2]) difference() {
-		if (1) union() {
-			cylinder(r=tube_or,h=tube_l,center=true);
-			rotate([90,0,0]) hull() for (z=[1,-1]) translate([0,z*8,-tube_or/1.5]) cylinder(r=tube_or/2,h=tube_or/1.15,center=true);
-		}
-		difference() {
-			cylinder(r=tube_ir,h=tube_l+extra,center=true);
-			for (r=[1,0]) mirror([0,0,r]) scale([1,1,2.1]) translate([0,tube_ir,-tube_l/4.3]) rotate([0,90,0]) intersection() {
-				difference() {
-					union() {
-						translate([0,-pitot_r-pitot_t+clearance/4,0]) cube([tube_l*2/4.3,tube_ir*2,pitot_t],center=true);
-						rotate_extrude() translate([tube_ir,0]) circle(r=pitot_r+pitot_t,center=true);
-					}
-					rotate_extrude() translate([tube_ir,0]) circle(r=pitot_r,center=true);
-				}
-				cube([tube_l,tube_or*3,tube_ir],center=true);
-			}
-		}
-		for (z=[-1,0,1]) translate([0,tube_ir+4,z*8]) rotate([90,0,0]) translate([0,0,0]) cylinder(r=port_r,h=8*2,center=true);
-		
-	}
-}
 // not right anymore...
 module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
 	difference() {

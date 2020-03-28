@@ -4,7 +4,7 @@
 // Project author: Daren Schwenke
 
 // circle complexity.  Turn down for working, up to like 60 for rendering
-$fn=30;
+$fn=60;
 //cam();
 //laser_callibration_square(w=10);
 //arm_l();
@@ -15,7 +15,7 @@ $fn=30;
 //bag_mount();
 //bearing_bushing();
 //bearing_washer();
-flow_sensor_for_pcb();
+//flow_sensor_for_pcb();
 //laser_arm_mount();
 //bldc_motor_standoff();
 //laser_bearing_washer();
@@ -26,9 +26,9 @@ flow_sensor_for_pcb();
 //laser_base_t();
 //laser_base_b();
 //laser_paddle();
-//laser_arm();
+laser_arm();
 // generates the path for the cam.
-path_step=5; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
+path_step=2; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 
 //assembly_view(cam_angle=$t*180,explode=0);
 //cam_assembly(explode=10);
@@ -103,12 +103,12 @@ pcb_b=1.6;
 pcb_port_z_offset=8;
 pcb_port_z_spacing=4;
 pcb_port_x_spacing=4;
-tube_d=22;
-tube_l=tube_d*2+(pcb_y-tube_d)+pcb_b*4;
+tube_d=21;
+tube_l=tube_d*2+(pcb_y-tube_d)+pcb_b*5;
 // inner pitot tube
 pitot_r=5/2;
 pitot_t=nozzle_r*2*2;
-port_r=4.25/2;
+port_r=4.5/2;
 
 module flow_sensor_for_pcb() {
 	t=tube_or-tube_ir;
@@ -135,27 +135,28 @@ module flow_sensor_for_pcb() {
 						translate([0,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+24]) rotate([90,0,0]) cylinder(r=bolt_r-clearance/2,h=t*3.75+extra,center=true);
 					}
 				}
-				for (x=[0]) for (z=[0,24]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=bolt_r-clearance/2,h=t*3.75,center=true);
+				for (x=[0]) for (z=[0,24]) translate([x*pcb_port_x_spacing,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=bolt_r-clearance/2,h=t*3.75,center=true);
 				translate([0,tube_or+t+pcb_t/2+pcb_c_t,tube_l-(pcb_y+pcb_b*2)/2]) cube([pcb_x,pcb_t+extra,pcb_y],center=true);
-				for (x=[-1]) for (z=[-1,1]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=port_r,h=t*3.75,center=true);
-				for (x=[1]) for (z=[-1]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=port_r,h=t*3.75,center=true);
-				for (x=[1]) for (z=[1]) translate([x*4,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) {
-					translate([0,t/2,0]) rotate([90,0,0]) cylinder(r=port_r,h=t*2,center=true);
-					translate([tube_or/2,0,0]) scale([1,1,2.5]) rotate([0,90,0]) cylinder(r1=port_r/2,r2=port_r,h=tube_or,center=true);
+				for (x=[-1]) for (z=[-1,1]) translate([x*pcb_port_x_spacing,tube_or+pcb_c_t/2-pcb_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=port_r,h=pcb_c_t*2+t*2+extra,center=true);
+				for (x=[1]) for (z=[-1]) translate([x*pcb_port_x_spacing,tube_or+pcb_c_t/2-pcb_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) rotate([90,0,0]) cylinder(r=port_r,h=pcb_c_t*2+t*2+extra,center=true);
+				for (x=[1]) for (z=[1]) translate([x*pcb_port_x_spacing,tube_or+pcb_c_t-pcb_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+z*pcb_port_z_spacing]) {
+					translate([0,0,t*2]) scale([2.5,1,1]) rotate([0,0,0]) cylinder(r=port_r/2,h=t*pcb_port_x_spacing,center=true);
+					translate([0,t,0]) rotate([90,0,0]) cylinder(r=port_r,h=t*2,center=true);
 				}
+				for (i=[-1,1]) translate([(pcb_port_x_spacing+tube_or/2)*i,tube_or+pcb_c_t,tube_l-pcb_y-pcb_b+pcb_port_z_offset+pcb_port_z_spacing+t*4]) scale([1,0.5,2.5]) rotate([0,90*i,0]) cylinder(r1=port_r/2,r2=port_r,h=tube_or,center=true);
 			}
-			rotate([0,0,20]) translate([0,0,tube_l-pcb_y-pcb_b+pcb_port_z_offset]) {
+			rotate([0,0,21]) translate([0,0,tube_l-pcb_y-pcb_b+pcb_port_z_offset]) {
 				intersection() {
 					union() {
 						for (r=[1,0]) mirror([0,0,r]) translate([0,tube_or,tube_or+pcb_port_z_spacing]) rotate([0,90,0]) difference() {
 							union() {
 								rotate_extrude() translate([tube_or,0]) circle(r=pitot_r+pitot_t,center=true);
-								translate([tube_ir/2+4,(-tube_or-t)/2,0]) cube([tube_ir+4,tube_or+t+pitot_r+pitot_t-pcb_b,pitot_t],center=true);
+								translate([tube_ir/2+pcb_port_x_spacing,(-tube_or-t)/2,0]) cube([tube_ir+pcb_port_x_spacing,tube_or+t+pitot_r+pitot_t-pcb_b,pitot_t],center=true);
 							}
 							rotate_extrude() translate([tube_or,0]) circle(r=pitot_r,center=true);
 						}
 					}
-					translate([0,(tube_or+t-pitot_r-pitot_t-pcb_b)/2,0]) cube([tube_ir,tube_or+t+pitot_r+pitot_t-pcb_b,(tube_ir+4)*2],center=true);
+					translate([0,(tube_or+t-pitot_r-pitot_t-pcb_b)/2,0]) cube([tube_ir,tube_or+t+pitot_r+pitot_t-pcb_b,(tube_ir+pcb_port_z_spacing)*2],center=true);
 				}
 			}
 		}
@@ -230,7 +231,8 @@ module laser_arm_mount() {
 	projection(cut=true) arm_mount();
 }
 module laser_arm() {
-	projection(cut=true) arm_model();
+	arm_model();
+	//projection(cut=true) arm_model();
 }
 module laser_paddle() {
 	projection(cut=true) paddle(laser=1);

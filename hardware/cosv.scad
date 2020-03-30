@@ -4,7 +4,7 @@
 // Project author: Daren Schwenke
 
 // circle complexity.  Turn down for working, up to like 60 for rendering
-$fn=90;
+$fn=30;
 
 // Assembly views, currently broken.
 //assembly_view(cam_angle=$t*180,explode=0);
@@ -22,7 +22,14 @@ $fn=90;
 //bag_mount();
 //bearing_bushing();
 //bearing_washer();
-//flow_sensor_for_pcb();
+projection() translate([0,0,-15.5]) rotate([90,0,0]) intersection() {
+	union() {
+		flow_sensor_for_pcb();
+		cube([10,100,10],center=true);
+	}
+	translate([0,15.55,0]) cube([1000,0.1,1000],center=true);
+}
+//flow_sensor_cover();
 //bldc_motor_standoff();
 
 //laser_callibration_square(w=10);
@@ -130,8 +137,10 @@ oled_x=12+clearance;
 oled_y=39+clearance;
 oled_t=2;
 
-t=tube_or-tube_ir;
-translate([0,-tube_l/2-tube_d/1.5,tube_or+t+pcb_t+pcb_c_t+pcb_cover_t/2+pcb_b]) rotate([-90,0,0]) flow_sensor_cover();
+//t=tube_or-tube_ir;
+//translate([0,-tube_l/2-tube_d/1.5,tube_or+t+pcb_t+pcb_c_t+pcb_cover_t/2+pcb_b]) rotate([-90,0,0]) flow_sensor_cover();
+
+
 module flow_sensor_cover() {
 	t=tube_or-tube_ir;
 	if (1) difference() {

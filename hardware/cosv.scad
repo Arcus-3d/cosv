@@ -4,7 +4,7 @@
 // Project author: Daren Schwenke
 
 // circle complexity.  Turn down for working, up to like 60 for rendering
-$fn=60;
+$fn=90;
 
 // Assembly views, currently broken.
 //assembly_view(cam_angle=$t*180,explode=0);
@@ -15,7 +15,7 @@ $fn=60;
 
 //cam();
 //arm_l();
-paddle();
+//paddle();
 //base_b();
 //base_t();
 //chest_bar();
@@ -29,7 +29,7 @@ if (0) projection() translate([0,0,-15.5]) rotate([90,0,0]) intersection() {
 	}
 	translate([0,15.55,0]) cube([1000,0.1,1000],center=true);
 }
-//flow_sensor_for_pcb();
+flow_sensor_for_pcb();
 //flow_sensor_cover(oled=1);
 //flow_sensor_cover();
 //bldc_motor_standoff();
@@ -182,8 +182,8 @@ module flow_sensor_for_pcb() {
 	difference() {
 		if (1) union() {
 			// bottom taper
-			translate([0,0,tube_d/2+t/4]) cylinder(r2=tube_or+tube_taper,r1=tube_or,h=tube_d-t/2,center=true);
-			translate([0,0,t/4]) cylinder(r1=tube_or-t/4,r2=tube_or,h=t/2,center=true);
+			translate([0,0,tube_d/2]) cylinder(r2=tube_or+tube_taper,r1=tube_or,h=tube_d,center=true);
+			//translate([0,0,t/4]) cylinder(r1=tube_or-t/4,r2=tube_or,h=t/2,center=true);
 			// top
 			hull() {
 				for (z=[0,-pcb_y-pcb_b-pcb_z_offset*2]) translate([0,0,tube_l-t/2+z]) rotate_extrude() translate([tube_or+t-t/2,0]) circle(r=t/2,center=true);

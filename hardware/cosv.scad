@@ -4,7 +4,7 @@
 // Project author: Daren Schwenke
 
 // circle complexity.  Turn down for working, up to like 60 for rendering
-$fn=30;
+$fn=60;
 
 // Assembly views, currently broken.
 //assembly_view(cam_angle=$t*180,explode=0);
@@ -15,7 +15,7 @@ $fn=30;
 
 //cam();
 //arm_l();
-//paddle();
+paddle();
 //base_b();
 //base_t();
 //chest_bar();
@@ -29,7 +29,7 @@ if (0) projection() translate([0,0,-15.5]) rotate([90,0,0]) intersection() {
 	}
 	translate([0,15.55,0]) cube([1000,0.1,1000],center=true);
 }
-flow_sensor_for_pcb();
+//flow_sensor_for_pcb();
 //flow_sensor_cover(oled=1);
 //flow_sensor_cover();
 //bldc_motor_standoff();
@@ -585,7 +585,7 @@ module bag_mount(w=arm_w) {
 	}
 }
 				
-module paddle(laser=1) {
+module paddle(laser=0) {
 	difference() {
 		union() {
 			scale([paddle_scale,paddle_scale,1]) intersection() {

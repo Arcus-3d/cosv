@@ -20,18 +20,14 @@ $fn=90;
 //base_t();
 //chest_bar();
 //bag_mount();
+
 //bearing_bushing();
 //bearing_washer();
-if (0) projection() translate([0,0,-15.5]) rotate([90,0,0]) intersection() {
-	union() {
-		flow_sensor_for_pcb();
-		cube([10,100,10],center=true);
-	}
-	translate([0,15.55,0]) cube([1000,0.1,1000],center=true);
-}
-flow_sensor_for_pcb();
+
+//flow_sensor_for_pcb();
 //flow_sensor_cover(oled=1);
 //flow_sensor_cover();
+
 //bldc_motor_standoff();
 
 //laser_callibration_square(w=10);
@@ -47,14 +43,14 @@ flow_sensor_for_pcb();
 //laser_arm();
 
 // generates the path for the cam.
-path_step=2; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
+path_step=5; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 
 //assembly_view(cam_angle=$t*180,explode=0);
 //cam_assembly(explode=10);
 
-
 clearance=0.4;
 extra=0.02;
+
 // nozzle size for 3D printing.  Generates parts that are exactly a multiple of this width for strength
 nozzle_r=0.4/2;
 
@@ -111,11 +107,13 @@ y_pos=-cam_y_offset-cam_l/2.5;
 
 // volume sensing pitot tube dimensions
 // outer tube.  This is the dia of the mask, generally
-tube_or=22/2-nozzle_r;
+tube_or=22/2;
 tube_taper=nozzle_r;
 tube_ir=tube_or-nozzle_r*2*5;
+// depth of the socket/tube
+tube_d=20;
 
-pcb_t=1.6+3.2+clearance; // OLED is 5.2mm tall.  Recess in lid is 2mm.
+pcb_t=1.6+3.2+clearance; // Board is 1.6, OLED is 5.2mm tall.  Recess in lid is 2mm.
 pcb_c_t=2.4;
 pcb_b=1.6;
 pcb_x=16+clearance;
@@ -127,22 +125,24 @@ pcb_port_x_spacing=4;
 pcb_bolt_spacing=24;
 pcb_cover_t=2.8;
 pcb_cable_t=1.5;
-// depth of the socket/tube
-tube_d=20;
+
 // total length
 tube_l=tube_d*2+(pcb_y-tube_d)+pcb_z_offset+16;
+
 // inner pitot tube
-pitot_r=4.2/2;
+pitot_r=5/2;
 pitot_t=nozzle_r*2*2;
 port_r=5.25/2;
+// oled
 oled_x=12+clearance;
 oled_y=39+clearance;
-oled_t=2;
+oled_pin_h=1;
+oled_t=2+oled_pin_h;
 oled_glass_x=11;
 oled_glass_y=30;
 
-//t=tube_or-tube_ir;
-//translate([0,-tube_l/2-tube_d/1.5,tube_or+t+pcb_t+pcb_c_t+pcb_cover_t/2+pcb_b]) rotate([-90,0,0]) flow_sensor_cover(oled=0);
+t=tube_or-tube_ir;
+translate([0,-tube_l/2-tube_d/1.5,tube_or+t+pcb_t+pcb_c_t+pcb_cover_t/2+pcb_b]) rotate([-90,0,0]) flow_sensor_cover(oled=0);
 
 
 module flow_sensor_cover(oled=0) {
@@ -150,24 +150,30 @@ module flow_sensor_cover(oled=0) {
 	if (1) difference() {
 		union() {
 			hull() for (x=[-1,1]) for (z=[-1,1]) translate([(pcb_x+pcb_b)/2*x,tube_or+t+pcb_t+pcb_c_t+extra/2,tube_l-(pcb_y+pcb_b*2)/2-pcb_z_offset+(pcb_y+pcb_b+pcb_z_offset*2)/2*z]) {
-				rotate([90,0,0]) cylinder(r=pcb_b/2,h=extra,center=true);
-				translate([x*-0.5,pcb_cover_t-pcb_b/2,0]) sphere(r=pcb_b/2,center=true);
+				rotate([90,0,0]) cylinder(r=pcb_b/2,$fn=$fn/2,h=extra,center=true);
+				translate([x*-0.5,pcb_cover_t-pcb_b/2,0]) sphere(r=pcb_b/2,$fn=$fn/2,center=true);
 			}
 			difference() {
-				hull() {
-					translate([0,tube_or+t+pcb_cover_t/2+pcb_t+pcb_c_t,tube_l-pcb_z_offset/2]) translate([0,-pcb_t+t/2,0]) cube([pcb_x/3,pcb_c_t,pcb_z_offset+extra],center=true);
-					translate([0,tube_or+t+pcb_t+pcb_c_t+extra/2,tube_l-pcb_z_offset/2]) cube([pcb_x/3,extra,pcb_z_offset+extra],center=true);
+				#hull() {
+					translate([0,tube_or+t*1.25+pcb_cover_t/2+pcb_t+pcb_c_t,tube_l-pcb_z_offset/2-pcb_b/2]) translate([0,-pcb_t+t/2,0]) cube([pcb_x/3,pcb_c_t,pcb_z_offset+pcb_b+extra],center=true);
+					translate([0,tube_or+t+pcb_t+pcb_c_t+extra/2,tube_l-pcb_z_offset/2-pcb_b/2]) cube([pcb_x/3,extra,pcb_z_offset+pcb_b+extra],center=true);
 				}
 				translate([0,tube_or+t+pcb_cover_t/2+pcb_t+pcb_c_t,tube_l-pcb_z_offset/2]) translate([0,-pcb_t/2-pcb_c_t/2-pcb_cover_t/2,-t/2]) rotate([0,90,0]) cylinder(r=t/1.5,h=pcb_x/3+extra,center=true);
 			}
 			translate([0,tube_or+t+pcb_t+pcb_c_t,tube_l-(pcb_y+pcb_b*2)-pcb_z_offset+pcb_b/2]) hull() {
-				cube([pcb_x,extra,pcb_b*2.5-clearance/3],center=true);
-				rotate([45,0,0]) translate([0,-pcb_b*2,0]) rotate([0,90,0]) cylinder(r=pcb_b/2,h=pcb_x,center=true);
+				cube([pcb_x-clearance,extra,pcb_b*2.5-clearance/3],center=true);
+				rotate([45,0,0]) translate([0,-pcb_b*2,0]) rotate([0,90,0]) cylinder(r=pcb_b/2,h=pcb_x-clearance,center=true);
 			}
-			translate([0,tube_or+t+pcb_t+pcb_c_t,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset]) cube([oled_x+pcb_b*2,oled_t+extra,oled_y+pcb_b*2],center=true);
+			// oled rim
+			translate([0,tube_or+t+pcb_t+pcb_c_t,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset-pcb_b]) cube([oled_x+pcb_b*2,oled_t/2+extra,oled_y+pcb_b*4],center=true);
 		}
-		translate([0,tube_or+t+pcb_t+pcb_c_t+oled_t/2-pcb_b,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset]) cube([oled_x+clearance,oled_t+pcb_b*2+extra,oled_y+clearance],center=true);
+		// oled pocket
+		translate([0,tube_or+t+pcb_t+pcb_c_t-pcb_b+extra/2,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset]) cube([oled_x+clearance,oled_t+pcb_b+extra,oled_y+clearance],center=true);
+		// oled pins
+		translate([0,tube_or+t+pcb_t+pcb_c_t-pcb_b+extra/2+oled_pin_h,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset+oled_y/2-2]) cube([oled_x/1.5+clearance,oled_t+pcb_b+extra,oled_t*1.3],center=true);
+		// oled display opening
 		if (oled) translate([0,tube_or+t+pcb_t+pcb_c_t+oled_t/2-pcb_b,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset]) cube([oled_glass_x,oled_t*2+pcb_b*2+extra,oled_glass_y],center=true);
+		// screw holes
 		for (x=[-1,1]) for (z=[1]) translate([(pcb_x+pcb_b-t*3)/2*x,tube_or+t*2.8+pcb_cover_t+extra/2,tube_l-(pcb_y+pcb_b*2)/2-pcb_z_offset+(pcb_y+pcb_b+pcb_z_offset*2-t*2.5)/2*z]) {
 			rotate([90,0,0]) cylinder(r=3/2,h=pcb_t+pcb_c_t+t,center=true);
 			translate([0,pcb_cover_t,0]) rotate([90,0,0]) cylinder(r1=3/2,r1=3,h=3,center=true);
@@ -182,13 +188,18 @@ module flow_sensor_for_pcb() {
 	difference() {
 		if (1) union() {
 			// bottom taper
-			translate([0,0,tube_d/2]) cylinder(r2=tube_or+tube_taper,r1=tube_or,h=tube_d,center=true);
+			for (r=[0,90]) rotate([0,0,r]) hull() {
+				translate([0,0,tube_d*1.05]) cube([tube_or*2+tube_taper*2,t,extra],center=true);
+				translate([0,0,extra/2]) cube([tube_or*2-clearance/2,t,extra],center=true);
+			}
+			translate([0,0,tube_d/2]) cylinder(r=tube_or,h=tube_d,center=true);
+			// bottom bevel.  SLA printers didn't like this...
 			//translate([0,0,t/4]) cylinder(r1=tube_or-t/4,r2=tube_or,h=t/2,center=true);
 			// top
 			hull() {
-				for (z=[0,-pcb_y-pcb_b-pcb_z_offset*2]) translate([0,0,tube_l-t/2+z]) rotate_extrude() translate([tube_or+t-t/2,0]) circle(r=t/2,center=true);
+				for (z=[0,-pcb_y-pcb_b-pcb_z_offset*2]) translate([0,0,tube_l-t/2+z]) rotate_extrude() translate([tube_or+t-t/2,0]) circle(r=t/2,$fn=$fn/2,center=true);
 				//translate([0,0,tube_l-(pcb_y+pcb_b*2)/2-pcb_z_offset]) cylinder(r=tube_or+t,h=pcb_y+pcb_b*2+pcb_z_offset*2,center=true);
-				for (x=[-1,1]) for (z=[-1,1]) translate([(pcb_x+pcb_b)/2*x,tube_or+t+pcb_t/2+pcb_c_t/2,tube_l-(pcb_y+pcb_b*2)/2-pcb_z_offset+(pcb_y+pcb_b+pcb_z_offset*2)/2*z]) rotate([90,0,0]) cylinder(r=pcb_b/2,h=pcb_t+pcb_c_t,center=true);
+				for (x=[-1,1]) for (z=[-1,1]) translate([(pcb_x+pcb_b)/2*x,tube_or+t+pcb_t/2+pcb_c_t/2,tube_l-(pcb_y+pcb_b*2)/2-pcb_z_offset+(pcb_y+pcb_b+pcb_z_offset*2)/2*z]) rotate([90,0,0]) cylinder(r=pcb_b/2,h=pcb_t+pcb_c_t,$fn=$fn/2,center=true);
 // cube([pcb_x+pcb_b*2,pcb_t+pcb_c_t,pcb_y+pcb_b*2+pcb_z_offset*2],center=true);
 				translate([0,0,tube_l/2]) cylinder(r=tube_or+tube_taper,h=tube_l-tube_d*2,center=true);
 			}
@@ -196,15 +207,30 @@ module flow_sensor_for_pcb() {
 		difference() {
 			if (1) union() {
 				// screw holes
-				for (x=[-1,1]) for (z=[1]) translate([(pcb_x+pcb_b-t*3)/2*x,tube_or+t*3+extra/2,tube_l-(pcb_y+pcb_b*2)/2-pcb_z_offset+(pcb_y+pcb_b+pcb_z_offset*2-t*2.5)/2*z]) rotate([90,0,0]) cylinder(r=3/2-clearance,h=pcb_t+pcb_c_t+t+t,center=true);
+				for (x=[-1,1]) for (z=[1]) translate([(pcb_x+pcb_b-t*3)/2*x,tube_or+t*2.8+pcb_cover_t+extra/2,tube_l-(pcb_y+pcb_b*2)/2-pcb_z_offset+(pcb_y+pcb_b+pcb_z_offset*2-t*2.5)/2*z]) {
+					rotate([90,0,0]) cylinder(r=3/2-clearance,h=pcb_t+pcb_c_t+t,center=true);
+					translate([0,pcb_cover_t,0]) rotate([90,0,0]) cylinder(r1=3/2,r1=3,h=3,center=true);
+				}
 				// led hole/vent
-				translate([0,tube_or+t/2+pcb_t/2+pcb_c_t/2,tube_l-pcb_b*2-t-pcb_z_offset]) scale([1,0.5,1.25]) rotate([0,90,0]) cylinder(r=t,h=pcb_x*2,center=true);
+				translate([0,tube_or+t/2+pcb_t/2,tube_l-pcb_b*2-t*2.5-pcb_z_offset]) {
+					for (r=[0,180]) rotate([r,0,r]) translate([tube_or-t/3,-pcb_t/2,0]) rotate([-6,90,0]) linear_extrude(1) {
+						translate([0,pcb_t]) text(size=3,halign="center",valign="center",text="DO NOT");
+						translate([0,0]) text(size=3,halign="center",valign="center",text="COVER");
+					}
+					scale([1,0.5,1.25]) rotate([0,90,0]) cylinder(r=t,h=pcb_x*2,center=true);
+				}
 				// center cutout
 				translate([0,0,tube_l/2]) cylinder(r=tube_ir,h=tube_l+extra*2,center=true);
 				// top taper lip
 				translate([0,0,tube_l]) cylinder(r1=tube_or,r2=tube_or+t/2,h=t,center=true);
 				// top taper cutout
-				translate([0,0,tube_l-tube_d/2]) cylinder(r2=tube_or,r1=tube_or-tube_taper,h=tube_d+extra,center=true);
+				intersection() {
+					hull() {
+						translate([0,0,tube_l]) cube([tube_or*2+tube_taper*2,tube_or*2+tube_taper*2,extra],center=true);
+						translate([0,0,tube_l-tube_d]) cube([tube_or*2-tube_taper,tube_or*2-tube_taper,extra],center=true);
+					}
+					translate([0,0,tube_l-tube_d/2]) cylinder(r=tube_or+tube_taper,h=tube_d+extra,center=true);
+				}
 				// cover mount cutout
 				translate([0,tube_or+t+pcb_t+pcb_c_t,tube_l-(pcb_y+pcb_b*2)-pcb_z_offset+pcb_b/2]) hull() {
 					cube([pcb_x,extra,pcb_b*2.5],center=true);

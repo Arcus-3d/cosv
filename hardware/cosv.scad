@@ -47,7 +47,7 @@ path_step=15; // turn down when rendering the actual path for a smooth one... up
 
 //laser_callibration_square(w=10); // A square, 10x10mm in case units don't go over with the svg export.
 //laser_arm_mount(); // raised area by arm bearings as a layer
-//laser_bearing_washer(); // washer, if laser cutting it
+laser_bearing_washer(); // washer, if laser cutting it
 //laser_cam(); // cam top/bottom
 //laser_cam_center(); //cam center.  Stronger, but you need to glue it to top/bottom
 //laser_bearing_bushing(); // bushing to make up the difference between bolt_r and bearing_ir
@@ -56,7 +56,7 @@ path_step=15; // turn down when rendering the actual path for a smooth one... up
 //laser_base_b(); // base, bottom plate
 //laser_paddle(); // paddle for arm ends
 //laser_arm(); // The arms (when symetrical).  Make sure to reset arm_w to a larger value that for FFF printing.
-laser_bag_mount();
+//laser_bag_mount();
 
 // Abbreviations
 // r=radius (and sometimes rotation within modules)

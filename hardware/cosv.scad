@@ -23,7 +23,7 @@ path_step=1; // turn down when rendering the actual path for a smooth one... up 
 // Uncomment these to generate them, render, export.
 // for the laser files, export as svg.
 
-//cam(); // cam top/bottom.  Need 2.
+cam(); // cam top/bottom.  Need 2.
 //paddle(); // paddle for the arms.  Need 2
 //base_b(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
 //base_t(); // top plate/electronics mount.  Need 1.
@@ -34,7 +34,7 @@ path_step=1; // turn down when rendering the actual path for a smooth one... up 
 //chest_bar();
 
 // The flow sensors.
-flow_sensor_for_pcb(); // 
+//flow_sensor_for_pcb(); // 
 //flow_sensor_for_pcb_no_pocket(); // 
 //flow_sensor_cover(oled=1);
 //flow_sensor_cover();
@@ -170,17 +170,17 @@ oled_glass_y=30;
 ////// motor selection
 //
 // wiper motor
-//d_shaft=2;
-//motor_tri=1;
-//motor_mount_offset=0;
-//motor_mount_x=-35;
-//motor_mount_y=-46;
-//motor_r=54;
-//motor_bolt_r=6/2+clearance/4-kerf;
-//motor_pilot_r=24/2+clearance-kerf;
-//motor_shaft_r=12/2+clearance/4-kerf;
-//motor_shaft_flat_x=8.1/2;
-//motor_shaft_flat_y=11/2;
+d_shaft=2;
+motor_tri=1;
+motor_mount_offset=0;
+motor_mount_x=-35;
+motor_mount_y=-46;
+motor_r=54;
+motor_bolt_r=6/2+clearance/4-kerf;
+motor_pilot_r=24/2+clearance-kerf;
+motor_shaft_r=12/2+clearance/4-kerf;
+motor_shaft_flat_x=8.1/2;
+motor_shaft_flat_y=11/2;
 
 
 // small worm gear motor
@@ -206,21 +206,21 @@ oled_glass_y=30;
 //motor_r=37/2;
 
 // Nema 23
-d_shaft=1;
-motor_tri=0;
-motor_bolt_r=4/2+clearance/4;
-motor_shaft_r=6.35/2-kerf;
-motor_shaft_r=8/2;
-motor_mount_y=47.1;
-motor_mount_x=47.1;
-motor_mount_offset=47.1/2;
-motor_pilot_r=38.1/2+clearance-kerf;
+//d_shaft=1;
+//motor_tri=0;
+//motor_bolt_r=4/2+clearance/4;
+//motor_shaft_r=6.35/2-kerf;
+//motor_shaft_r=8/2;
+//motor_mount_y=47.1;
+//motor_mount_x=47.1;
+//motor_mount_offset=47.1/2;
+//motor_pilot_r=38.1/2+clearance-kerf;
 
 module laser_bag_mount() {
 	projection(cut=true) bag_mount(t=arm_w*1.5);
 }
 module laser_base_t() {
-	projection(cut=true) base_plate();
+	projection(cut=false) base_t();
 }
 module laser_bearing_washer() {
 	projection(cut=true) bearing_washer();
@@ -232,7 +232,10 @@ module laser_cam_center() {
 	projection(cut=true) cam_center();
 }
 module laser_arm_mount() {
-	projection(cut=true) arm_mount();
+	projection(cut=true) difference() {
+		arm_mount();
+		translate([0,0,-cam_thickness*2]) motor_holes();
+	}
 }
 module laser_arm() {
 	//arm_model();
@@ -246,10 +249,7 @@ module laser_bearing_bushing() {
 	projection(cut=true) bearing_bushing();
 }
 module laser_base_b() {
-	projection(cut=true) difference() {
-		base_plate();
-		motor_holes();
-	}
+	projection(cut=false) base_b();
 }
 module laser_callibration_square(w=10) {
 	projection(cut=true) cube([w,w,w],center=true);
@@ -602,7 +602,7 @@ module base_plate(h=cam_thickness,explode=0) {
 			if (1) translate([0,bvm_r+bearing_or/2+bvm_y_offset+arm_w,h/2]) intersection() {
 				difference() {
 					translate([0,0,0]) cylinder(r=bvm_r+arm_w*3,h=h,$fn=$fn*2,center=true);
-					translate([0,0,0]) cylinder(r=bvm_r,h=h+extra*2,$fn=$fn*2,center=true);
+					translate([0,0,0]) cylinder(r=bvm_r,h=h+extra,$fn=$fn*2,center=true);
 				}
 				hull() {
 					for(r=[-60,60]) rotate([0,0,r]) translate([0,-bvm_r*8,0]) cube([extra,bvm_r*16,h+extra*3],center=true);
@@ -665,7 +665,7 @@ module motor_holes(h=cam_thickness) {
 			}
 			translate([0,-motor_mount_y,h/2]) {
 				cylinder(r=motor_bolt_r,h=h*2+extra,center=true);
-				#translate([0,0,cam_thickness*1.5]) cylinder(r=motor_bolt_r*2,h=h*2+extra,center=true);
+				translate([0,0,cam_thickness*1.5]) cylinder(r=motor_bolt_r*2,h=h*2+extra,center=true);
 			}
 		}
 	} else {

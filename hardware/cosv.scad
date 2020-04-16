@@ -23,7 +23,7 @@ path_step=1; // turn down when rendering the actual path for a smooth one... up 
 // Uncomment these to generate them, render, export.
 // for the laser files, export as svg.
 
-cam(); // cam top/bottom.  Need 2.
+//cam(); // cam top/bottom.  Need 2.
 //paddle(); // paddle for the arms.  Need 2
 //base_b(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
 //base_t(); // top plate/electronics mount.  Need 1.
@@ -57,7 +57,7 @@ cam(); // cam top/bottom.  Need 2.
 //laser_base_b(); // base, bottom plate
 //laser_paddle(); // paddle for arm ends
 //laser_arm(); // The arms (when symetrical).  Make sure to reset arm_w to a larger value that for FFF printing.
-//laser_bag_mount();
+laser_bag_mount();
 
 // Abbreviations
 // r=radius (and sometimes rotation within modules)
@@ -170,17 +170,17 @@ oled_glass_y=30;
 ////// motor selection
 //
 // wiper motor
-d_shaft=2;
-motor_tri=1;
-motor_mount_offset=0;
-motor_mount_x=-35;
-motor_mount_y=-46;
-motor_r=54;
-motor_bolt_r=6/2+clearance/4-kerf;
-motor_pilot_r=24/2+clearance-kerf;
-motor_shaft_r=12/2+clearance/4-kerf;
-motor_shaft_flat_x=8.1/2;
-motor_shaft_flat_y=11/2;
+//d_shaft=2;
+//motor_tri=1;
+//motor_mount_offset=0;
+//motor_mount_x=-35;
+//motor_mount_y=-46;
+//motor_r=54;
+//motor_bolt_r=6/2+clearance/4-kerf;
+//motor_pilot_r=24/2+clearance-kerf;
+//motor_shaft_r=12/2+clearance/4-kerf;
+//motor_shaft_flat_x=8.1/2;
+//motor_shaft_flat_y=11/2;
 
 
 // small worm gear motor
@@ -194,7 +194,7 @@ motor_shaft_flat_y=11/2;
 //motor_bolt_r=3/2+clearance/4-kerf;
 
 // BLDC gear motor
-//d_shaft=0;
+//d_shaft=1;
 //motor_tri=0;
 //motor_shaft_r=6/2-kerf;
 //motor_mount_y=26.75;
@@ -206,15 +206,15 @@ motor_shaft_flat_y=11/2;
 //motor_r=37/2;
 
 // Nema 23
-//d_shaft=1;
-//motor_tri=0;
-//motor_bolt_r=4/2+clearance/4;
-//motor_shaft_r=6.35/2-kerf;
-//motor_shaft_r=8/2;
-//motor_mount_y=47.1;
-//motor_mount_x=47.1;
-//motor_mount_offset=47.1/2;
-//motor_pilot_r=38.1/2+clearance-kerf;
+d_shaft=1;
+motor_tri=0;
+motor_bolt_r=4/2+clearance/4;
+motor_shaft_r=6.35/2-kerf;
+motor_shaft_r=8/2;
+motor_mount_y=47.1;
+motor_mount_x=47.1;
+motor_mount_offset=47.1/2;
+motor_pilot_r=38.1/2+clearance-kerf;
 
 module laser_bag_mount() {
 	projection(cut=true) bag_mount(t=arm_w*1.5);

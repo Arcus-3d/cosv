@@ -24,13 +24,13 @@ path_step=1; // turn down when rendering the actual path for a smooth one... up 
 // for the laser files, export as svg.
 
 //cam(); // cam top/bottom.  Need 2.
-//paddle(bearing_h=9.1); // paddle for the arms.  Need 2
+//paddle(); // paddle for the arms.  Need 2
 //base_b(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
 //base_t(); // top plate/electronics mount.  Need 1.
 //bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
 //bag_mount(); // thin arms to support the bag ends and keep it from wandering. Need 2.
 //arm_l();
-fan_calibration_adapter();
+supply_cover();
 
 //chest_bar();
 
@@ -111,8 +111,7 @@ comp_rot=90;
 arm_w=12*nozzle_r*2;
 
 // paddle internal ribs and top thickness
-paddle_scale_x=2;
-paddle_scale_y=1.5;
+paddle_scale=1.5;
 paddle_t=3*nozzle_r*2;
 paddle_rib_w=3*nozzle_r*2;
 
@@ -131,6 +130,10 @@ cam_pre_rot=-0;
 x_pos=arm_x_offset+cam_l/2.5;
 y_pos=-cam_y_offset-cam_l/2.5;
 
+supply_cover_x=38;
+supply_cover_y=98;
+supply_cover_z=20;
+supply_cover_t=1.6;
 
 // volume sensing pitot tube dimensions
 // outer tube.  This is the dia of the mask, generally
@@ -265,7 +268,7 @@ module laser_bldc_motor_standoff() {
 
 // now a little screwed up since I split the parts into layers
 module cosv_assembly_view(explode=0,cam_angle=0) {
-	if (0) translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,0]) {
+	if (1) translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,0]) {
 	//if (0) {
 		//$fn=32;
 		if (cam_angle < comp_rot) {
@@ -288,37 +291,36 @@ module cosv_assembly_view(explode=0,cam_angle=0) {
 			}
 		}
 	}
-	if (0) translate([0,0,-cam_thickness*2-explode*4]) base_b();
+	if (1) translate([0,0,-cam_thickness*2-explode*4]) base_b();
 	if (0) translate([0,0,-cam_thickness-explode*3]) arm_mount();
 	if (0) translate([0,-cam_y_offset,0]) rotate([0,0,-cam_angle+cam_pre_rot]) cam_assembly_view(explode=0);
 	if (0) translate([0,bvm_y_offset+bearing_or/2,explode*5]) rotate([90,0,90]) translate([0,0,-bearing_h/2]) bag_mount();
 	if (0) mirror([0,0,1]) translate([0,bvm_y_offset+bearing_or/2,-explode*5]) rotate([90,0,90]) translate([0,0,-bearing_h/2]) bag_mount();
-	if (1) translate([arm_x_offset,0,cam_thickness]) {
+	if (0) translate([arm_x_offset,0,cam_thickness]) {
 		translate([0,0,bearing_h/2]) bearing();
 		if (cam_angle < comp_rot) {
 			rotate([0,0,cam_angle/(comp_rot/arm_rot)]) {
 				arm_r();
-				//translate([arm_x_offset-bvm_r-arm_w*3,bvm_r+bvm_y_offset+bearing_or/2+arm_w*2,bearing_h/2]) {
-				if (1) translate([-arm_x_offset+bvm_r+arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2.5,0,0]) paddle();
+				if (1) translate([-arm_x_offset+bvm_r,bvm_r+bvm_y_offset+bearing_or,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		} else {
 			rotate([0,0,comp_rot/(comp_rot/arm_rot)*2-cam_angle/(comp_rot/arm_rot)]) {
 				arm_r();
-				if (1) translate([-arm_x_offset+bvm_r+arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2.5,0,0]) paddle();
+				if (1) translate([-arm_x_offset+bvm_r,bvm_r+bvm_y_offset+bearing_or,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		}
 	}
-	if (1) translate([-arm_x_offset,0,cam_thickness]) {
+	if (0) translate([-arm_x_offset,0,cam_thickness]) {
 		translate([0,0,bearing_h/2+clearance]) bearing();
 		if (cam_angle < comp_rot) {
 			rotate([0,0,-cam_angle/(comp_rot/arm_rot)]) {
 				arm_l();
-				if (1) translate([arm_x_offset-bvm_r-arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2.5,0,0]) paddle();
+				if (1) translate([arm_x_offset-bvm_r,bvm_r+bvm_y_offset+bearing_or,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		} else {
 			rotate([0,0,-comp_rot/(comp_rot/arm_rot)*2+cam_angle/(comp_rot/arm_rot)]) {
 				arm_l();
-				if (1) translate([arm_x_offset-bvm_r-arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2.5,0,0]) paddle();
+				if (1) translate([arm_x_offset-bvm_r,bvm_r+bvm_y_offset+bearing_or,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		}
 	}
@@ -342,6 +344,19 @@ module flow_sensor_cover(oled=0) {
 	translate([0,-tube_l/2-tube_d/1.5,tube_or+t+pcb_t+pcb_c_t+pcb_cover_t/2+pcb_b]) rotate([-90,0,0]) flow_sensor_cover_model(oled=oled);
 }
 
+module supply_cover() {
+	difference() {
+		hull() {
+			translate([0,0,supply_cover_z/2]) cube([supply_cover_x+supply_cover_t*2,supply_cover_y+supply_cover_t*2,supply_cover_z],center=true);
+			translate([0,supply_cover_y/2+supply_cover_t+arm_bolt_r+clearance/2,supply_cover_z/2]) rotate([0,90,0]) cylinder(r=arm_bolt_r*2,h=supply_cover_x+supply_cover_t*2,center=true);
+			translate([0,arm_bolt_r+supply_cover_t+clearance/2,supply_cover_z/4]) cube([supply_cover_x+supply_cover_t*2,supply_cover_y+supply_cover_t*2,supply_cover_z/2],center=true);
+			
+		}
+		translate([0,0,supply_cover_z/2+supply_cover_t]) cube([supply_cover_x,supply_cover_y,supply_cover_z],center=true);
+		translate([0,supply_cover_y/2+supply_cover_t+arm_bolt_r+clearance/2,supply_cover_z/2]) rotate([0,90,0]) cylinder(r=arm_bolt_r+clearance/2,h=supply_cover_x+supply_cover_t*2+extra,center=true);
+		for (y=[-1,1]) translate([0,supply_cover_y*0.25*y,supply_cover_t/2]) cylinder(r=5.2/2,h=supply_cover_t*4,center=true);
+	}
+}
 module flow_sensor_cover_model(oled=0) {
 	t=tube_or-tube_ir;
 	if (1) difference() {
@@ -387,7 +402,7 @@ module flow_sensor_for_pcb_no_pocket() {
 		flow_sensor_for_pcb();
 	}
 }
-module flow_sensor_for_pcb(sla=0) {
+module flow_sensor_for_pcb() {
 	t=tube_or-tube_ir;
 	difference() {
 		if (1) union() {
@@ -511,7 +526,7 @@ module flow_sensor_for_pcb(sla=0) {
 			#translate([0,tube_or+t+pcb_t/2+pcb_c_t,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset]) cube([oled_x,pcb_t+extra,oled_y],center=true);
 		}
 		// SLA vent hole.  Without this, sometimes the tube ends up SOLID.
-		if (sla) for (r=[0:90:365]) rotate([0,0,r]) translate([0,0,t]) rotate([0,90,0]) cylinder(r=t/2,h=tube_or*2+t*4,center=true);
+		for (r=[0:90:365]) rotate([0,0,r]) translate([0,0,t]) rotate([0,90,0]) cylinder(r=t/2,h=tube_or*2+t*4,center=true);
 	}
 }
 module flow_sensor_test() {
@@ -695,43 +710,14 @@ module base_holes(h=cam_thickness) {
 	for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=arm_bolt_r,h=h+extra,center=true);
 	translate([0,bvm_y_offset,h/2]) cube([bearing_h,bearing_h*1.5,h+extra],center=true);
 }
-module fan_calibration_adapter(x=19.5,y=15.25,or=tube_or,h1=tube_d,h2=tube_d/2,t=tube_or-tube_ir) {
-	difference() {
-		union() {
-			translate([0,0,h1/2]) cylinder(r=or,h=h1,center=true);
-			for (r=[0,90]) rotate([0,0,r]) hull() {
-				for (x=[-1,1]) translate([(or-or/2)*x,0,extra/2]) cylinder(r=or/2,h=extra,center=true);
-				for (x=[-1,1]) translate([(or-or/2+nozzle_r)*x,0,h1]) cylinder(r=or/2,h=extra,center=true);
-			}
-			hull() {
-				translate([0,0,h1+h1/2-nozzle_r*8]) cylinder(r=or,h=h1,center=true);
-				translate([0,0,h1+h1/2]) cylinder(r=or+nozzle_r,h=h1,center=true);
-				translate([0,0,h1*2+h2/2]) cube([x+t*2,y+t*2,h2],center=true);
-			}
-		}
-		difference() {
-			union() {
-				translate([0,0,h1/2]) cylinder(r=or-t,h=h1+extra,center=true);
-				hull() {
-					translate([0,0,h1+h1/2]) cylinder(r=or-t,h=h1+extra,center=true);
-					translate([0,0,h1*2+h2/2]) cube([x,y,h2+extra],center=true);
-				}
-			}
-			//for (x=[0:or/3:or*2]) translate([-or+x-or/6,0,h1*1.5/2]) cube([nozzle_r*4,tube_or*2,h1*1.5],center=true);
-			//for (y=[0:or/3:or*2]) translate([0,-or+y-or/6,h1*1.5/2]) cube([tube_or*2,nozzle_r*4,h1*1.5],center=true);
-		}
-		//translate([0,0,h1/1.5/2]) cylinder(r2=0,r1=or-t,h=h1/1.5+extra,center=true);
-	}
-}
-		
 
-module bag_mount(l=bvm_l/2-cam_h,w=arm_w*1.25) {
+module bag_mount(w=arm_w*1.5) {
 	union() {
-		translate([bvm_r+bearing_h/2,0,bearing_h/2]) scale([1,l/bvm_r,1]) {
+		translate([bvm_r+bearing_h/2,0,bearing_h/2]) scale([1,bvm_l/1.7/bvm_r,1]) {
 			union() {
 				intersection() {
 					difference() {
-						translate([-arm_w,1.2,0]) cylinder(r=bvm_r+w,h=bearing_h,$fn=$fn*2,center=true);
+						translate([0,1.2,0]) cylinder(r=bvm_r+w,h=bearing_h,$fn=$fn*2,center=true);
 						cylinder(r=bvm_r,h=bearing_h+extra*2,$fn=$fn*2,center=true);
 					}
 					intersection() {
@@ -745,36 +731,35 @@ module bag_mount(l=bvm_l/2-cam_h,w=arm_w*1.25) {
 			}
 		}
 		hull() {
-			translate([-bearing_h/1.9/2-arm_w,bearing_h,bearing_h/2]) cube([bearing_h*1.5-clearance/2,bearing_h*2,bearing_h+extra],center=true);
-			translate([bearing_h/4-l/35,-l/2.75,bearing_h/2]) cube([bvm_c/4,bearing_h*1.5-clearance/2,bearing_h+extra],center=true);
+			translate([-bearing_h/1.9/2-arm_w,3,bearing_h/2]) cube([bearing_h*1.5-clearance,bearing_h*1.5-clearance/2,bearing_h+extra],center=true);
+			translate([bearing_h/3,-25,bearing_h/2]) cube([clearance/2,bearing_h*1.5-clearance/2,bearing_h+extra],center=true);
 		}
 	}
 }
 				
-module paddle(laser=1,bearing_h=bearing_h) {
+module paddle(laser=0,bearing_h=bearing_h) {
 	difference() {
 		union() {
-			scale([paddle_scale_x,paddle_scale_y,1]) intersection() {
+			scale([paddle_scale,paddle_scale,1]) intersection() {
 				translate([0,0,-bvm_r/2+bvm_r/6]) sphere(r=bvm_r/2,center=true);
 				translate([0,0,bvm_r/2]) cylinder(r=bvm_r/3,h=bvm_r,center=true);
 			}
 		}
 		if (! laser) union() {
 			difference() {
-				scale([paddle_scale_x,paddle_scale_y,1]) intersection() {
+				scale([paddle_scale,paddle_scale,1]) intersection() {
 					translate([0,0,-bvm_r/2+bvm_r/6-paddle_t-extra]) sphere(r=bvm_r/2,center=true);
-					translate([0,0,bvm_r/2-extra+nozzle_r]) cylinder(r=bvm_r/3-paddle_t,h=bvm_r-nozzle_r,center=true);
+					translate([0,0,bvm_r/2-extra]) cylinder(r=bvm_r/3-paddle_t,h=bvm_r,center=true);
 				}
-				for (x=[0:bvm_r/8:bvm_r*2]) translate([-bvm_r+x,0,0]) cube([paddle_rib_w,bvm_r,bvm_r*2],center=true);
-				for (y=[0:bvm_r/8:bvm_r*2]) translate([0,-bvm_r+y,0]) cube([bvm_r*2,paddle_rib_w,bvm_r*2],center=true);
+				for (x=[0:bvm_r/8:bvm_r]) translate([-bvm_r/2+x,0,0]) cube([paddle_rib_w,bvm_r,bvm_r],center=true);
+				for (y=[0:bvm_r/8:bvm_r]) translate([0,-bvm_r/2+y,0]) cube([bvm_r,paddle_rib_w,bvm_r],center=true);
 				hull() {
-					for (z=[0,bvm_c*1.5]) translate([0,0,z]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/2+paddle_rib_w*2,h=bearing_h+clearance/4+paddle_rib_w*5,center=true);
+					for (z=[0,bvm_c*1.5]) translate([0,0,z]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/2+paddle_rib_w,h=bearing_h+clearance/4+paddle_rib_w*2,center=true);
 				}
 			}
 		}
 		if (1) hull() {
-			rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/4,h=bearing_h+clearance/2,center=true);
-			translate([0,0,bvm_c]) rotate([0,90,0]) cylinder(r=bvm_c*1.5,h=bearing_h,center=true);
+			for (z=[0,bvm_c*1.5]) translate([0,0,z]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/2,h=bearing_h+clearance/4,center=true);
 		}
 	}
 }
@@ -817,45 +802,24 @@ module arm_model() {
 	difference() {
 		union() {
 			// end_mounts
-			#if (1) hull()  translate([arm_x_offset-bvm_r-arm_w*3,bvm_r+bvm_y_offset+bearing_or/2+arm_w*2,bearing_h/2]) {
+			if (1) hull()  translate([arm_x_offset-bvm_r-arm_w*2,bvm_r+bvm_y_offset+bearing_or/2,bearing_h/2]) {
 				cylinder(r=bvm_c*1.5,h=bearing_h,center=true);
-				rotate([0,0,arm_rot/2.5]) translate([arm_w*1.75,0,0]) cylinder(r=bvm_c*1.5,h=bearing_h,center=true);
-			}
-			if (1) hull()  translate([arm_x_offset-bvm_r-arm_w*3,bvm_r+bvm_y_offset+bearing_or/2+arm_w*2,bearing_h/2]) {
-				cylinder(r=bvm_c*1.5,h=bearing_h,center=true);
-				rotate([0,0,arm_rot/2.5]) for (y=[1,-1.5]) translate([bvm_c*0.25,arm_w*y,0]) cylinder(r=bvm_c*1.25,h=bearing_h,center=true);
-			}
-			if (1) hull()  translate([arm_x_offset-bvm_r-arm_w*3,bvm_r+bearing_or/2+bvm_y_offset,bearing_h/2]) {
-				translate([0,arm_w*2,0]) cylinder(r=bvm_c*1.5,h=bearing_h,center=true);
-				cube([arm_w*2,extra,bearing_h],center=true);
-				translate([bvm_r+arm_w*4,-arm_w*2,0]) intersection() {
-					difference() {
-						translate([0,0,0]) cylinder(r=bvm_r+arm_w*5,h=bearing_h,$fn=$fn*2,center=true);
-						translate([0,arm_w*3,0]) cylinder(r=bvm_r+arm_w*2.75,h=bearing_h+extra*2,$fn=$fn*2,center=true);
-					}
-					#intersection() {
-						translate([-bvm_r,-bvm_r,0]) cube([bvm_r*2,bvm_r*2,bearing_h+extra*3],center=true);
-						rotate([0,0,-89.99]) translate([-bvm_r,-bvm_r,0]) cube([bvm_r*2,bvm_r*2,bearing_h+extra*4],center=true);
-					}
-				}
+				rotate([0,0,arm_rot/2.5]) translate([arm_w*2,0,0]) cylinder(r=bvm_c*1.5,h=bearing_h,center=true);
 			}
 			// end curve
-			if (1) translate([arm_x_offset+arm_w,bvm_r+bearing_or/2+bvm_y_offset-arm_w*2,bearing_h/2]) intersection() {
+			if (1) translate([arm_x_offset+arm_w,bvm_r+bearing_or/2+bvm_y_offset,bearing_h/2]) intersection() {
 				difference() {
-					translate([0,0,0]) cylinder(r=bvm_r+arm_w*5,h=bearing_h,$fn=$fn*2,center=true);
-					translate([-arm_w*1.25,arm_w*3,0]) cylinder(r=bvm_r+arm_w*1.5,h=bearing_h+extra*2,$fn=$fn*2,center=true);
+					translate([0,-arm_w,0]) cylinder(r=bvm_r+arm_w*4,h=bearing_h,$fn=$fn*2,center=true);
+					translate([0,arm_w,0]) cylinder(r=bvm_r+arm_w*2.2,h=bearing_h+extra*2,$fn=$fn*2,center=true);
 				}
 				intersection() {
 					translate([-bvm_r,-bvm_r,0]) cube([bvm_r*2,bvm_r*2,bearing_h+extra*3],center=true);
-					rotate([0,0,-30]) translate([-bvm_r,-bvm_r,0]) cube([bvm_r*2,bvm_r*2,bearing_h+extra*4],center=true);
+					rotate([0,0,-15]) translate([-bvm_r,-bvm_r,0]) cube([bvm_r*2,bvm_r*2,bearing_h+extra*4],center=true);
 				}
 			}
 			// cam drive and bearing mount
 			if (1) hull() {
-				translate([arm_x_offset+arm_w,bvm_r+bearing_or/2+bvm_y_offset-arm_w*2,bearing_h/2]) rotate([0,0,-60]) {
-					translate([0,-bvm_r-arm_w*4.95,0]) cylinder(r=extra,h=bearing_h,center=true);
-					translate([0,-bvm_r-arm_w*2,0]) cylinder(r=extra,h=bearing_h,center=true);
-				}
+				translate([arm_x_offset+arm_w,bvm_r+bearing_or+bvm_y_offset-arm_w,bearing_h/2]) rotate([0,0,-60]) translate([0,-bvm_r-arm_w*4.5,0]) cylinder(r=extra,h=bearing_h,center=true);
 				translate([0,0,bearing_h/2]) cylinder(r=arm_x_offset-clearance,h=bearing_h,center=true);
 				translate([arm_x_offset-bearing_or,-cam_y_offset,bearing_h/2]) {
 					translate([bearing_or*.75/2-clearance,0,0])  rotate([0,0,cam_pre_rot]) cube([bearing_or*1.25,cam_l+arm_w*2,bearing_h],center=true);

@@ -33,15 +33,18 @@ class DisplayButton(BoxLayout,Button):
     def __init__(self,*args,**kwargs):
         super(DisplayButton,self).__init__(*args,**kwargs)
         self.orientation="vertical"
-        self.padding=(5,5)
+        self.padding=(0,0)
+        self.spacing=0
         self.bold=True
         self.font_size='20sp'
+        self.halign='center'
         labelTop = Label(halign='center',valign='top',text=self.text_top,size=self.texture_size,font_size="13sp")
         self.add_widget(labelTop)
         labelMiddle = Label(text=" ",size=self.texture_size, bold=True,font_size='20sp')
         self.add_widget(labelMiddle)
-        labelBottom = Label(halign='center',valign='bottom',text=self.text_bottom,size=self.texture_size,font_size="13sp")
-        self.add_widget(labelBottom)
+        if (self.text_bottom):
+            labelBottom = Label(halign='center',valign='bottom',text=self.text_bottom,size=self.texture_size,font_size="13sp")
+            self.add_widget(labelBottom)
 
 
 class COSVTouchApp(App):
@@ -49,32 +52,42 @@ class COSVTouchApp(App):
         self.availablePorts = listSerialPorts()
         self.connection = serial.Serial
         self.counter = 1
-        self.runState = False 
+        self.runState = False
+        self.enableCO2 = False
         if len(self.availablePorts) == 0:
             self.availablePorts.append("----")
         self.layoutMain = BoxLayout(orientation='horizontal',spacing=0, padding=0)
         
-        self.layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0,size_hint=(1,0.8))
+        self.layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
         self.layoutGraph = BoxLayout(orientation='vertical', spacing=0, padding=(5,0))
-        self.graphPaw = Graph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=5, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=20)
-        self.graphFlow = Graph(ylabel='Flow l/min', draw_border=True, y_ticks_major=20, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-60, ymax=60)
-        self.graphCO2 = Graph(ylabel='CO2 mmHg', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40,size_hint_y=0)
+        self.graphPaw = Graph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=5, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=20)
+        self.graphFlow = Graph(ylabel='Flow L/min', draw_border=True, y_ticks_major=20, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-60, ymax=60)
+        self.graphVt = Graph(ylabel='Vt mL', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40)
+        if (self.enableCO2):
+            self.graphCO2 = Graph(ylabel='CO2 mmHg', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40,size_hint_y=0,)
         self.plot = []
-        self.plot.append(LinePlot(color=[1, 0, 0, 1],line_width=1))
-        self.plot.append(LinePlot(color=[0, 1, 0, 1],line_width=1))
-        self.plot.append(LinePlot(color=[0, 1, 0, 1],line_width=1))
+        self.plot.append(LinePlot(color=[1, 0, 1, 1],line_width=1))
+        self.plot.append(LinePlot(color=[0, 1, 1, 1],line_width=1))
+        self.plot.append(LinePlot(color=[1, 1, 0, 1],line_width=1))
+        if (self.enableCO2): 
+            self.plot.append(LinePlot(color=[0.5, 0.5, 1, 1],line_width=1))
   
         self.reset_plots()
   
         self.graphPaw.add_plot(self.plot[0])
         self.graphFlow.add_plot(self.plot[1])
-        self.graphCO2.add_plot(self.plot[2])
+        self.graphVt.add_plot(self.plot[2])
+        if (self.enableCO2):
+            self.graphCO2.add_plot(self.plot[3])
 
         self.layoutGraph.add_widget(self.graphPaw)
         self.layoutGraph.add_widget(self.graphFlow)
-        self.layoutGraph.add_widget(self.graphCO2)
-
+        self.layoutGraph.add_widget(self.graphVt)
+        if (self.enableCO2):
+            self.layoutGraph.add_widget(self.graphCO2)
+        #self.graphCO2.height='0dp'
+        #self.graphCO2.size_hint_y=0
         self.layoutLeft.add_widget(self.layoutGraph)
         
         # Bottom Controls
@@ -102,7 +115,7 @@ class COSVTouchApp(App):
         
         # Right Controls
         self.layoutControlRight = BoxLayout(orientation='vertical', spacing=10, padding=(10,5),size_hint=(0.2,1))
-        self.buttonAlarmPause = DisplayButton(text="Alarm\nSilence",background_color=(1,1,0,1));
+        self.buttonAlarmPause = DisplayButton(text="Alarm\nSilence",background_color=(1,1,0.3,1));
         self.layoutControlRight.add_widget(self.buttonAlarmPause);
         self.buttonAlarmSetup = DisplayButton(text="Alarm\nSetup");
         self.layoutControlRight.add_widget(self.buttonAlarmSetup);
@@ -177,6 +190,7 @@ class COSVTouchApp(App):
         if self.runState == False:
             try:
                 self.connection = serial.Serial(self.dlPort.text, self.dlBaudrate.text)
+                self.reset_plots()
                 Clock.schedule_interval(self.get_data, 1 / 100.)
                 self.counter = 1
                 self.buttonRun.text="Run"      
@@ -188,7 +202,6 @@ class COSVTouchApp(App):
             try:
                 self.connection.close()
                 Clock.unschedule(self.get_data)
-                self.reset_plots()
                 self.buttonRun.text="Stop"      
                 self.buttonRun.background_color=(1,0.3,0.3,1)      
                 self.runState = False
@@ -208,9 +221,11 @@ class COSVTouchApp(App):
   
             self.counter = 599
   
-        self.plot[0].points.append((self.counter, sin(self.counter/20.)*50. ))
-        self.plot[1].points.append((self.counter, sin(self.counter/30.)*50. ))
-        self.plot[2].points.append((self.counter, sin(self.counter/40.)*50. ))
+        self.plot[0].points.append((self.counter, sin(self.counter/50.)*50. ))
+        self.plot[1].points.append((self.counter, sin(self.counter/50.)*50. ))
+        self.plot[2].points.append((self.counter, sin(self.counter/50.)*50. ))
+        if (self.enableCO2):
+            self.plot[3].points.append((self.counter, sin(self.counter/50.)*50. ))
         self.counter += 1      
   
 class ErrorPopup(Popup):

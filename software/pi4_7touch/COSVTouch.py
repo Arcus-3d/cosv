@@ -35,7 +35,7 @@ class DisplayButton(BoxLayout,Button):
     def updateValue(self,*args):
         self.text=str(self.value)
     def pressEvent(self,*args):
-        pass
+        return True
     def __init__(self,**kwargs):
         self.name=kwargs.pop('name',None)
         self.text_top=kwargs.pop('text_top',' ')
@@ -191,7 +191,7 @@ class COSVTouchApp(App):
         
         # Bottom Controls
         layoutControlBottom = BoxLayout(orientation='horizontal', spacing=10, padding=(5,10),size_hint=(1,0.2))
-        buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV-Assist'),text_bottom=" ")
+        buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV'),text_bottom=" ")
         layoutControlBottom.add_widget(buttonMode);
         
         buttonTidalVolume = SliderButton(name='tidalv',text_top="TidalV",min=200,max=800,value=500,text_bottom="ml");

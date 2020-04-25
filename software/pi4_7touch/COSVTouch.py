@@ -99,7 +99,7 @@ class SliderButton(PopupButton):
         super(SliderButton,self).pressEvent(self,*args)
         self.slider.bind(on_touch_move=self.updatePopup)
         self.updatePopup()
-        Clock.schedule_once(self.bindTouchUp,1/10)
+        Clock.schedule_once(self.bindTouchUp,0.5)
 
 class SelectButton(PopupButton):
     def __init__(self,**kwargs):

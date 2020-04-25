@@ -82,24 +82,24 @@ class SliderButton(PopupButton):
         super(SliderButton,self).__init__(**kwargs)
         self.slider=Slider(min=self.min,value=self.value,max=self.max,step=self.step,cursor_width='32sp',orientation=self.popup_orientation,size_hint=(1,1),size=('25sp','100sp'))
         self.popupBox.add_widget(self.slider)
-        self.popupBox.title=str(self.value)
+        #self.popupBox.title=str(self.value)
     def bindTouchUp(self,*args):
         self.slider.bind(on_touch_up=self.updateValue)
     def updateValue(self,*args):
         #self.popup.title=str(self.text_top) + str(':  ') + str(self.slider.value)
-        self.value=self.slider.value
+        self.value=int(self.slider.value)
         self.slider.unbind(on_touch_up=self.updateValue)
         self.slider.unbind(on_touch_move=self.updatePopup)
         super(SliderButton,self).updateValue(self,*args)
         
     def updatePopup(self,*args):
         self.popup.title=str(self.text_top) + str(' : ') + str(self.slider.value)
+        Clock.schedule_once(self.bindTouchUp,0.5)
     def pressEvent(self,*args):
         self.slider.value=self.value
         super(SliderButton,self).pressEvent(self,*args)
         self.slider.bind(on_touch_move=self.updatePopup)
         self.updatePopup()
-        Clock.schedule_once(self.bindTouchUp,0.5)
 
 class SelectButton(PopupButton):
     def __init__(self,**kwargs):

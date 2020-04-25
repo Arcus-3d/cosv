@@ -1,12 +1,15 @@
 import kivy
 kivy.require('1.8.0')
   
-from kivy.app import App
 import serial
 from serial.tools import list_ports
+from math import sin
+from itertools import cycle
 
+from kivy.app import App
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.uix.spinner import Spinner
+from kivy.uix.slider import Slider
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label 
 from kivy.uix.switch import Switch 
@@ -15,9 +18,12 @@ from kivy.uix.popup import Popup
 from kivy.uix.button import Button
 from kivy.uix.behaviors import ButtonBehavior
 from kivy.clock import Clock
-from math import sin
-  
+from kivy.core.window import Window
 from kivy.garden.graph import Graph, MeshLinePlot, LinePlot
+from kivy.config import Config
+#Config.set('graphics','show_cursor','1')
+#Config.write()
+#quit()  
 def listSerialPorts():
     ports = list_ports.comports()
     portList = list()
@@ -26,46 +32,139 @@ def listSerialPorts():
     return portList
 
 class DisplayButton(BoxLayout,Button):
-    text_top = StringProperty(' ')
-    text_middle = StringProperty(' ')
-    text_bottom = StringProperty(' ')
-    obj_state = ObjectProperty(True)
-    def __init__(self,*args,**kwargs):
-        super(DisplayButton,self).__init__(*args,**kwargs)
-        self.orientation="vertical"
-        self.padding=(0,0)
+    def updateValue(self,*args):
+        self.text=str(self.value)
+    def pressEvent(self,*args):
+        pass
+    def __init__(self,**kwargs):
+        self.name=kwargs.pop('name',None)
+        self.text_top=kwargs.pop('text_top',' ')
+        self.value=kwargs.pop('value',0)
+        self.text_bottom=kwargs.pop('text_bottom',' ')
+        super(DisplayButton,self).__init__(**kwargs)
+        self.text=str(self.value)
         self.spacing=0
         self.bold=True
         self.font_size='20sp'
         self.halign='center'
-        labelTop = Label(halign='center',valign='top',text=self.text_top,size=self.texture_size,font_size="13sp")
+        self.orientation='vertical'
+        labelTop = Label(halign='center',valign='top',text=self.text_top,font_size="13sp")
         self.add_widget(labelTop)
-        labelMiddle = Label(text=" ",size=self.texture_size, bold=True,font_size='20sp')
+        labelMiddle = Label(text=" ",bold=True,font_size='20sp')
         self.add_widget(labelMiddle)
-        if (self.text_bottom):
-            labelBottom = Label(halign='center',valign='bottom',text=self.text_bottom,size=self.texture_size,font_size="13sp")
-            self.add_widget(labelBottom)
+        labelBottom = Label(halign='center',valign='bottom',text=self.text_bottom,font_size="13sp")
+        self.add_widget(labelBottom)
+        self.bind(on_press=self.pressEvent)
+        #self.bind(value=self.updateValue)
 
+class PopupButton(DisplayButton):
+    def __init__(self,**kwargs):
+        self.popup_orientation=kwargs.pop('orientation','vertical')
+        super(PopupButton,self).__init__(**kwargs)
+        self.popupBox=BoxLayout(orientation=self.popup_orientation)
+        size_hint=(0.2,0.7)
+        if (self.popup_orientation == 'horizontal'): size_hint=(0.7,0.2)
+        self.popup=Popup(title=self.text_top,content=self.popupBox,title_size='20sp',title_align='center',size_hint=size_hint)
+    def updateValue(self,*args):
+        self.popup.dismiss()
+        super(PopupButton,self).updateValue(self,*args)
+    def pressEvent(self,*args):
+        self.popup.pos_hint={'center_x':(self.pos[0]+self.width/2)/Window.width,'bottom_y':(self.pos[1]+self.height)/Window.height}
+        self.popup.open()
+        super(PopupButton,self).pressEvent(self,*args)
 
+class SliderButton(PopupButton):
+    def __init__(self,**kwargs):
+        self.min=kwargs.pop('min',0)
+        self.max=kwargs.pop('max',100)
+        self.step=kwargs.pop('step',1)
+        self.sliderBind=False
+        super(SliderButton,self).__init__(**kwargs)
+        self.slider=Slider(min=self.min,value=self.value,max=self.max,step=self.step,cursor_width='32sp',orientation=self.popup_orientation,size_hint=(1,1),size=('25sp','100sp'))
+        self.popupBox.add_widget(self.slider)
+        self.popupBox.title=str(self.value)
+    def bindTouchUp(self,*args):
+        self.slider.bind(on_touch_up=self.updateValue)
+    def updateValue(self,*args):
+        #self.popup.title=str(self.text_top) + str(':  ') + str(self.slider.value)
+        self.value=self.slider.value
+        self.slider.unbind(on_touch_up=self.updateValue)
+        self.slider.unbind(on_touch_move=self.updatePopup)
+        super(SliderButton,self).updateValue(self,*args)
+        
+    def updatePopup(self,*args):
+        self.popup.title=str(self.text_top) + str(' : ') + str(self.slider.value)
+    def pressEvent(self,*args):
+        self.slider.value=self.value
+        super(SliderButton,self).pressEvent(self,*args)
+        self.slider.bind(on_touch_move=self.updatePopup)
+        self.updatePopup()
+        Clock.schedule_once(self.bindTouchUp,1/10)
+
+class SelectButton(PopupButton):
+    def __init__(self,**kwargs):
+        self.values=kwargs.pop('values',('------'))
+        super(SelectButton,self).__init__(**kwargs)
+        for v in self.values:
+            button = Button(text=v,size=('100sp','50sp'), on_press=lambda button:self.updateValue(button.text))
+            self.popupBox.add_widget(button)
+    def updateValue(self,value):
+        self.value=value
+        super(SelectButton,self).updateValue(self,value)
+    def stopUpdate(self,value):
+        return False
+    def pressEvent(self,value):
+        self.popup.pos_hint={'center_x':(self.pos[0]+self.width/2)/Window.width,'bottom_y':(self.pos[1]+self.height)/Window.height}
+        self.popup.open()
+
+class RotaryButton(DisplayButton):
+    def __init__(self,**kwargs):
+        self.value_colors=kwargs.pop('value_colors',{'default':(1,1,1,1)})
+        self.values=kwargs.pop('values',('-----'))
+        self.value_list=cycle(self.values)
+        super(RotaryButton,self).__init__(**kwargs)
+        if (self.value in self.values):
+            for v in self.value_list:
+                if (v == self.value): break
+        if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
+    def pressEvent(self,*args):
+        super(RotaryButton,self).pressEvent(self,args)
+        self.value=next(self.value_list)
+        self.text =str(self.value)
+        if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
+class ScrollGraph(Graph):
+    pass
 class COSVTouchApp(App):
+    def build_config(self,config):
+        config.setdefaults('state', {
+            'running'   : 0,
+            'mode'      : 'PCV-VG',
+            'tidalv'    : 500,
+            'rate'      : 20,
+            'ie'        : '1:2',
+            'pressure'  : 20,
+            'pmax'      : 50,
+            'peep'      : 0,
+        })
+        config.setdefaults('modes', {
+            'PCV-VG': 'Pressure Controlled Ventilation'
+        })
     def build(self): 
-        self.availablePorts = listSerialPorts()
-        self.connection = serial.Serial
+        availablePorts = listSerialPorts()
+        self.connection = serial.Serial(availablePorts[0], 115200)
         self.counter = 1
         self.runState = False
         self.enableCO2 = False
-        if len(self.availablePorts) == 0:
-            self.availablePorts.append("----")
-        self.layoutMain = BoxLayout(orientation='horizontal',spacing=0, padding=0)
+        layoutMain = BoxLayout(orientation='horizontal',spacing=0, padding=0)
         
-        self.layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
+        layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
-        self.layoutGraph = BoxLayout(orientation='vertical', spacing=0, padding=(5,0))
-        self.graphPaw = Graph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=5, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=20)
-        self.graphFlow = Graph(ylabel='Flow L/min', draw_border=True, y_ticks_major=20, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-60, ymax=60)
-        self.graphVt = Graph(ylabel='Vt mL', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40)
+        layoutGraph = BoxLayout(orientation='vertical', spacing=0, padding=(5,0))
+        graphPaw = ScrollGraph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=5, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=20)
+        graphFlow = ScrollGraph(ylabel='Flow L/min', draw_border=True, y_ticks_major=20, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-60, ymax=60)
+        graphVt = ScrollGraph(ylabel='Vt mL', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40)
         if (self.enableCO2):
-            self.graphCO2 = Graph(ylabel='CO2 mmHg', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40,size_hint_y=0,)
+            graphCO2 = ScrollGraph(ylabel='CO2 mmHg', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40,size_hint_y=0,)
         self.plot = []
         self.plot.append(LinePlot(color=[1, 0, 1, 1],line_width=1))
         self.plot.append(LinePlot(color=[0, 1, 1, 1],line_width=1))
@@ -75,140 +174,78 @@ class COSVTouchApp(App):
   
         self.reset_plots()
   
-        self.graphPaw.add_plot(self.plot[0])
-        self.graphFlow.add_plot(self.plot[1])
-        self.graphVt.add_plot(self.plot[2])
+        graphPaw.add_plot(self.plot[0])
+        graphFlow.add_plot(self.plot[1])
+        graphVt.add_plot(self.plot[2])
         if (self.enableCO2):
-            self.graphCO2.add_plot(self.plot[3])
+            graphCO2.add_plot(self.plot[3])
 
-        self.layoutGraph.add_widget(self.graphPaw)
-        self.layoutGraph.add_widget(self.graphFlow)
-        self.layoutGraph.add_widget(self.graphVt)
+        layoutGraph.add_widget(graphPaw)
+        layoutGraph.add_widget(graphFlow)
+        layoutGraph.add_widget(graphVt)
         if (self.enableCO2):
-            self.layoutGraph.add_widget(self.graphCO2)
+            layoutGraph.add_widget(graphCO2)
         #self.graphCO2.height='0dp'
         #self.graphCO2.size_hint_y=0
-        self.layoutLeft.add_widget(self.layoutGraph)
+        layoutLeft.add_widget(layoutGraph)
         
         # Bottom Controls
-        self.layoutControlBottom = BoxLayout(orientation='horizontal', spacing=10, padding=(5,10),size_hint=(1,0.2))
-        self.buttonMode = DisplayButton(text_top="Mode",text="PCV-VG",text_bottom=" ");
-        self.layoutControlBottom.add_widget(self.buttonMode);
+        layoutControlBottom = BoxLayout(orientation='horizontal', spacing=10, padding=(5,10),size_hint=(1,0.2))
+        buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV-Assist'),text_bottom=" ")
+        layoutControlBottom.add_widget(buttonMode);
         
-        self.buttonTidalVolume = DisplayButton(text_top="TidalV",text="500",text_bottom="ml");
-        self.layoutControlBottom.add_widget(self.buttonTidalVolume);
+        buttonTidalVolume = SliderButton(name='tidalv',text_top="TidalV",min=200,max=800,value=500,text_bottom="ml");
+        layoutControlBottom.add_widget(buttonTidalVolume);
         
-        self.buttonRespRate = DisplayButton(text_top="Rate",text="12",text_bottom="/min");
-        self.layoutControlBottom.add_widget(self.buttonRespRate);
+        buttonRespRate = SliderButton(name='rate',text_top="Rate",min=8,max=40,value=18,text_bottom="/min");
+        layoutControlBottom.add_widget(buttonRespRate);
         
-        self.buttonInhaleExhale = DisplayButton(text_top="I:E",text="1:2",text_bottom=" ");
-        self.layoutControlBottom.add_widget(self.buttonInhaleExhale);
+        buttonInhaleExhale = SelectButton(name='ie',text_top="I:E",value="1:2",values=('1:1','1:2','1:3','1:4'),text_bottom=" ");
+        layoutControlBottom.add_widget(buttonInhaleExhale);
         
-        self.buttonPEEP = DisplayButton(text_top="PEEP",text="5",text_bottom="cmH2O");
-        self.layoutControlBottom.add_widget(self.buttonPEEP);
+        buttonPEEP = SliderButton(name='peep',text_top="PEEP",min=0,value="5",max=25,text_bottom="cmH2O");
+        layoutControlBottom.add_widget(buttonPEEP);
         
-        self.buttonPressureMax = DisplayButton(text_top="Pmax",text="5",text_bottom="cmH2O");
-        self.layoutControlBottom.add_widget(self.buttonPressureMax);
+        buttonPressureMax = SliderButton(name='pmax',text_top="Pmax",min=10,value="20",max=60,text_bottom="cmH2O");
+        layoutControlBottom.add_widget(buttonPressureMax);
         
-        self.layoutLeft.add_widget(self.layoutControlBottom)
-        self.layoutMain.add_widget(self.layoutLeft)
+        layoutLeft.add_widget(layoutControlBottom)
+        layoutMain.add_widget(layoutLeft)
         
         # Right Controls
-        self.layoutControlRight = BoxLayout(orientation='vertical', spacing=10, padding=(10,5),size_hint=(0.2,1))
-        self.buttonAlarmPause = DisplayButton(text="Alarm\nSilence",background_color=(1,1,0.3,1));
-        self.layoutControlRight.add_widget(self.buttonAlarmPause);
-        self.buttonAlarmSetup = DisplayButton(text="Alarm\nSetup");
-        self.layoutControlRight.add_widget(self.buttonAlarmSetup);
-        self.buttonSystemSetup = DisplayButton(text="System\nSetup");
-        self.layoutControlRight.add_widget(self.buttonSystemSetup);
-        self.buttonRun = DisplayButton(text_top="Status",text="Stop",background_color=(1,0.3,0.3,1))
-        self.buttonRun.bind(on_press = self.buttonRunToggle)
-        self.layoutControlRight.add_widget(self.buttonRun)
+        layoutControlRight = BoxLayout(orientation='vertical', spacing=10, padding=(10,5),size_hint=(0.2,1))
+        buttonAlarmPause = RotaryButton(name='alarm',text_top='Alarm Status',value="Silenced",values={'Normal','Alarm','Silenced'},value_colors={'Normal':(0.3,1,0.3,1),'Silenced':(1,1,0.3,1),'Alarm':(1,0.3,0.3,1)});
+        layoutControlRight.add_widget(buttonAlarmPause);
+        buttonAlarmSetup = DisplayButton(value="Alarm\nSetup");
+        layoutControlRight.add_widget(buttonAlarmSetup);
+        buttonSystemSetup = DisplayButton(value="System\nSetup");
+        layoutControlRight.add_widget(buttonSystemSetup);
+        self.buttonRun = RotaryButton(name='status',text_top="Status",on_press=self.runButton,value="Stopped",values=('Stopped','Running'),value_colors={'Stopped':(1,0.3,0.3,1),'Running':(0.3,1,0.3,1)})
+        layoutControlRight.add_widget(self.buttonRun)
 
-        
-        self.layoutMain.add_widget(self.layoutControlRight)
+        layoutMain.add_widget(layoutControlRight)
        
-        self.layoutSetup = BoxLayout(orientation='vertical', spacing=10, padding=(5,10))
-        self.lblSerialSettings = Label(text="Serial settings")
-        self.layoutSetup.add_widget(self.lblSerialSettings)
-        
-        self.dlBaudrate = Spinner(values = ["57600", "115200", "230400", "460800", "921600"],
-                                  text = "115200")
-        self.layoutSetup.add_widget(self.dlBaudrate)
-        self.dlPort = Spinner(values = self.availablePorts,
-                              text = self.availablePorts[0])
-        self.layoutSetup.add_widget(self.dlPort)
-        
-
-        return self.layoutMain
-    def buttonRunToggleInstance(self,instance):
-        if instance.state == False:
+        return layoutMain
+    def runButton(self,event):
+        if self.buttonRun.value == 'Running':
             try:
-                self.connection = serial.Serial(self.dlPort.text, self.dlBaudrate.text)
+                availablePorts = listSerialPorts()
+                self.connection = serial.Serial(availablePorts[0], 115200)
                 Clock.schedule_interval(self.get_data, 1 / 100.)
                 self.counter = 1
-                instance.state = True
-                instance.text_middle="Running"      
-                self.background_color=(0.3,1,0.3,1)      
             except Exception as e:
                 print(e)
+                popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
+                popup.open()
         else:
             try:
                 self.connection.close()
                 Clock.unschedule(self.get_data)
                 self.reset_plots()
-                instance.text_middle="Stop"      
-                instance.background_color=(1,0.4,0.4,1)      
-                instance.state = False
-
             except Exception as e:
                 print(e)
-     
-    def buttonRunToggle(self,instance):
-        if self.runState == False:
-            try:
-                self.connection = serial.Serial(self.dlPort.text, self.dlBaudrate.text)
-                Clock.schedule_interval(self.get_data, 1 / 100.)
-                self.counter = 1
-                self.buttonRun.text="Run"      
-                self.buttonRun.background_color=(0.3,1,0.3,1)      
-                self.runState = True
-            except Exception as e:
-                print(e)
-        else:
-            try:
-                self.connection.close()
-                Clock.unschedule(self.get_data)
-                self.reset_plots()
-                self.buttonRun.text="Stop"      
-                self.buttonRun.background_color=(1,0.3,0.3,1)      
-                self.runState = False
-
-            except Exception as e:
-                print(e)
-    def buttonRunToggle(self,instance):
-        if self.runState == False:
-            try:
-                self.connection = serial.Serial(self.dlPort.text, self.dlBaudrate.text)
-                self.reset_plots()
-                Clock.schedule_interval(self.get_data, 1 / 100.)
-                self.counter = 1
-                self.buttonRun.text="Run"      
-                self.buttonRun.background_color=(0.3,1,0.3,1)      
-                self.runState = True
-            except Exception as e:
-                print(e)
-        else:
-            try:
-                self.connection.close()
-                Clock.unschedule(self.get_data)
-                self.buttonRun.text="Stop"      
-                self.buttonRun.background_color=(1,0.3,0.3,1)      
-                self.runState = False
-
-            except Exception as e:
-                print(e)
-     
+                popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
+                popup.open()
     def reset_plots(self):
         for plot in self.plot:
             plot.points = [(0,0)]

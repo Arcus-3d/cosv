@@ -64,7 +64,7 @@ class PopupButton(DisplayButton):
         self.popupBox=BoxLayout(orientation=self.popup_orientation)
         size_hint=(0.2,0.7)
         if (self.popup_orientation == 'horizontal'): size_hint=(0.7,0.2)
-        self.popup=Popup(title=self.text_top,content=self.popupBox,title_size='20sp',title_align='center',size_hint=size_hint)
+        self.popup=Popup(title=self.text_top,auto_dismiss=False,content=self.popupBox,title_size='20sp',title_align='center',size_hint=size_hint)
     def updateValue(self,*args):
         self.popup.dismiss()
         super(PopupButton,self).updateValue(self,*args)

@@ -54,7 +54,7 @@ class DisplayButton(BoxLayout,Button):
         self.add_widget(labelMiddle)
         labelBottom = Label(halign='center',valign='bottom',text=self.text_bottom,font_size="13sp")
         self.add_widget(labelBottom)
-        self.bind(on_press=self.pressEvent)
+        self.bind(on_release=self.pressEvent)
         #self.bind(value=self.updateValue)
 
 class PopupButton(DisplayButton):

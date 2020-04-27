@@ -42,9 +42,60 @@ TwoWire *i2cBus2 = NULL;
 #define ENABLE_PIN_BUS_A 4
 #define ENABLE_PIN_BUS_B 5
 
+// DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
+//
+// Simple way to make both I2C buses use a single I2C port
+// Use an NPN transistor to permit the SCL line to pull SCL to GND
+//
+// NOTE: SCL1 & SCL2 have pullups on the VISP
+//
+//                                       / ------  SCL1 to VISP
+//                                      /
+// ENABLE_PIN_BUS_A  --- v^v^v^----  --|
+//                        10K           V
+//                                       \------  SCL from NANO
+//
+//                                       / ------  SCL2 to VISP
+//                                      /
+// ENABLE_PIN_BUS_B  --- v^v^v^----  --|
+//                        10K           V
+//                                       \------  SCL from NANO
+//
+// Connect BOTH SDA1 and SDA2 together to the SDA
+//
+//   SDA on NANO --------------+-- SDA1 to the VISP
+//                             |
+//                             +-- SDA2 to the VISP
+//
+// Shamelessly swiped from:
+
+
+// Communications to/from the display
+//
+//
+// Lines that start with a number are CSV sensor reports
+// Lines that start with [a-z][A-Z] are comments
+// Lines that start with ! are command responses
+// Example: snprintf(response, "!ERROR %s\n", errorStr(errno));
+// Example: snprintf(response, "!SUCCESS %s\n", errorStr(errno));
+//
+// The goal is to have every command given have a reply
+// ping
+// !PONG
+//
+// calibrate
+// !CALIBRATED
+//
+// mode VC-CMV
+// !MODE VC-CMV
+//
+//
+
+
+
 
 // Chip type detection
-#define DETECTION_MAX_RETRY_COUNT   5
+#define DETECTION_MAX_RETRY_COUNT   2
 
 // Use these definitions to map sensors internally
 // When discovering sensors, make sure you map them appropriately
@@ -160,14 +211,15 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
     if (busDev->currentChannel != channel)
     {
       uint8_t error;
-      hwSerial.print("muxSelectChannel Changing from ");
-      hwSerial.print(busDev->currentChannel);
-      hwSerial.print(" to ");
-      hwSerial.println(channel);
+      //hwSerial.print("muxSelectChannel Changing from ");
+      //hwSerial.print(busDev->currentChannel);
+      //hwSerial.print(" to ");
+      //hwSerial.println(channel);
       busDev->busdev.i2c.i2cBus->beginTransmission(busDev->busdev.i2c.address);
       busDev->busdev.i2c.i2cBus->write(1 << (channel - 1));
       error = busDev->busdev.i2c.i2cBus->endTransmission();
-      delay(1);
+      busDev->currentChannel = channel;
+      // delay(1);
       return error;
     }
     return 0;

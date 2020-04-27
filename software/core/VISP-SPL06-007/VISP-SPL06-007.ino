@@ -22,22 +22,47 @@
 #include <SPI.h>
 
 
+// #define TEENSY 1
+
+
+
+#ifdef TEENSY
+#define hwSerial Serial1
+TwoWire *i2cBus1 = &Wire1;
+TwoWire *i2cBus2 = &Wire2;
+#else
+#define hwSerial Serial
+TwoWire *i2cBus1 = &Wire;
+TwoWire *i2cBus2 = NULL;
+#endif
+
+
+// Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
+// This is detected if needed
+#define ENABLE_PIN_BUS_A 4
+#define ENABLE_PIN_BUS_B 5
 
 
 // Chip type detection
 #define DETECTION_MAX_RETRY_COUNT   5
+
+// Use these definitions to map sensors internally
+// When discovering sensors, make sure you map them appropriately
+#define AMBIANT_PRESSURE 0
+#define PITOT1           1
+#define PITOT2           2
+#define PATIENT_PRESSURE 3
 
 float calibrationTotals[4];
 int calibrationSampleCounter = 0;
 float calibrationOffset[4];
 
 typedef enum {
-  RUNSTATE_STARTUP = 0,
-  RUNSTATE_CALIBRATE = 1,
-  RUNSTATE_RUN = 2
+  RUNSTATE_CALIBRATE = 0,
+  RUNSTATE_RUN
 } runState_e;
 
-runState_e runState=RUNSTATE_STARTUP;
+runState_e runState = RUNSTATE_CALIBRATE;
 
 typedef enum {
   BUSTYPE_ANY  = 0,
@@ -66,6 +91,7 @@ typedef struct busDevice_s {
       uint8_t address;        // I2C bus device address
       uint8_t channel;        // MUXed I2C Channel
       struct busDevice_s *channelDev; // MUXed I2C Channel Address
+      int8_t enablePin;
     } i2c;
   } busdev;
 } busDevice_t;
@@ -133,9 +159,16 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
   {
     if (busDev->currentChannel != channel)
     {
+      uint8_t error;
+      hwSerial.print("muxSelectChannel Changing from ");
+      hwSerial.print(busDev->currentChannel);
+      hwSerial.print(" to ");
+      hwSerial.println(channel);
       busDev->busdev.i2c.i2cBus->beginTransmission(busDev->busdev.i2c.address);
       busDev->busdev.i2c.i2cBus->write(1 << (channel - 1));
-      return busDev->busdev.i2c.i2cBus->endTransmission();
+      error = busDev->busdev.i2c.i2cBus->endTransmission();
+      delay(1);
+      return error;
     }
     return 0;
   }
@@ -144,34 +177,39 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
   }
 }
 
-
-void busPrint(busDevice_t *bus, const char *function)
+void busPrint(busDevice_t *bus, const __FlashStringHelper *function)
 {
-  Serial.print(function);
+  hwSerial.print(function);
   if (bus->busType == BUSTYPE_I2C)
   {
-    Serial.print("(I2C:");
-    Serial.print(" address=");
-    Serial.print(bus->busdev.i2c.address);
+    hwSerial.print(F("(I2C:"));
+    hwSerial.print(F(" address="));
+    hwSerial.print(bus->busdev.i2c.address);
     // MUX based VISP
     if (bus->busdev.i2c.channel)
     {
-      Serial.print(" channel=");
-      Serial.print(bus->busdev.i2c.channel);
+      hwSerial.print(F(" channel="));
+      hwSerial.print(bus->busdev.i2c.channel);
     }
-    Serial.println(")");
+    if (bus->busdev.i2c.enablePin != -1)
+    {
+      hwSerial.print(F(" enablePin="));
+      hwSerial.print(bus->busdev.i2c.enablePin);
+    }
+    hwSerial.println(F(")"));
+    delay(100);
     return;
   }
   if (bus->busType == BUSTYPE_SPI)
   {
-    Serial.print("(SPI CSPIN=");
-    Serial.print(bus->busdev.spi.csnPin);
-    Serial.println(")");
+    hwSerial.print(F("(SPI CSPIN="));
+    hwSerial.print(bus->busdev.spi.csnPin);
+    hwSerial.println(F(")"));
     return;
   }
 }
 
-busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL)
+busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, int8_t enablePin = -1)
 {
   busDevice_t *dev = (busDevice_t *)malloc(sizeof(busDevice_t));
   memset(dev, 0, sizeof(busDevice_t));
@@ -180,6 +218,7 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 
   dev->busdev.i2c.address = address;
   dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
   dev->busdev.i2c.channelDev = channelDev;
+  dev->busdev.i2c.enablePin = enablePin;
   return dev;
 }
 
@@ -199,6 +238,39 @@ void busDeviceFree(busDevice_t *dev)
   free(dev);
 }
 
+bool busDeviceDetect(busDevice_t *busDev)
+{
+  if (busDev->busType == BUSTYPE_I2C)
+  {
+    int error;
+    uint8_t address = busDev->busdev.i2c.address;
+    TwoWire *wire = busDev->busdev.i2c.i2cBus;
+
+    busPrint(busDev, F("Detecting if present"));
+
+    // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
+    if (busDev->busdev.i2c.enablePin != -1)
+      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
+    muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
+
+    wire->beginTransmission(address);
+    error = wire->endTransmission();
+
+    // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
+    if (busDev->busdev.i2c.enablePin != -1)
+      digitalWrite(busDev->busdev.i2c.enablePin, LOW);
+
+    if (error == 0)
+      busPrint(busDev, F("DETECTED!!!"));
+    else
+      busPrint(busDev, F("MISSING..."));
+    return (error == 0);
+  }
+  else
+    hwSerial.println(F("busDeviceDetect() unsupported bustype"));
+
+  return false;
+}
 
 
 char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, uint8_t length)
@@ -210,6 +282,10 @@ char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, u
   {
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
+
+    // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
+    if (busDev->busdev.i2c.enablePin != -1)
+      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
 
     muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
@@ -223,10 +299,19 @@ char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, u
       {
         values[x] = wire->read();
       }
+
+      // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
+      if (busDev->busdev.i2c.enablePin != -1)
+        digitalWrite(busDev->busdev.i2c.enablePin, LOW);
+
       return (1);
     }
-    Serial.print("endTransmission() returned ");
-    Serial.println(error);
+
+    if (busDev->busdev.i2c.enablePin != -1)
+      digitalWrite(busDev->busdev.i2c.enablePin, LOW);
+
+    hwSerial.print(F("endTransmission() returned "));
+    hwSerial.println(error);
     return (0);
   }
   return (0);
@@ -234,16 +319,24 @@ char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, u
 
 char busWriteBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, char length)
 {
+  int error;
   if (busDev->busType == BUSTYPE_I2C)
   {
     int address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
     muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
+    if (busDev->busdev.i2c.enablePin != -1)
+      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
 
     wire->beginTransmission(address);
     wire->write(values, length);
-    if (0 == wire->endTransmission())
+    error = wire->endTransmission();
+
+    if (busDev->busdev.i2c.enablePin != -1)
+      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
+
+    if (0 == error)
       return (1);
     else
       return (0);
@@ -277,12 +370,12 @@ void myprint(uint64_t value)
     sz[i] = '0' + (value % 10);
   }
 
-  Serial.print(sz);
+  hwSerial.print(sz);
 }
 void myprintln(uint64_t value)
 {
   myprint(value);
-  Serial.println("");
+  hwSerial.println(F(""));
 }
 
 
@@ -516,7 +609,7 @@ bool spl06DeviceDetect(busDevice_t * busDev)
     delay(100);
     bool ack = busRead(busDev, SPL06_CHIP_ID_REG, &chipId);
     if (ack && chipId == SPL06_DEFAULT_CHIP_ID) {
-      busPrint(busDev, "SPL206 Detected");
+      busPrint(busDev, F("SPL206 Detected"));
       return true;
     }
   }
@@ -718,13 +811,17 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
   }
   baro->busDev = busDev;
 
-  busPrint(busDev, "BMP280 Detected");
+  busPrint(busDev, F("BMP280 Detected"));
 
   // read calibration
   busReadBuf(baro->busDev, BMP280_TEMPERATURE_CALIB_DIG_T1_LSB_REG, (uint8_t *)&baro->bmp280_cal, 24);
 
+  delay(100);
+
   //set filter setting and sample rate
   busWrite(baro->busDev, BMP280_CONFIG_REG, BMP280_FILTER | BMP280_SAMPLING);
+
+  delay(100);
 
   // set oversampling + power mode (forced), and start sampling
   busWrite(baro->busDev, BMP280_CTRL_MEAS_REG, BMP280_MODE);
@@ -762,139 +859,179 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
 // U5 & U6 are on Mux Bus #1
 // U7 & U8 are on Mux Bus #2
 //
+// U5 & U7 = 0x76
+// U6 & U8 = 0x77
 // Index mapping of the sensors to the board (See schematic)
-#define SENSOR_U5 0
-#define SENSOR_U6 1
-#define SENSOR_U7 2 // PITOT TUBE
+#define SENSOR_U5 0    // tube
+#define SENSOR_U6 1    // ambiant
+#define SENSOR_U7 2 // PITOT TUBE 
 #define SENSOR_U8 3 // PITOT TUBE
-baroDev_t sensors[4];
+baroDev_t sensors[4]; // See mapping at the top of the file, PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
+
+busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
+{
+  busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enablePin);
+  busPrint(device, F("Detecting device on"));
+  if (!bmp280Detect(baro, device))
+    if (!spl06Detect(baro, device))
+    {
+      busDeviceFree(device);
+      device = NULL;
+      hwSerial.print(F("Device refused to be detected at 0x"));
+      hwSerial.println(address, HEX);
+    }
+  return device;
+}
+
 
 bool detectMuxedSensors(TwoWire *wire)
 {
   uint8_t channel, address;
+  int8_t enablePin = -1;
+
   // MUX has a switching chip that can have different adresses (including ones on our devices)
   // Could be 2 paths with 2 sensors each or 4 paths with 1 on each.
-  wire->beginTransmission(0x70);
-  if (0 == wire->endTransmission())
-  {
-    busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70);
-    Serial.println("MUX Based VISP Detected");
-    for (channel = 1; channel < 3; channel++)
-    {
-      muxSelectChannel(muxDevice, channel);
-      for (address = 0x76; address < 0x78; address++)
-      {
-        wire->beginTransmission(address);
-        if (0 == wire->endTransmission())
-        {
-          uint8_t sensorNum = (address - 0x76) + ((channel - 1) * 2);
-          busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice);
-          if (!bmp280Detect(&sensors[sensorNum], device))
-            if (!spl06Detect(&sensors[sensorNum], device))
-            {
-              busDeviceFree(device);
-              Serial.print("Device refused to be detected at 0x");
-              Serial.println(address, HEX);
-            }
-        }
-      }
-    }
-    return true;
-  }
 
-  return false;
+  busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70);
+  if (!busDeviceDetect(muxDevice))
+  {
+    hwSerial.println(F("Failed to find MUX on I2C, detecting enable pin"));
+    enablePin = ENABLE_PIN_BUS_A;
+    busDeviceFree(muxDevice);
+    muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enablePin);
+    if (!busDeviceDetect(muxDevice))
+    {
+      hwSerial.println(F("Failed to detect MUX Based VISP"));
+      busDeviceFree(muxDevice);
+      return false;
+    }
+  }
+  hwSerial.println(F("MUX Based VISP Detected"));
+
+  // Detect U5, U6
+  hwSerial.println(F("Looking for U5"));
+  detectIndividualSensor(&sensors[PATIENT_PRESSURE], wire, 0x76, 1, muxDevice, enablePin);
+  hwSerial.println(F("Looking for U6"));
+  detectIndividualSensor(&sensors[AMBIANT_PRESSURE], wire, 0x77, 1, muxDevice, enablePin);
+  // Detect U7, U8
+  hwSerial.println(F("Looking for U7"));
+  detectIndividualSensor(&sensors[PITOT1], wire, 0x76, 2, muxDevice, enablePin);
+  hwSerial.println(F("Looking for U8"));
+  detectIndividualSensor(&sensors[PITOT2], wire, 0x77, 2, muxDevice, enablePin);
+
+  // Do not free muxDevice, as it is shared by the sensors
+  return true;
 }
 
-bool detectXLateSensors(TwoWire *wire)
+// TODO: verify mapping
+bool detectXLateSensors(TwoWire * wire)
 {
-  uint8_t channel, address;
+  int enablePin = -1;
   // XLATE version has chips at 0x74, 0x75, 0x76, and 0x77
   // So, if we find 0x74... We are good to go
-  wire->beginTransmission(0x74);
-  if (0 == wire->endTransmission())
+
+  busDevice_t *seventyFour = busDeviceInitI2C(wire, 0x74);
+  if (!busDeviceDetect(seventyFour))
   {
-    for (address = 0x74; address < 0x78; address++)
+    busDeviceFree(seventyFour);
+    seventyFour = busDeviceInitI2C(wire, 0x74, 0, NULL, ENABLE_PIN_BUS_A);
+    if (!busDeviceDetect(seventyFour))
     {
-      wire->beginTransmission(address);
-      if (0 == wire->endTransmission())
-      {
-        busDevice_t *device = busDeviceInitI2C(wire, address);
-        if (!bmp280Detect(&sensors[address - 0x74], device))
-        {
-          if (!spl06Detect(&sensors[address - 0x74], device))
-          {
-            Serial.print("Device refused to be detected at 0x");
-            Serial.println(address, HEX);
-            busDeviceFree(device);
-          }
-        }
-      }
+      hwSerial.println(F("Failed to detect XLate Based VISP"));
+      busDeviceFree(seventyFour);
+      return false;
     }
-    return true;
+    enablePin = ENABLE_PIN_BUS_A;
   }
-  return false;
+
+  hwSerial.println(F("XLate Based VISP Detected"));
+
+  // Detect U5, U6
+  detectIndividualSensor(&sensors[PATIENT_PRESSURE], wire, 0x76, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[AMBIANT_PRESSURE], wire, 0x77, 0, NULL, enablePin);
+
+  // Detect U7, U8
+  detectIndividualSensor(&sensors[PITOT1], wire, 0x74, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[PITOT2], wire, 0x75, 0, NULL, enablePin);
+  return true;
 }
 
-bool detectDualI2CSensors(TwoWire *wireA, TwoWire *wireB)
+bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
 {
   int channel, sensorCount = 0;
   uint8_t address;
+  int8_t enablePinA = -1;
+  int8_t enablePinB = -1;
 
-  Serial.println("Assuming DUAL I2C VISP");
-  for (address = 0x76; address < 0x78; address++)
+
+  hwSerial.println(F("Assuming DUAL I2C VISP"));
+
+  busDevice_t *eeprom = busDeviceInitI2C(wireA, 0x54);
+  if (!busDeviceDetect(eeprom))
   {
-    // First Bus
-    wireA->beginTransmission(address);
-    if (0 == wireA->endTransmission())
+    hwSerial.println(F("Failed to find U5 on I2C, detecting enable pin"));
+    enablePinA = 4;
+    enablePinB = 5;
+    busDeviceFree(eeprom);
+    eeprom = busDeviceInitI2C(wireA, 0x54, 0, NULL, enablePinA);
+    if (!busDeviceDetect(eeprom))
     {
-      busDevice_t *device = busDeviceInitI2C(wireA, address);
-      if (!bmp280Detect(&sensors[address - 0x76], device))
+      busDeviceFree(eeprom);
+      eeprom = busDeviceInitI2C(wireA, 0x54, 0, NULL, enablePinB);
+      if (!busDeviceDetect(eeprom))
       {
-        if (!spl06Detect(&sensors[address - 0x76], device))
-        {
-          Serial.print("Device refused to be detected at 0x");
-          Serial.println(address, HEX);
-          busDeviceFree(device);
-        }
+        hwSerial.println(F("Failed to detect DUAL I2C VISP"));
+        busDeviceFree(eeprom);
+        return false;
       }
-    }
+      else
+      {
+        hwSerial.println(F("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
+        busDeviceFree(eeprom);
+        return false;
 
-    // Optional Second bus (TEENSY, MEGA, etc...)...
-    if (wireB)
-    {
-      wireB->beginTransmission(address);
-      if (0 == wireB->endTransmission())
-      {
-        busDevice_t *device = busDeviceInitI2C(wireB, address);
-        if (!bmp280Detect(&sensors[(address - 0x76) + 2], device))
-        {
-          if (!spl06Detect(&sensors[(address - 0x76) + 2], device))
-            busDeviceFree(device);
-        }
       }
     }
+    hwSerial.println(F("Enable pins detected!"));
   }
 
+  // Detect U5, U6
+  detectIndividualSensor(&sensors[PATIENT_PRESSURE], wireA, 0x76, 0, NULL, enablePinA);
+  detectIndividualSensor(&sensors[AMBIANT_PRESSURE], wireA, 0x77, 0, NULL, enablePinA);
+
+  // TEENSY has dual i2c busses, NANO does not.
+  // Detect U7, U8
+  if (wireB)
+  {
+    hwSerial.println(F("TEENSY second I2C bus"));
+    detectIndividualSensor(&sensors[PITOT1], wireB, 0x76, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[PITOT2], wireB, 0x77, 0, NULL, enablePinB);
+  }
+  else
+  {
+    hwSerial.println(F("No second HW I2C, using Primary I2C bus with enable pin"));
+    detectIndividualSensor(&sensors[PITOT1], wireA, 0x76, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[PITOT2], wireA, 0x77, 0, NULL, enablePinB);
+  }
   return true;
 }
 
 // FUTURE: read EEPROM and determine what type of VISP it is.
-bool detectSensors()
+bool detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
 {
   memset(&sensors, 0, sizeof(sensors));
 
-  if (detectMuxedSensors(&Wire))
+  hwSerial.println(F("Detecting MUX VISP"));
+  if (detectMuxedSensors(i2cBusA))
     return true;
 
-  if (detectXLateSensors(&Wire))
+  hwSerial.println(F("Detecting XLate VISP"));
+  if (detectXLateSensors(i2cBusA))
     return true;
-#ifdef TEENSY
-  if (detectDualI2CSensors(&Wire, &Wire1))
+
+  hwSerial.println(F("Detecting DUAL-I2C VISP"));
+  if (detectDualI2CSensors(i2cBusA, i2cBusB))
     return true;
-#else
-  if (detectDualI2CSensors(&Wire, NULL))
-    return true;
-#endif
   return false;
 }
 
@@ -904,12 +1041,19 @@ bool detectSensors()
 bool timeToReadSensors = false;
 
 
-void scan_i2c(TwoWire *wire)
+void scan_i2c(TwoWire * wire, int8_t enablePin = -1)
 {
   byte error, address; //variable for error and I2C address
   int nDevices;
 
-  Serial.println("Scanning Hardware I2C bus...");
+  hwSerial.println(F("Scanning Hardware I2C bus..."));
+
+  if (enablePin != -1)
+  {
+    hwSerial.print(F("Enabling Bus Pin "));
+    hwSerial.println(enablePin);
+    digitalWrite(enablePin, HIGH);
+  }
 
   nDevices = 0;
   for (address = 1; address < 127; address++ )
@@ -922,26 +1066,28 @@ void scan_i2c(TwoWire *wire)
 
     if (error == 0)
     {
-      Serial.print("I2C device found at address 0x");
+      hwSerial.print(F("I2C device found at address 0x"));
       if (address < 16)
-        Serial.print("0");
-      Serial.print(address, HEX);
-      Serial.println("  !");
+        hwSerial.print(F("0"));
+      hwSerial.print(address, HEX);
+      hwSerial.println(F("  !"));
       nDevices++;
     }
     else if (error == 4)
     {
-      Serial.print("Unknown error at address 0x");
+      hwSerial.print(F("Unknown error at address 0x"));
       if (address < 16)
-        Serial.print("0");
-      Serial.println(address, HEX);
+        hwSerial.print("0");
+      hwSerial.println(address, HEX);
     }
   }
   if (nDevices == 0)
-    Serial.println("No I2C devices found\n");
+    hwSerial.println(F("No I2C devices found\n"));
   else
-    Serial.println("done\n");
+    hwSerial.println(F("done\n"));
 
+  if (enablePin != -1)
+    digitalWrite(enablePin, LOW);
 }
 
 
@@ -982,55 +1128,34 @@ t tasks[] = {
 
 
 void setup() {
-  uint8_t pbar = 0;
-  uint64_t chipid;
+  bool sensorsFound;
 
-  Serial.begin(230400);
-  Serial.println("VISP Sensor Reader Test Application V0.1a");
-  Wire.begin();
-  Wire.setClock(400000); // Typical
-#ifdef TEENSY
-  Wire1.begin();
-#endif
+  // Address select lines for Dual I2C switching using NPN Transistors
+  pinMode(ENABLE_PIN_BUS_A, OUTPUT);
+  digitalWrite(ENABLE_PIN_BUS_A, LOW);
+  pinMode(ENABLE_PIN_BUS_B, OUTPUT);
+  digitalWrite(ENABLE_PIN_BUS_B, LOW);
 
-  Wire.beginTransmission(0x70);
-  if (0 == Wire.endTransmission())
-  {
-    busDevice_t *mux = busDeviceInitI2C(&Wire, 0x70);
-    Serial.println("Scanning MUX Bus 1");
-    muxSelectChannel(mux, 1);
-    scan_i2c(&Wire);
 
-    Serial.println("Scanning MUX Bus 2");
-    muxSelectChannel(mux, 2);
-    scan_i2c(&Wire);
-  }
-  else
-    scan_i2c(&Wire);
+  hwSerial.begin(230400);
+  hwSerial.println(F("VISP Sensor Reader Test Application V0.1b"));
+  i2cBus1->begin();
+  i2cBus1->setClock(400000); // Typical
 
-#ifdef TEENSY
-  Wire1.begin();
-  Wire1.setClock(400000); // Typical
-  Serial.println("Scanning Second I2C bus");
-  Wire1.beginTransmission(0x70);
-  if (0 == Wire1.endTransmission())
-  {
-    busDevice_t *mux = busDeviceInitI2C(&Wire1, 0x70);
-    Serial.println("Scanning MUX Bus 1");
-    muxSelectChannel(mux, 1);
-    scan_i2c(&Wire1);
-
-    Serial.println("Scanning MUX Bus 2");
-    muxSelectChannel(mux, 2);
-    scan_i2c(&Wire1);
-  }
-  else
-    scan_i2c(&Wire1);
-#endif
 
   delay(200);
 
-  detectSensors();
+  do
+  {
+    sensorsFound = detectSensors(i2cBus1, i2cBus2);
+    if (sensorsFound)
+      hwSerial.println(F("Sensors detected!"));
+    else
+    {
+      hwSerial.println(F("Error finding sensors, retrying"));
+      delay(500);
+    }
+  } while (!sensorsFound);
 }
 
 void loop() {
@@ -1051,63 +1176,70 @@ void loop() {
       if (sensors[x].busDev)
         sensors[x].calculate(&sensors[x], &P[x], &T[x]);
     }
-    if (Serial.available())
+
+    if (hwSerial.available())
     {
-      command = Serial.readString(); //reads serial input
+      command = hwSerial.readString(); //reads serial input
       if (command == 'calibrate')
       {
         runState = RUNSTATE_CALIBRATE;
       }
     }
-    if (runState == RUNSTATE_STARTUP || runState == RUNSTATE_CALIBRATE)
-    {
-      calibrationTotals[0] += P[0];
-      calibrationTotals[1] += P[1];
-      calibrationTotals[2] += P[2];
-      calibrationTotals[3] += P[3];
-      calibrationSampleCounter++;
-      if (calibrationSampleCounter == 99) {
-        float average = (calibrationTotals[0]+calibrationTotals[1]+calibrationTotals[2]+calibrationTotals[3])/400;
-        for (int x = 0; x < 4; x++)
-        {
-          calibrationOffset[x] = calibrationTotals[x]/100 - average;
-        }
-        calibrationSampleCounter=0;
-        runState = RUNSTATE_RUN;
-      }
-    }
-    static float paTocmH2O = 0.0101972;
-//    static float paTocmH2O = 0.00501972;
-    ambientPressure = P[1] - calibrationOffset[1];
-    pitot1 = P[2] - calibrationOffset[2];
-    pitot2 = P[3] - calibrationOffset[3];
-    patientPressure = P[0] - calibrationOffset[0];
 
-    pitot_diff=(pitot1-pitot2)/100; // pascals to hPa
-    
-    airflow = (0.05*pitot_diff*pitot_diff - 0.0008*pitot_diff); // m/s
-    //airflow=sqrt(2*pitot_diff/2.875);
-    if (pitot_diff < 0) {
-      airflow = -airflow;
+    switch (runState)
+    {
+      case RUNSTATE_CALIBRATE:
+        calibrationTotals[0] += P[0];
+        calibrationTotals[1] += P[1];
+        calibrationTotals[2] += P[2];
+        calibrationTotals[3] += P[3];
+        calibrationSampleCounter++;
+        if (calibrationSampleCounter == 99) {
+          float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400;
+          for (int x = 0; x < 4; x++)
+          {
+            calibrationOffset[x] = calibrationTotals[x] / 100 - average;
+          }
+          calibrationSampleCounter = 0;
+          runState = RUNSTATE_RUN;
+        }
+        break;
+
+      case RUNSTATE_RUN:
+        const float paTocmH2O = 0.0101972;
+        //    static float paTocmH2O = 0.00501972;
+        ambientPressure = P[AMBIANT_PRESSURE] - calibrationOffset[AMBIANT_PRESSURE];
+        pitot1 = P[PITOT1] - calibrationOffset[PITOT1];
+        pitot2 = P[PITOT2] - calibrationOffset[PITOT2];
+        patientPressure = P[PATIENT_PRESSURE] - calibrationOffset[PATIENT_PRESSURE];
+
+        pitot_diff = (pitot1 - pitot2) / 100; // pascals to hPa
+
+        airflow = (0.05 * pitot_diff * pitot_diff - 0.0008 * pitot_diff); // m/s
+        //airflow=sqrt(2*pitot_diff/2.875);
+        if (pitot_diff < 0) {
+          airflow = -airflow;
+        }
+        //airflow = -(-0.0008+sqrt(0.0008*0.0008-4*0.05*0.0084+4*0.05*pitot_diff))/2*0.05;
+
+        volume = airflow * 0.25 * 60; // volume for our 18mm orfice, and 60s/min
+        pressure = (patientPressure - ambientPressure) * paTocmH2O; // average of all sensors in the tube for pressure reading
+
+        // Take some time to write to the serial port
+        hwSerial.print(millis());
+        hwSerial.print(F(","));
+        hwSerial.print(pressure, 4);
+        hwSerial.print(F(","));
+        hwSerial.print(volume, 4);
+        hwSerial.print(F(","));
+        hwSerial.print(ambientPressure, 1);
+        hwSerial.print(F(","));
+        hwSerial.print(patientPressure, 1);
+        hwSerial.print(F(","));
+        hwSerial.print(pitot1, 1);
+        hwSerial.print(F(","));
+        hwSerial.println(pitot2, 1);
+        break;
     }
-    //airflow = -(-0.0008+sqrt(0.0008*0.0008-4*0.05*0.0084+4*0.05*pitot_diff))/2*0.05;
-    
-    volume=airflow * 0.25 * 60; // volume for our 18mm orfice, and 60s/min
-    pressure = (patientPressure - ambientPressure)*paTocmH2O; // average of all sensors in the tube for pressure reading
-    
-    // Take some time to write to the serial port
-    Serial.print(millis());
-    Serial.print(",");
-    Serial.print(pressure, 4);
-    Serial.print(",");
-    Serial.print(volume, 4);
-    Serial.print(",");
-    Serial.print(ambientPressure, 1);
-    Serial.print(",");
-    Serial.print(patientPressure, 1);
-    Serial.print(",");
-    Serial.print(pitot1, 1);
-    Serial.print(",");
-    Serial.println(pitot2, 1);
   }
 }

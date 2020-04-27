@@ -151,7 +151,7 @@ class COSVTouchApp(App):
         })
     def build(self): 
         availablePorts = listSerialPorts()
-        self.connection = serial.Serial(availablePorts[0], 115200)
+        self.serial = serial.Serial()
         self.counter = 1
         self.runState = False
         self.enableCO2 = False
@@ -160,8 +160,8 @@ class COSVTouchApp(App):
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
         layoutGraph = BoxLayout(orientation='vertical', spacing=0, padding=(5,0))
-        graphPaw = ScrollGraph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=5, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=20)
-        graphFlow = ScrollGraph(ylabel='Flow L/min', draw_border=True, y_ticks_major=20, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-60, ymax=60)
+        graphPaw = ScrollGraph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=5, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=30)
+        graphFlow = ScrollGraph(ylabel='Flow L/min', draw_border=True, y_ticks_major=20, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-30, ymax=30)
         graphVt = ScrollGraph(ylabel='Vt mL', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40)
         if (self.enableCO2):
             graphCO2 = ScrollGraph(ylabel='CO2 mmHg', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40,size_hint_y=0,)
@@ -230,7 +230,7 @@ class COSVTouchApp(App):
         if self.buttonRun.value == 'Running':
             try:
                 availablePorts = listSerialPorts()
-                self.connection = serial.Serial(availablePorts[0], 115200)
+                self.serial = serial.Serial(port=availablePorts[0], baudrate=230400,timeout=1)
                 Clock.schedule_interval(self.get_data, 1 / 100.)
                 self.counter = 1
             except Exception as e:
@@ -239,7 +239,7 @@ class COSVTouchApp(App):
                 popup.open()
         else:
             try:
-                self.connection.close()
+                self.serial.close()
                 Clock.unschedule(self.get_data)
                 self.reset_plots()
             except Exception as e:
@@ -255,16 +255,20 @@ class COSVTouchApp(App):
             for plot in self.plot:
                 del(plot.points[0])
                 plot.points[:] = [(i[0]-1, i[1]) for i in plot.points[:]]
-  
             self.counter = 599
-  
-        self.plot[0].points.append((self.counter, sin(self.counter/50.)*50. ))
-        self.plot[1].points.append((self.counter, sin(self.counter/50.)*50. ))
-        self.plot[2].points.append((self.counter, sin(self.counter/50.)*50. ))
-        if (self.enableCO2):
-            self.plot[3].points.append((self.counter, sin(self.counter/50.)*50. ))
-        self.counter += 1      
-  
+        if (self.serial.is_open and self.serial.in_waiting > 0): 
+            row = str(self.serial.readline().decode('ascii'))
+            try:
+                col=[float(i) for i in row.strip().split(',',10)]
+                self.plot[0].points.append((self.counter, col[1] ))
+                self.plot[1].points.append((self.counter, col[2] ))
+                self.plot[2].points.append((self.counter, col[3] ))
+                #self.plot[3].points.append((self.counter, col[4] ))
+                self.counter += 1
+            except Exception as e:      
+                #print(e)
+                print(row)
+
 class ErrorPopup(Popup):
     pass
   

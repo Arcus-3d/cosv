@@ -160,8 +160,8 @@ class COSVTouchApp(App):
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
         layoutGraph = BoxLayout(orientation='vertical', spacing=0, padding=(5,0))
-        graphPaw = ScrollGraph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=5, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=30)
-        graphFlow = ScrollGraph(ylabel='Flow L/min', draw_border=True, y_ticks_major=20, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-30, ymax=30)
+        graphPaw = ScrollGraph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=60)
+        graphFlow = ScrollGraph(ylabel='Flow L/min', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-30, ymax=30)
         graphVt = ScrollGraph(ylabel='Vt mL', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40)
         if (self.enableCO2):
             graphCO2 = ScrollGraph(ylabel='CO2 mmHg', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40,size_hint_y=0,)
@@ -227,7 +227,7 @@ class COSVTouchApp(App):
        
         return layoutMain
     def runButton(self,event):
-        if self.buttonRun.value == 'Running':
+        if self.buttonRun.value == 'Stopped':
             try:
                 availablePorts = listSerialPorts()
                 self.serial = serial.Serial(port=availablePorts[0], baudrate=230400,timeout=1)
@@ -257,8 +257,8 @@ class COSVTouchApp(App):
                 plot.points[:] = [(i[0]-1, i[1]) for i in plot.points[:]]
             self.counter = 599
         if (self.serial.is_open and self.serial.in_waiting > 0): 
-            row = str(self.serial.readline().decode('ascii'))
             try:
+                row = str(self.serial.readline().decode('ascii'))
                 col=[float(i) for i in row.strip().split(',',10)]
                 self.plot[0].points.append((self.counter, col[1] ))
                 self.plot[1].points.append((self.counter, col[2] ))

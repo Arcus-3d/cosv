@@ -30,6 +30,7 @@
 float calibrationTotals[4];
 int calibrationSampleCounter = 0;
 float calibrationOffset[4];
+float volumeAvg[20];
 
 typedef enum {
   RUNSTATE_STARTUP = 0,
@@ -1083,10 +1084,10 @@ void loop() {
     pitot2 = P[3] - calibrationOffset[3];
     patientPressure = P[0] - calibrationOffset[0];
 
-    pitot_diff=(pitot1-pitot2)/100; // pascals to hPa
+    pitot_diff=(pitot1-pitot2); // pascals to hPa
     
     airflow = (0.05*pitot_diff*pitot_diff - 0.0008*pitot_diff); // m/s
-    //airflow=sqrt(2*pitot_diff/2.875);
+    airflow=20*sqrt(abs(pitot_diff/patientPressure));
     if (pitot_diff < 0) {
       airflow = -airflow;
     }

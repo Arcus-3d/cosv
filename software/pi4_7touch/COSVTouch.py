@@ -155,6 +155,7 @@ class COSVTouchApp(App):
         self.counter = 1
         self.runState = False
         self.enableCO2 = False
+        self.vt=0;
         layoutMain = BoxLayout(orientation='horizontal',spacing=0, padding=0)
         
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
@@ -256,18 +257,21 @@ class COSVTouchApp(App):
                 del(plot.points[0])
                 plot.points[:] = [(i[0]-1, i[1]) for i in plot.points[:]]
             self.counter = 599
-        if (self.serial.is_open and self.serial.in_waiting > 0): 
-            try:
+        try:
+            if (self.serial.is_open and self.serial.in_waiting > 0): 
                 row = str(self.serial.readline().decode('ascii'))
                 col=[float(i) for i in row.strip().split(',',10)]
+                self.vt = (self.vt + col[2]/100);
+                if (self.vt < 0):
+                    self.vt = 0
                 self.plot[0].points.append((self.counter, col[1] ))
                 self.plot[1].points.append((self.counter, col[2] ))
-                self.plot[2].points.append((self.counter, col[3] ))
+                self.plot[2].points.append((self.counter, self.vt ))
                 #self.plot[3].points.append((self.counter, col[4] ))
                 self.counter += 1
-            except Exception as e:      
-                #print(e)
-                print(row)
+        except Exception as e:      
+            print(e)
+            print(row)
 
 class ErrorPopup(Popup):
     pass

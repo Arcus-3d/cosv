@@ -12,7 +12,7 @@ $fn=30;
 // Smaller values result in smoother, but more complicated surfaces.  
 // A good value for working is 15.
 // A good value for rendering is 2-5.
-path_step=10; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
+path_step=5; // turn down when rendering the actual path for a smooth one... up to 10 when editing.
 
 // Assembly views, a little broken.
 //cosv_assembly_view(cam_angle=$t*180,explode=0);
@@ -29,14 +29,14 @@ path_step=10; // turn down when rendering the actual path for a smooth one... up
 //base_t(); // top plate/electronics mount.  Need 1.
 //bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
 //bag_mount(); // thin arms to support the bag ends and keep it from wandering. Need 2.
-//arm_l();
+arm_l();
 //supply_cover();
 
 //chest_bar();
 
 // The flow sensors.
 //flow_sensor_for_pcb(); // 
-flow_sensor_venturi_for_pcb(); // 
+//flow_sensor_venturi_for_pcb(); // 
 //flow_sensor_for_pcb_no_pocket(); // 
 //flow_sensor_cover(oled=0);
 //flow_sensor_cover();

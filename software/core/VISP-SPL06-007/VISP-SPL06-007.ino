@@ -22,12 +22,12 @@
 #include <SPI.h>
 
 
-// #define TEENSY 1
+#define TEENSY 1
 
-
+#define DEBUG_DISPLAY 1
 
 #ifdef TEENSY
-#define hwSerial Serial1
+#define hwSerial Serial
 TwoWire *i2cBus1 = &Wire1;
 TwoWire *i2cBus2 = &Wire2;
 #else
@@ -1497,7 +1497,7 @@ void loopVenturiVersion(float *P, float *T)
         volume = 0;
       }
 
-      const float alpha = 0.25; // smoothing factor for exponential filter
+      const float alpha = 0.10; // smoothing factor for exponential filter.  Lower is smoother
       volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
 
       pressure = ((inletPressure + outletPressure) / 2 - ambientPressure) * paTocmH2O;

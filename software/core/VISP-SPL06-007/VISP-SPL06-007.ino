@@ -67,7 +67,7 @@ TwoWire *i2cBus2 = NULL;
 //                             |
 //                             +-- SDA2 to the VISP
 //
-// Shamelessly swiped from:
+// Shamelessly swiped from: https://i.stack.imgur.com/WnsM0.png
 
 
 // Communications to/from the display
@@ -91,18 +91,60 @@ TwoWire *i2cBus2 = NULL;
 //
 //
 
+// EEPROM is 24c01 128x8
+typedef struct sensor_mapping_s {
+  uint8_t mappingType; // In case we want to change this in the future, provide a mechanism to detect this
+  uint8_t i2cAddress;  // If non zero, then it's an I2C device.  Otherwise, we assume SPI.
+  uint8_t muxAddress; // 0 if not behind a mux
+  uint8_t busNumber; //  If MUXed, then it's the muxChannel.  If straight I2C, then it could be multiple I2C channels, if SPI, then it's the enable pin on the VISP
+}  sensor_mapping_t;
+
+// We are using the M24C01 128 byte eprom
+#define EEPROM_PAGE_SIZE 16
+
+// First 32-bytes is configuration
+// WARNING: Must be a multiple of the eeprom's write page.   Assume 8-byte multiples
+// This is at address 0 in the eeprom
+typedef struct visp_eeprom_s {
+  char VISP[4];  // LETTERS VISP
+  uint8_t busType;  // Character type "M"=mux "X"=XLate, "D"=Dual "S"=SPI
+  uint8_t bodyType; // "V"=Venturi "P"=Pitot "H"=Hybrid
+  uint8_t bodyVersion; // printable character
+  uint8_t zero;  // NULL Terminator, so we can Serial.print(*eeprom);
+  sensor_mapping_t sensorMapping[4]; // 16 bytes for sensor mapping.
+  uint8_t padding[6]; // Future whatever
+  uint16_t checksum; // TODO: future, paranoia about integrity
+} visp_eeprom_t; // WARNING: Must be a multiple of the eeprom's write page.   Assume 8-byte multiples
+
+visp_eeprom_t visp_eeprom;
 
 
+typedef enum {
+  VISP_BUS_TYPE_NONE = ' ',
+  VISP_BUS_TYPE_SPI = 's',
+  VISP_BUS_TYPE_I2C = 'i',
+  VISP_BUS_TYPE_MUX = 'm',
+  VISP_BUS_TYPE_XLATE = 'x'
+} vispBusType_e;
+
+vispBusType_e detectedVispType = VISP_BUS_TYPE_NONE;
+
+typedef enum {
+  VISP_BODY_TYPE_NONE = ' ',
+  VISP_BODY_TYPE_PITOT = 'p',
+  VISP_BODY_TYPE_VENTURI = 'v',
+  VISP_BODY_TYPE_HYBRID = 'h',
+  VISP_BODY_TYPE_EXPERIMENTAL = 'x'
+} vispBodyType_e;
+
+
+
+// This is at address sizeof(visp_eeprom_t), and is VISP specific (venturi/pitot/etc).
+uint8_t visp_calibration[128 - sizeof(visp_eeprom)];
 
 // Chip type detection
 #define DETECTION_MAX_RETRY_COUNT   2
 
-// Use these definitions to map sensors internally
-// When discovering sensors, make sure you map them appropriately
-#define AMBIANT_PRESSURE 0
-#define PITOT1           1
-#define PITOT2           2
-#define PATIENT_PRESSURE 3
 
 float calibrationTotals[4];
 int calibrationSampleCounter = 0;
@@ -146,6 +188,10 @@ typedef struct busDevice_s {
     } i2c;
   } busdev;
 } busDevice_t;
+
+
+// Simple bus device for initially reading the VISP eeprom
+busDevice_t *eeprom = NULL;
 
 
 typedef struct bmp280_calib_param_s {
@@ -290,6 +336,7 @@ void busDeviceFree(busDevice_t *dev)
   free(dev);
 }
 
+// Simply detect if the device is present on this device assignment
 bool busDeviceDetect(busDevice_t *busDev)
 {
   if (busDev->busType == BUSTYPE_I2C)
@@ -323,7 +370,6 @@ bool busDeviceDetect(busDevice_t *busDev)
 
   return false;
 }
-
 
 char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, uint8_t length)
 {
@@ -407,6 +453,15 @@ char busWrite(busDevice_t *busDev, unsigned char reg, unsigned char value)
   return busWriteBuf(busDev, reg, values, 2);
 }
 
+void readEEPROM(busDevice_t *eeprom, uint16_t location, char *data, uint16_t length)
+{
+
+}
+
+void writeEEPROM(busDevice_t *eeprom, uint16_t location, char *data, uint16_t length)
+{
+
+}
 
 
 
@@ -914,10 +969,17 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
 // U5 & U7 = 0x76
 // U6 & U8 = 0x77
 // Index mapping of the sensors to the board (See schematic)
-#define SENSOR_U5 0    // tube
-#define SENSOR_U6 1    // ambiant
-#define SENSOR_U7 2 // PITOT TUBE 
-#define SENSOR_U8 3 // PITOT TUBE
+#define SENSOR_U5 0
+#define SENSOR_U6 1
+#define SENSOR_U7 2
+#define SENSOR_U8 3
+
+// Do your venturi mapping here
+#define VENTURI0 0
+#define VENTURI1 1
+#define VENTURI2 2
+#define VENTURI3 3
+
 baroDev_t sensors[4]; // See mapping at the top of the file, PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
 
 busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
@@ -933,6 +995,17 @@ busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t addr
       hwSerial.println(address, HEX);
     }
   return device;
+}
+
+busDevice_t *detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
+{
+  busDevice_t *thisDevice = busDeviceInitI2C(wire, address, muxChannel, muxDevice, enablePin);
+  if (!busDeviceDetect(thisDevice))
+  {
+    free(thisDevice);
+    return NULL;
+  }
+  return thisDevice;
 }
 
 
@@ -960,16 +1033,21 @@ bool detectMuxedSensors(TwoWire *wire)
   }
   hwSerial.println(F("MUX Based VISP Detected"));
 
+  hwSerial.println(F("Looking for EEPROM"));
+  eeprom = detectEEPROM(wire, 0x54, 1, muxDevice, enablePin);
+
   // Detect U5, U6
   hwSerial.println(F("Looking for U5"));
-  detectIndividualSensor(&sensors[PATIENT_PRESSURE], wire, 0x76, 1, muxDevice, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enablePin);
   hwSerial.println(F("Looking for U6"));
-  detectIndividualSensor(&sensors[AMBIANT_PRESSURE], wire, 0x77, 1, muxDevice, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 1, muxDevice, enablePin);
   // Detect U7, U8
   hwSerial.println(F("Looking for U7"));
-  detectIndividualSensor(&sensors[PITOT1], wire, 0x76, 2, muxDevice, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x76, 2, muxDevice, enablePin);
   hwSerial.println(F("Looking for U8"));
-  detectIndividualSensor(&sensors[PITOT2], wire, 0x77, 2, muxDevice, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x77, 2, muxDevice, enablePin);
+
+  detectedVispType = VISP_BUS_TYPE_MUX;
 
   // Do not free muxDevice, as it is shared by the sensors
   return true;
@@ -998,13 +1076,19 @@ bool detectXLateSensors(TwoWire * wire)
 
   hwSerial.println(F("XLate Based VISP Detected"));
 
+  hwSerial.println(F("Looking for EEPROM"));
+  eeprom = detectEEPROM(wire, 0x54, 0, NULL, enablePin);
+
   // Detect U5, U6
-  detectIndividualSensor(&sensors[PATIENT_PRESSURE], wire, 0x76, 0, NULL, enablePin);
-  detectIndividualSensor(&sensors[AMBIANT_PRESSURE], wire, 0x77, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 0, NULL, enablePin);
 
   // Detect U7, U8
-  detectIndividualSensor(&sensors[PITOT1], wire, 0x74, 0, NULL, enablePin);
-  detectIndividualSensor(&sensors[PITOT2], wire, 0x75, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x74, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x75, 0, NULL, enablePin);
+
+  detectedVispType = VISP_BUS_TYPE_XLATE;
+
   return true;
 }
 
@@ -1018,53 +1102,46 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
 
   hwSerial.println(F("Assuming DUAL I2C VISP"));
 
-  busDevice_t *eeprom = busDeviceInitI2C(wireA, 0x54);
-  if (!busDeviceDetect(eeprom))
+  hwSerial.println(F("Looking for EEPROM"));
+  eeprom = detectEEPROM(wireA, 0x54);
+  if (!eeprom)
   {
-    hwSerial.println(F("Failed to find U5 on I2C, detecting enable pin"));
     enablePinA = 4;
     enablePinB = 5;
-    busDeviceFree(eeprom);
-    eeprom = busDeviceInitI2C(wireA, 0x54, 0, NULL, enablePinA);
-    if (!busDeviceDetect(eeprom))
+    eeprom = detectEEPROM(wireA, 0x54, 0, NULL, enablePinA);
+    if (!eeprom)
     {
-      busDeviceFree(eeprom);
-      eeprom = busDeviceInitI2C(wireA, 0x54, 0, NULL, enablePinB);
-      if (!busDeviceDetect(eeprom))
-      {
-        hwSerial.println(F("Failed to detect DUAL I2C VISP"));
-        busDeviceFree(eeprom);
-        return false;
-      }
-      else
-      {
+      eeprom = detectEEPROM(wireA, 0x54, 0, NULL, enablePinB);
+      if (eeprom)
         hwSerial.println(F("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
-        busDeviceFree(eeprom);
-        return false;
-
-      }
+      else
+        hwSerial.println(F("Failed to detect DUAL I2C VISP"));
+      return false;
     }
     hwSerial.println(F("Enable pins detected!"));
   }
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[PATIENT_PRESSURE], wireA, 0x76, 0, NULL, enablePinA);
-  detectIndividualSensor(&sensors[AMBIANT_PRESSURE], wireA, 0x77, 0, NULL, enablePinA);
+  detectIndividualSensor(&sensors[SENSOR_U5], wireA, 0x76, 0, NULL, enablePinA);
+  detectIndividualSensor(&sensors[SENSOR_U6], wireA, 0x77, 0, NULL, enablePinA);
 
   // TEENSY has dual i2c busses, NANO does not.
   // Detect U7, U8
   if (wireB)
   {
     hwSerial.println(F("TEENSY second I2C bus"));
-    detectIndividualSensor(&sensors[PITOT1], wireB, 0x76, 0, NULL, enablePinB);
-    detectIndividualSensor(&sensors[PITOT2], wireB, 0x77, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[SENSOR_U7], wireB, 0x76, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[SENSOR_U8], wireB, 0x77, 0, NULL, enablePinB);
   }
   else
   {
     hwSerial.println(F("No second HW I2C, using Primary I2C bus with enable pin"));
-    detectIndividualSensor(&sensors[PITOT1], wireA, 0x76, 0, NULL, enablePinB);
-    detectIndividualSensor(&sensors[PITOT2], wireA, 0x77, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[SENSOR_U7], wireA, 0x76, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[SENSOR_U8], wireA, 0x77, 0, NULL, enablePinB);
   }
+
+  detectedVispType = VISP_BUS_TYPE_I2C;
+
   return true;
 }
 
@@ -1179,8 +1256,31 @@ t tasks[] = {
 
 
 
+void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
+{
+  hwSerial.println(F("Formatting VISP"));
+
+  memset(&visp_eeprom, 0, sizeof(visp_eeprom));
+  memset(visp_calibration, 0, sizeof(visp_calibration));
+
+  visp_eeprom.VISP[0] = 'V';
+  visp_eeprom.VISP[1] = 'I';
+  visp_eeprom.VISP[2] = 'S';
+  visp_eeprom.VISP[3] = 'P';
+  visp_eeprom.busType = busType;
+  visp_eeprom.bodyType = bodyType;
+  visp_eeprom.bodyVersion = '0';
+  // TODO: scan sensor mappings and populate the eeprom with what we have detected
+  // TODO: checksum;
+
+  writeEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
+  writeEEPROM(eeprom, sizeof(visp_eeprom), (char *)visp_calibration, sizeof(visp_calibration));
+}
+
+
 void setup() {
-  bool sensorsFound;
+  bool sensorsFound = false, formatVisp = false;;
+  uint8_t sensorCount = 0;
 
   // Address select lines for Dual I2C switching using NPN Transistors
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
@@ -1207,12 +1307,133 @@ void setup() {
       hwSerial.println(F("Error finding sensors, retrying"));
       delay(500);
     }
-  } while (!sensorsFound);
+
+    // Make sure they are all there
+    sensorCount = 0;
+    for (uint8_t x = 0; x < 5; x++)
+    {
+      if (sensors[x].busDev)
+        sensorCount++;
+    }
+    if (sensorCount != 4)
+      hwSerial.println(F("Error finding all of the sensors, retrying"));
+  } while (!sensorsFound || sensorCount == 0);
+
+  if (eeprom)
+  {
+    uint8_t *buf;
+    hwSerial.println(F("Reading VISP configuration"));
+
+    readEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
+    readEEPROM(eeprom, sizeof(visp_eeprom), (char *)visp_calibration, sizeof(visp_calibration));
+
+    if (visp_eeprom.VISP[0] != 'V'
+        ||  visp_eeprom.VISP[1] != 'I'
+        ||  visp_eeprom.VISP[2] != 'S'
+        ||  visp_eeprom.VISP[3] != 'P')
+    {
+      // ok, unformatted VISP
+      formatVisp = true;
+      hwSerial.println(F("!ERROR eeprom not formatted"));
+    }
+  }
+  else
+  {
+    hwSerial.println(F("!ERROR eeprom not available"));
+    formatVisp = true;
+  }
+
+  if (formatVisp)
+    formatVispEEPROM(detectedVispType, VISP_BODY_TYPE_PITOT);
+
+  // Just put it out there, what type we are for the status system to figure out
+  hwSerial.print("!identity ");
+  hwSerial.println(visp_eeprom.VISP);
+
+}
+
+// Use these definitions to map sensors to their usage
+#define PATIENT_PRESSURE SENSOR_U5
+#define AMBIANT_PRESSURE SENSOR_U6
+#define PITOT1           SENSOR_U7
+#define PITOT2           SENSOR_U8
+
+void loopPitotVersion(float *P, float *T)
+{
+  float  airflow, volume, pitot_diff, ambientPressure, pitot1, pitot2, patientPressure, pressure;
+
+  switch (runState)
+  {
+    case RUNSTATE_CALIBRATE:
+      calibrationTotals[0] += P[0];
+      calibrationTotals[1] += P[1];
+      calibrationTotals[2] += P[2];
+      calibrationTotals[3] += P[3];
+      calibrationSampleCounter++;
+      if (calibrationSampleCounter == 99) {
+        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400;
+        for (int x = 0; x < 4; x++)
+        {
+          calibrationOffset[x] = calibrationTotals[x] / 100 - average;
+        }
+        calibrationSampleCounter = 0;
+        hwSerial.println(F("!calibrated"));
+        runState = RUNSTATE_RUN;
+      }
+      break;
+
+    case RUNSTATE_RUN:
+      const float paTocmH2O = 0.0101972;
+      //    static float paTocmH2O = 0.00501972;
+      ambientPressure = P[AMBIANT_PRESSURE] - calibrationOffset[AMBIANT_PRESSURE];
+      pitot1 = P[PITOT1] - calibrationOffset[PITOT1];
+      pitot2 = P[PITOT2] - calibrationOffset[PITOT2];
+      patientPressure = P[PATIENT_PRESSURE] - calibrationOffset[PATIENT_PRESSURE];
+
+      pitot_diff = (pitot1 - pitot2) / 100; // pascals to hPa
+
+      airflow = (0.05 * pitot_diff * pitot_diff - 0.0008 * pitot_diff); // m/s
+      //airflow=sqrt(2*pitot_diff/2.875);
+      if (pitot_diff < 0) {
+        airflow = -airflow;
+      }
+      //airflow = -(-0.0008+sqrt(0.0008*0.0008-4*0.05*0.0084+4*0.05*pitot_diff))/2*0.05;
+
+      volume = airflow * 0.25 * 60; // volume for our 18mm orfice, and 60s/min
+      pressure = (patientPressure - ambientPressure) * paTocmH2O; // average of all sensors in the tube for pressure reading
+
+      // Take some time to write to the serial port
+      hwSerial.print(millis());
+      hwSerial.print(F(","));
+      hwSerial.print(pressure, 4);
+      hwSerial.print(F(","));
+      hwSerial.print(volume, 4);
+      hwSerial.print(F(","));
+      hwSerial.print(ambientPressure, 1);
+      hwSerial.print(F(","));
+      hwSerial.print(patientPressure, 1);
+      hwSerial.print(F(","));
+      hwSerial.print(pitot1, 1);
+      hwSerial.print(F(","));
+      hwSerial.println(pitot2, 1);
+      break;
+  }
+
+}
+
+void loopVenturiVersion(float *P, float *T)
+{
+  static bool flag = true;
+  if (flag)
+  {
+    hwSerial.println("!ERROR Daren, put Venturu code here");
+    flag = false;
+  }
 }
 
 void loop() {
   String command;
-  float P[4], T[4], airflow, volume, pitot_diff, ambientPressure, pitot1, pitot2, patientPressure, pressure;
+  float P[4], T[4];
 
   for (int x = 0; tasks[x].cbk; x++)
     tCheck(&tasks[x]);
@@ -1225,8 +1446,7 @@ void loop() {
     for (int x = 0; x < 4; x++)
     {
       P[x] = 0;
-      if (sensors[x].busDev)
-        sensors[x].calculate(&sensors[x], &P[x], &T[x]);
+      sensors[x].calculate(&sensors[x], &P[x], &T[x]);
     }
 
     if (hwSerial.available())
@@ -1236,62 +1456,30 @@ void loop() {
       {
         runState = RUNSTATE_CALIBRATE;
       }
+      if (command == 'ping')
+        hwSerial.println(F("!pong"));
+
+      if (command == 'identify')
+      {
+        hwSerial.print("!identity ");
+        hwSerial.println(visp_eeprom.VISP);
+      }
+
+      // TODO: format command from display
+      // void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
     }
 
-    switch (runState)
+    // Detect the VISP type from the EEPROM and use the appropriate function
+    switch (visp_eeprom.bodyType)
     {
-      case RUNSTATE_CALIBRATE:
-        calibrationTotals[0] += P[0];
-        calibrationTotals[1] += P[1];
-        calibrationTotals[2] += P[2];
-        calibrationTotals[3] += P[3];
-        calibrationSampleCounter++;
-        if (calibrationSampleCounter == 99) {
-          float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400;
-          for (int x = 0; x < 4; x++)
-          {
-            calibrationOffset[x] = calibrationTotals[x] / 100 - average;
-          }
-          calibrationSampleCounter = 0;
-          runState = RUNSTATE_RUN;
-        }
+      case 'P':
+        loopPitotVersion(P, T);
         break;
-
-      case RUNSTATE_RUN:
-        const float paTocmH2O = 0.0101972;
-        //    static float paTocmH2O = 0.00501972;
-        ambientPressure = P[AMBIANT_PRESSURE] - calibrationOffset[AMBIANT_PRESSURE];
-        pitot1 = P[PITOT1] - calibrationOffset[PITOT1];
-        pitot2 = P[PITOT2] - calibrationOffset[PITOT2];
-        patientPressure = P[PATIENT_PRESSURE] - calibrationOffset[PATIENT_PRESSURE];
-
-        pitot_diff = (pitot1 - pitot2) / 100; // pascals to hPa
-
-        airflow = (0.05 * pitot_diff * pitot_diff - 0.0008 * pitot_diff); // m/s
-        //airflow=sqrt(2*pitot_diff/2.875);
-        if (pitot_diff < 0) {
-          airflow = -airflow;
-        }
-        //airflow = -(-0.0008+sqrt(0.0008*0.0008-4*0.05*0.0084+4*0.05*pitot_diff))/2*0.05;
-
-        volume = airflow * 0.25 * 60; // volume for our 18mm orfice, and 60s/min
-        pressure = (patientPressure - ambientPressure) * paTocmH2O; // average of all sensors in the tube for pressure reading
-
-        // Take some time to write to the serial port
-        hwSerial.print(millis());
-        hwSerial.print(F(","));
-        hwSerial.print(pressure, 4);
-        hwSerial.print(F(","));
-        hwSerial.print(volume, 4);
-        hwSerial.print(F(","));
-        hwSerial.print(ambientPressure, 1);
-        hwSerial.print(F(","));
-        hwSerial.print(patientPressure, 1);
-        hwSerial.print(F(","));
-        hwSerial.print(pitot1, 1);
-        hwSerial.print(F(","));
-        hwSerial.println(pitot2, 1);
+      case 'V':
+        loopVenturiVersion(P, T);
         break;
+      default:
+        loopPitotVersion(P, T);
     }
   }
 }

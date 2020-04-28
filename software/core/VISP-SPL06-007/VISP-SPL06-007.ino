@@ -36,6 +36,13 @@ TwoWire *i2cBus1 = &Wire;
 TwoWire *i2cBus2 = NULL;
 #endif
 
+#ifdef DEBUG_DISPLAY
+#define dprint(...) hwSerial.print( __VA_ARGS__)
+#define dprintln(...) hwSerial.println( __VA_ARGS__)
+#else
+#define dprint(...)
+#define dprintln(...)
+#endif
 
 // Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
 // This is detected if needed
@@ -257,10 +264,10 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
     if (busDev->currentChannel != channel)
     {
       uint8_t error;
-      //hwSerial.print("muxSelectChannel Changing from ");
-      //hwSerial.print(busDev->currentChannel);
-      //hwSerial.print(" to ");
-      //hwSerial.println(channel);
+      //dprint("muxSelectChannel Changing from ");
+      //dprint(busDev->currentChannel);
+      //dprint(" to ");
+      //dprintln(channel);
       busDev->busdev.i2c.i2cBus->beginTransmission(busDev->busdev.i2c.address);
       busDev->busdev.i2c.i2cBus->write(1 << (channel - 1));
       error = busDev->busdev.i2c.i2cBus->endTransmission();
@@ -277,32 +284,32 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
 
 void busPrint(busDevice_t *bus, const __FlashStringHelper *function)
 {
-  hwSerial.print(function);
+  dprint(function);
   if (bus->busType == BUSTYPE_I2C)
   {
-    hwSerial.print(F("(I2C:"));
-    hwSerial.print(F(" address="));
-    hwSerial.print(bus->busdev.i2c.address);
+    dprint(F("(I2C:"));
+    dprint(F(" address="));
+    dprint(bus->busdev.i2c.address);
     // MUX based VISP
     if (bus->busdev.i2c.channel)
     {
-      hwSerial.print(F(" channel="));
-      hwSerial.print(bus->busdev.i2c.channel);
+      dprint(F(" channel="));
+      dprint(bus->busdev.i2c.channel);
     }
     if (bus->busdev.i2c.enablePin != -1)
     {
-      hwSerial.print(F(" enablePin="));
-      hwSerial.print(bus->busdev.i2c.enablePin);
+      dprint(F(" enablePin="));
+      dprint(bus->busdev.i2c.enablePin);
     }
-    hwSerial.println(F(")"));
+    dprintln(F(")"));
     delay(100);
     return;
   }
   if (bus->busType == BUSTYPE_SPI)
   {
-    hwSerial.print(F("(SPI CSPIN="));
-    hwSerial.print(bus->busdev.spi.csnPin);
-    hwSerial.println(F(")"));
+    dprint(F("(SPI CSPIN="));
+    dprint(bus->busdev.spi.csnPin);
+    dprintln(F(")"));
     return;
   }
 }
@@ -366,7 +373,7 @@ bool busDeviceDetect(busDevice_t *busDev)
     return (error == 0);
   }
   else
-    hwSerial.println(F("busDeviceDetect() unsupported bustype"));
+    dprintln(F("busDeviceDetect() unsupported bustype"));
 
   return false;
 }
@@ -408,8 +415,8 @@ char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, u
     if (busDev->busdev.i2c.enablePin != -1)
       digitalWrite(busDev->busdev.i2c.enablePin, LOW);
 
-    hwSerial.print(F("endTransmission() returned "));
-    hwSerial.println(error);
+    dprint(F("endTransmission() returned "));
+    dprintln(error);
     return (0);
   }
   return (0);
@@ -477,12 +484,12 @@ void myprint(uint64_t value)
     sz[i] = '0' + (value % 10);
   }
 
-  hwSerial.print(sz);
+  dprint(sz);
 }
 void myprintln(uint64_t value)
 {
   myprint(value);
-  hwSerial.println(F(""));
+  dprintln(F(""));
 }
 
 
@@ -991,8 +998,8 @@ busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t addr
     {
       busDeviceFree(device);
       device = NULL;
-      hwSerial.print(F("Device refused to be detected at 0x"));
-      hwSerial.println(address, HEX);
+      dprint(F("Device refused to be detected at 0x"));
+      dprintln(address, HEX);
     }
   return device;
 }
@@ -1020,31 +1027,31 @@ bool detectMuxedSensors(TwoWire *wire)
   busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70);
   if (!busDeviceDetect(muxDevice))
   {
-    hwSerial.println(F("Failed to find MUX on I2C, detecting enable pin"));
+    dprintln(F("Failed to find MUX on I2C, detecting enable pin"));
     enablePin = ENABLE_PIN_BUS_A;
     busDeviceFree(muxDevice);
     muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enablePin);
     if (!busDeviceDetect(muxDevice))
     {
-      hwSerial.println(F("Failed to detect MUX Based VISP"));
+      dprintln(F("Failed to detect MUX Based VISP"));
       busDeviceFree(muxDevice);
       return false;
     }
   }
-  hwSerial.println(F("MUX Based VISP Detected"));
+  dprintln(F("MUX Based VISP Detected"));
 
-  hwSerial.println(F("Looking for EEPROM"));
+  dprintln(F("Looking for EEPROM"));
   eeprom = detectEEPROM(wire, 0x54, 1, muxDevice, enablePin);
 
   // Detect U5, U6
-  hwSerial.println(F("Looking for U5"));
+  dprintln(F("Looking for U5"));
   detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enablePin);
-  hwSerial.println(F("Looking for U6"));
+  dprintln(F("Looking for U6"));
   detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 1, muxDevice, enablePin);
   // Detect U7, U8
-  hwSerial.println(F("Looking for U7"));
+  dprintln(F("Looking for U7"));
   detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x76, 2, muxDevice, enablePin);
-  hwSerial.println(F("Looking for U8"));
+  dprintln(F("Looking for U8"));
   detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x77, 2, muxDevice, enablePin);
 
   detectedVispType = VISP_BUS_TYPE_MUX;
@@ -1067,16 +1074,16 @@ bool detectXLateSensors(TwoWire * wire)
     seventyFour = busDeviceInitI2C(wire, 0x74, 0, NULL, ENABLE_PIN_BUS_A);
     if (!busDeviceDetect(seventyFour))
     {
-      hwSerial.println(F("Failed to detect XLate Based VISP"));
+      dprintln(F("Failed to detect XLate Based VISP"));
       busDeviceFree(seventyFour);
       return false;
     }
     enablePin = ENABLE_PIN_BUS_A;
   }
 
-  hwSerial.println(F("XLate Based VISP Detected"));
+  dprintln(F("XLate Based VISP Detected"));
 
-  hwSerial.println(F("Looking for EEPROM"));
+  dprintln(F("Looking for EEPROM"));
   eeprom = detectEEPROM(wire, 0x54, 0, NULL, enablePin);
 
   // Detect U5, U6
@@ -1100,9 +1107,9 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
   int8_t enablePinB = -1;
 
 
-  hwSerial.println(F("Assuming DUAL I2C VISP"));
+  dprintln(F("Assuming DUAL I2C VISP"));
 
-  hwSerial.println(F("Looking for EEPROM"));
+  dprintln(F("Looking for EEPROM"));
   eeprom = detectEEPROM(wireA, 0x54);
   if (!eeprom)
   {
@@ -1113,12 +1120,12 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
     {
       eeprom = detectEEPROM(wireA, 0x54, 0, NULL, enablePinB);
       if (eeprom)
-        hwSerial.println(F("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
+        dprintln(F("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
       else
-        hwSerial.println(F("Failed to detect DUAL I2C VISP"));
+        dprintln(F("Failed to detect DUAL I2C VISP"));
       return false;
     }
-    hwSerial.println(F("Enable pins detected!"));
+    dprintln(F("Enable pins detected!"));
   }
 
   // Detect U5, U6
@@ -1129,13 +1136,13 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
   // Detect U7, U8
   if (wireB)
   {
-    hwSerial.println(F("TEENSY second I2C bus"));
+    dprintln(F("TEENSY second I2C bus"));
     detectIndividualSensor(&sensors[SENSOR_U7], wireB, 0x76, 0, NULL, enablePinB);
     detectIndividualSensor(&sensors[SENSOR_U8], wireB, 0x77, 0, NULL, enablePinB);
   }
   else
   {
-    hwSerial.println(F("No second HW I2C, using Primary I2C bus with enable pin"));
+    dprintln(F("No second HW I2C, using Primary I2C bus with enable pin"));
     detectIndividualSensor(&sensors[SENSOR_U7], wireA, 0x76, 0, NULL, enablePinB);
     detectIndividualSensor(&sensors[SENSOR_U8], wireA, 0x77, 0, NULL, enablePinB);
   }
@@ -1150,15 +1157,15 @@ bool detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
 {
   memset(&sensors, 0, sizeof(sensors));
 
-  hwSerial.println(F("Detecting MUX VISP"));
+  dprintln(F("Detecting MUX VISP"));
   if (detectMuxedSensors(i2cBusA))
     return true;
 
-  hwSerial.println(F("Detecting XLate VISP"));
+  dprintln(F("Detecting XLate VISP"));
   if (detectXLateSensors(i2cBusA))
     return true;
 
-  hwSerial.println(F("Detecting DUAL-I2C VISP"));
+  dprintln(F("Detecting DUAL-I2C VISP"));
   if (detectDualI2CSensors(i2cBusA, i2cBusB))
     return true;
   return false;
@@ -1175,12 +1182,12 @@ void scan_i2c(TwoWire * wire, int8_t enablePin = -1)
   byte error, address; //variable for error and I2C address
   int nDevices;
 
-  hwSerial.println(F("Scanning Hardware I2C bus..."));
+  dprintln(F("Scanning Hardware I2C bus..."));
 
   if (enablePin != -1)
   {
-    hwSerial.print(F("Enabling Bus Pin "));
-    hwSerial.println(enablePin);
+    dprint(F("Enabling Bus Pin "));
+    dprintln(enablePin);
     digitalWrite(enablePin, HIGH);
   }
 
@@ -1195,25 +1202,25 @@ void scan_i2c(TwoWire * wire, int8_t enablePin = -1)
 
     if (error == 0)
     {
-      hwSerial.print(F("I2C device found at address 0x"));
+      dprint(F("I2C device found at address 0x"));
       if (address < 16)
-        hwSerial.print(F("0"));
-      hwSerial.print(address, HEX);
-      hwSerial.println(F("  !"));
+        dprint(F("0"));
+      dprint(address, HEX);
+      dprintln(F("  !"));
       nDevices++;
     }
     else if (error == 4)
     {
-      hwSerial.print(F("Unknown error at address 0x"));
+      dprint(F("Unknown error at address 0x"));
       if (address < 16)
-        hwSerial.print("0");
-      hwSerial.println(address, HEX);
+        dprint("0");
+      dprintln(address, HEX);
     }
   }
   if (nDevices == 0)
-    hwSerial.println(F("No I2C devices found\n"));
+    dprintln(F("No I2C devices found\n"));
   else
-    hwSerial.println(F("done\n"));
+    dprintln(F("done\n"));
 
   if (enablePin != -1)
     digitalWrite(enablePin, LOW);
@@ -1258,7 +1265,7 @@ t tasks[] = {
 
 void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
 {
-  hwSerial.println(F("Formatting VISP"));
+  dprintln(F("Formatting VISP"));
 
   memset(&visp_eeprom, 0, sizeof(visp_eeprom));
   memset(visp_calibration, 0, sizeof(visp_calibration));
@@ -1290,7 +1297,7 @@ void setup() {
 
 
   hwSerial.begin(230400);
-  hwSerial.println(F("VISP Sensor Reader Test Application V0.1b"));
+  dprintln(F("VISP Sensor Reader Test Application V0.1b"));
   i2cBus1->begin();
   i2cBus1->setClock(400000); // Typical
 
@@ -1301,10 +1308,10 @@ void setup() {
   {
     sensorsFound = detectSensors(i2cBus1, i2cBus2);
     if (sensorsFound)
-      hwSerial.println(F("Sensors detected!"));
+      dprintln(F("Sensors detected!"));
     else
     {
-      hwSerial.println(F("Error finding sensors, retrying"));
+      dprintln(F("Error finding sensors, retrying"));
       delay(500);
     }
 
@@ -1316,13 +1323,13 @@ void setup() {
         sensorCount++;
     }
     if (sensorCount != 4)
-      hwSerial.println(F("Error finding all of the sensors, retrying"));
+      dprintln(F("Error finding all of the sensors, retrying"));
   } while (!sensorsFound || sensorCount == 0);
 
   if (eeprom)
   {
     uint8_t *buf;
-    hwSerial.println(F("Reading VISP configuration"));
+    dprintln(F("Reading VISP configuration"));
 
     readEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
     readEEPROM(eeprom, sizeof(visp_eeprom), (char *)visp_calibration, sizeof(visp_calibration));
@@ -1334,12 +1341,12 @@ void setup() {
     {
       // ok, unformatted VISP
       formatVisp = true;
-      hwSerial.println(F("!ERROR eeprom not formatted"));
+      dprintln(F("!ERROR eeprom not formatted"));
     }
   }
   else
   {
-    hwSerial.println(F("!ERROR eeprom not available"));
+    dprintln(F("!ERROR eeprom not available"));
     formatVisp = true;
   }
 

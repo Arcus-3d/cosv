@@ -1285,6 +1285,13 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
 }
 
 
+void clearCalibrationData()
+{
+  memset(&calibrationTotals, 0, sizeof(calibrationTotals));
+  calibrationSampleCounter=0;
+  memset(&calibrationOffset, 0, sizeof(calibrationOffset));
+}
+
 void setup() {
   bool sensorsFound = false, formatVisp = false;;
   uint8_t sensorCount = 0;
@@ -1353,6 +1360,9 @@ void setup() {
   if (formatVisp)
     formatVispEEPROM(detectedVispType, VISP_BODY_TYPE_VENTURI);
 
+  clearCalibrationData();
+
+
   // Just put it out there, what type we are for the status system to figure out
   hwSerial.print("!identity ");
   hwSerial.println(visp_eeprom.VISP);
@@ -1397,16 +1407,16 @@ void loopPitotVersion(float *P, float *T)
       pitot2 = P[PITOT2] - calibrationOffset[PITOT2];
       patientPressure = P[PATIENT_PRESSURE] - calibrationOffset[PATIENT_PRESSURE];
 
-      pitot_diff = (pitot1 - pitot2) / 100; // pascals to hPa
+      pitot_diff = (pitot1 - pitot2) / 100.0; // pascals to hPa
 
-      airflow = (0.05 * pitot_diff * pitot_diff - 0.0008 * pitot_diff); // m/s
-      //airflow=sqrt(2*pitot_diff/2.875);
+      airflow = ((0.05 * pitot_diff * pitot_diff) - (0.0008 * pitot_diff)); // m/s
+      //airflow=sqrt(2.0*pitot_diff/2.875);
       if (pitot_diff < 0) {
         airflow = -airflow;
       }
       //airflow = -(-0.0008+sqrt(0.0008*0.0008-4*0.05*0.0084+4*0.05*pitot_diff))/2*0.05;
 
-      volume = airflow * 0.25 * 60; // volume for our 18mm orfice, and 60s/min
+      volume = airflow * 0.25 * 60.0; // volume for our 18mm orfice, and 60s/min
       pressure = (patientPressure - ambientPressure) * paTocmH2O; // average of all sensors in the tube for pressure reading
 
       // Take some time to write to the serial port
@@ -1435,7 +1445,7 @@ void loopPitotVersion(float *P, float *T)
 #define VENTURI_OUTPUT  SENSOR_U8
 void loopVenturiVersion(float *P, float *T)
 {
-  static float volumeSmoothed = 0; // Only used in this function, but needs to be persistant.
+  float volumeSmoothed = 0;
   float airflow, volume, pitot_diff, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
 
   switch (runState)
@@ -1447,10 +1457,10 @@ void loopVenturiVersion(float *P, float *T)
       calibrationTotals[3] += P[3];
       calibrationSampleCounter++;
       if (calibrationSampleCounter == 99) {
-        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400;
+        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400.0;
         for (int x = 0; x < 4; x++)
         {
-          calibrationOffset[x] = average - calibrationTotals[x] / 100;
+          calibrationOffset[x] = average - calibrationTotals[x] / 100.0;
         }
         calibrationSampleCounter = 0;
         runState = RUNSTATE_RUN;
@@ -1477,16 +1487,18 @@ void loopVenturiVersion(float *P, float *T)
       throatPressure = P[VENTURI_SENSOR];
 
       //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m
-      airflow = a_diff * sqrt(2 * (inletPressure - throatPressure) / 998) * 600000; // airflow in cubic m/s *60000 to get L/m
+      //airflow = a_diff * sqrt(2.0 * (inletPressure - throatPressure)) / 998.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
+      // Why multiply by 2 then devide by a number, why not just divide by half the number?
+      airflow = a_diff * sqrt((inletPressure - throatPressure) / 449.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
 
 
       if (inletPressure > outletPressure && inletPressure > throatPressure)
       {
-        volume = a_diff * sqrt(2 * (inletPressure - throatPressure) / 998) * 0.6;
+        volume = a_diff * sqrt((inletPressure - throatPressure) / 449.0) * 0.6;
       }
       else if (outletPressure > inletPressure && outletPressure > throatPressure)
       {
-        volume = -a_diff * sqrt(2 * (outletPressure - throatPressure) / 998) * 0.6;
+        volume = -a_diff * sqrt((outletPressure - throatPressure) / 449.0) * 0.6;
       }
       else
       {
@@ -1500,7 +1512,7 @@ void loopVenturiVersion(float *P, float *T)
       const float alpha = 0.10; // smoothing factor for exponential filter.  Lower is smoother
       volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
 
-      pressure = ((inletPressure + outletPressure) / 2 - ambientPressure) * paTocmH2O;
+      pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;
 
       // Take some time to write to the serial port
       hwSerial.print(millis());
@@ -1545,6 +1557,7 @@ void loop() {
       if (command == 'calibrate')
       {
         runState = RUNSTATE_CALIBRATE;
+        clearCalibrationData();
       }
       if (command == 'ping')
         hwSerial.println(F("!pong"));

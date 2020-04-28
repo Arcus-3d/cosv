@@ -22,12 +22,12 @@
 #include <SPI.h>
 
 
-#define TEENSY 1
-
+// #define TEENSY 1
 #define DEBUG_DISPLAY 1
 
+
 #ifdef TEENSY
-#define hwSerial Serial
+#define hwSerial Serial1
 TwoWire *i2cBus1 = &Wire1;
 TwoWire *i2cBus2 = &Wire2;
 #else
@@ -174,7 +174,8 @@ typedef enum {
 typedef enum {
   HWTYPE_NONE = 0,
   HWTYPE_SENSOR  = 1,
-  HWTYPE_MUX  = 2
+  HWTYPE_MUX  = 2,
+  HWTYPE_EEPROM = 3
 } hwType_e;
 
 typedef struct busDevice_s {
@@ -314,11 +315,12 @@ void busPrint(busDevice_t *bus, const __FlashStringHelper *function)
   }
 }
 
-busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, int8_t enablePin = -1)
+busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, int8_t enablePin = -1, hwType_e hwType = HWTYPE_NONE)
 {
   busDevice_t *dev = (busDevice_t *)malloc(sizeof(busDevice_t));
   memset(dev, 0, sizeof(busDevice_t));
   dev->busType = BUSTYPE_I2C;
+  dev->hwType = hwType;
   dev->busdev.i2c.i2cBus = wire;
   dev->busdev.i2c.address = address;
   dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
@@ -327,11 +329,12 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 
   return dev;
 }
 
-busDevice_t *busDeviceInitSPI(SPIClass *spiBus, uint8_t csnPin)
+busDevice_t *busDeviceInitSPI(SPIClass *spiBus, uint8_t csnPin, hwType_e hwType = HWTYPE_NONE)
 {
   busDevice_t *dev = (busDevice_t *)malloc(sizeof(busDevice_t));
   memset(dev, 0, sizeof(busDevice_t));
   dev->busType = BUSTYPE_SPI;
+  dev->hwType = hwType;
   dev->busdev.spi.spiBus = spiBus;
   dev->busdev.spi.csnPin = csnPin;
   return dev;
@@ -378,7 +381,7 @@ bool busDeviceDetect(busDevice_t *busDev)
   return false;
 }
 
-char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, uint8_t length)
+char busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
 {
   char x;
   int error;
@@ -395,15 +398,20 @@ char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, u
     muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
     wire->beginTransmission(address);
-    wire->write(reg);
+
+    if (busDev->hwType == HWTYPE_EEPROM)
+      wire->write( (byte) (reg >> 8) );   //high addr byte
+    wire->write((uint8_t)(reg & 0xFF));
+    
     if (0 == (error = wire->endTransmission()))
     {
+      if (busDev->hwType == HWTYPE_EEPROM)
+        delay(10);
       wire->requestFrom(address, length);
+      
       while (wire->available() != length) ; // wait until bytes are ready
       for (x = 0; x < length; x++)
-      {
         values[x] = wire->read();
-      }
 
       // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
       if (busDev->busdev.i2c.enablePin != -1)
@@ -422,9 +430,9 @@ char busReadBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, u
   return (0);
 }
 
-char busWriteBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, char length)
+char busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, char length)
 {
-  int error;
+  int error, txStatus;
   if (busDev->busType == BUSTYPE_I2C)
   {
     int address = busDev->busdev.i2c.address;
@@ -435,8 +443,25 @@ char busWriteBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, 
       digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
 
     wire->beginTransmission(address);
+    if (busDev->hwType == HWTYPE_EEPROM)
+      wire->write( (byte) (reg >> 8) );   //high addr byte
+    wire->write((uint8_t)(reg & 0xFF));
     wire->write(values, length);
     error = wire->endTransmission();
+
+    // EEPROM needs this...
+    if (busDev->hwType == HWTYPE_EEPROM && error == 0)
+    {
+      //wait up to 50ms for the write to complete
+      for (uint8_t i = 100; i; --i) {
+        delayMicroseconds(500);                     //no point in waiting too fast
+        wire->beginTransmission(address);
+        wire->write(0);        //high addr byte
+        wire->write(0);        //low addr byte
+        error = wire->endTransmission();
+        if (error == 0) break;
+      }
+    }
 
     if (busDev->busdev.i2c.enablePin != -1)
       digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
@@ -450,26 +475,42 @@ char busWriteBuf(busDevice_t *busDev, unsigned char reg, unsigned char *values, 
 }
 
 
-char busRead(busDevice_t *busDev, unsigned char reg, unsigned char *values)
+char busRead(busDevice_t *busDev, unsigned short reg, unsigned char *values)
 {
   return busReadBuf(busDev, reg, values, 1);
 }
-char busWrite(busDevice_t *busDev, unsigned char reg, unsigned char value)
+char busWrite(busDevice_t *busDev, unsigned short reg, unsigned char value)
 {
-  unsigned char values[2] = {reg, value};
-  return busWriteBuf(busDev, reg, values, 2);
+  return busWriteBuf(busDev, reg, &value, 1);
 }
 
-void readEEPROM(busDevice_t *eeprom, uint16_t location, char *data, uint16_t length)
+
+
+char readEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
 {
-
+  // loop through the length using EEPROM_PAGE_SIZE intervals
+  // The lower level WIRE library has a buffer limitation, so staying in EEPROM_PAGE_SIZE intervals is a good thing
+  for (unsigned short x=0; x<length; x+=EEPROM_PAGE_SIZE)
+  {
+    if (!busReadBuf(busDev, reg+x, &values[x], min(EEPROM_PAGE_SIZE,(length-x))))
+        return 0;
+  }
+  return 1; 
 }
-
-void writeEEPROM(busDevice_t *eeprom, uint16_t location, char *data, uint16_t length)
+char writeEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, char length)
 {
-
+   // loop through the length using EEPROM_PAGE_SIZE intervals
+   // Writes must align on page size boundaries (otherwise it wraps to the beginning of the page)
+   if (reg%EEPROM_PAGE_SIZE)
+     return 0;
+  
+  for (unsigned short x=0; x<length; x+=EEPROM_PAGE_SIZE)
+  {
+    if (!busWriteBuf(busDev, reg+x, &values[x], min(EEPROM_PAGE_SIZE,(length-x))))
+        return 0;
+  }
+  return 1; 
 }
-
 
 
 void myprint(uint64_t value)
@@ -994,13 +1035,15 @@ busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t addr
   busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enablePin);
   busPrint(device, F("Detecting device on"));
   if (!bmp280Detect(baro, device))
-    if (!spl06Detect(baro, device))
+  { if (!spl06Detect(baro, device))
     {
       busDeviceFree(device);
       device = NULL;
       dprint(F("Device refused to be detected at 0x"));
       dprintln(address, HEX);
     }
+  }
+  device->hwType = HWTYPE_SENSOR;
   return device;
 }
 
@@ -1012,6 +1055,7 @@ busDevice_t *detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 
     free(thisDevice);
     return NULL;
   }
+  thisDevice->hwType = HWTYPE_EEPROM;
   return thisDevice;
 }
 
@@ -1040,8 +1084,12 @@ bool detectMuxedSensors(TwoWire *wire)
   }
   dprintln(F("MUX Based VISP Detected"));
 
+  // Assign the device it's correct type
+  muxDevice->hwType = HWTYPE_MUX;
+
   dprintln(F("Looking for EEPROM"));
   eeprom = detectEEPROM(wire, 0x54, 1, muxDevice, enablePin);
+
 
   // Detect U5, U6
   dprintln(F("Looking for U5"));
@@ -1288,7 +1336,7 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
 void clearCalibrationData()
 {
   memset(&calibrationTotals, 0, sizeof(calibrationTotals));
-  calibrationSampleCounter=0;
+  calibrationSampleCounter = 0;
   memset(&calibrationOffset, 0, sizeof(calibrationOffset));
 }
 
@@ -1336,7 +1384,7 @@ void setup() {
   if (eeprom)
   {
     uint8_t *buf;
-    dprintln(F("Reading VISP configuration"));
+    dprintln(F("Reading VISP EEPROM"));
 
     readEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
     readEEPROM(eeprom, sizeof(visp_eeprom), (char *)visp_calibration, sizeof(visp_calibration));
@@ -1509,7 +1557,7 @@ void loopVenturiVersion(float *P, float *T)
         volume = 0;
       }
 
-      const float alpha = 0.10; // smoothing factor for exponential filter.  Lower is smoother
+      const float alpha = 0.25; // smoothing factor for exponential filter
       volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
 
       pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;

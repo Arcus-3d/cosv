@@ -1344,7 +1344,7 @@ void setup() {
   }
 
   if (formatVisp)
-    formatVispEEPROM(detectedVispType, VISP_BODY_TYPE_PITOT);
+    formatVispEEPROM(detectedVispType, VISP_BODY_TYPE_VENTURI);
 
   // Just put it out there, what type we are for the status system to figure out
   hwSerial.print("!identity ");
@@ -1421,15 +1421,98 @@ void loopPitotVersion(float *P, float *T)
 
 }
 
+//U7 is input tube, U8 is output tube, U5 is venturi, U6 is ambient
+#define VENTURI_SENSOR  SENSOR_U5
+#define VENTURI_AMBIANT SENSOR_U6
+#define VENTURI_INPUT   SENSOR_U7
+#define VENTURI_OUTPUT  SENSOR_U8
 void loopVenturiVersion(float *P, float *T)
 {
-  static bool flag = true;
-  if (flag)
+  static float volumeSmoothed = 0; // Only used in this function, but needs to be persistant.
+  float airflow, volume, pitot_diff, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
+
+  switch (runState)
   {
-    hwSerial.println("!ERROR Daren, put Venturu code here");
-    flag = false;
+    case RUNSTATE_CALIBRATE:
+      calibrationTotals[0] += P[0];
+      calibrationTotals[1] += P[1];
+      calibrationTotals[2] += P[2];
+      calibrationTotals[3] += P[3];
+      calibrationSampleCounter++;
+      if (calibrationSampleCounter == 99) {
+        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400;
+        for (int x = 0; x < 4; x++)
+        {
+          calibrationOffset[x] = average - calibrationTotals[x] / 100;
+        }
+        calibrationSampleCounter = 0;
+        runState = RUNSTATE_RUN;
+      }
+      break;
+
+    case RUNSTATE_RUN:
+      P[0] += calibrationOffset[0];
+      P[1] += calibrationOffset[1];
+      P[2] += calibrationOffset[2];
+      P[3] += calibrationOffset[3];
+      const float paTocmH2O = 0.0101972;
+      // venturi calculations
+      const float a1 = 232.35219306; // area of pipe
+      const float a2 = 56.745017403; // area of restriction
+
+      const float a_diff = (a1 * a2) / sqrt((a1 * a1) - (a2 * a2)); // area difference
+
+      //    static float paTocmH2O = 0.00501972;
+      ambientPressure = P[VENTURI_AMBIANT];
+      inletPressure = P[VENTURI_INPUT];
+      outletPressure = P[VENTURI_OUTPUT];
+      patientPressure = P[VENTURI_SENSOR];
+      throatPressure = P[VENTURI_SENSOR];
+
+      //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m
+      airflow = a_diff * sqrt(2 * (inletPressure - throatPressure) / 998) * 600000; // airflow in cubic m/s *60000 to get L/m
+
+
+      if (inletPressure > outletPressure && inletPressure > throatPressure)
+      {
+        volume = a_diff * sqrt(2 * (inletPressure - throatPressure) / 998) * 0.6;
+      }
+      else if (outletPressure > inletPressure && outletPressure > throatPressure)
+      {
+        volume = -a_diff * sqrt(2 * (outletPressure - throatPressure) / 998) * 0.6;
+      }
+      else
+      {
+        volume = 0;
+      }
+      if (isnan(volume) || abs(volume) < 0.1 )
+      {
+        volume = 0;
+      }
+
+      const float alpha = 0.25; // smoothing factor for exponential filter
+      volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
+
+      pressure = ((inletPressure + outletPressure) / 2 - ambientPressure) * paTocmH2O;
+
+      // Take some time to write to the serial port
+      hwSerial.print(millis());
+      hwSerial.print(F(","));
+      hwSerial.print(pressure, 4);
+      hwSerial.print(F(","));
+      hwSerial.print(volumeSmoothed, 4);
+      hwSerial.print(F(","));
+      hwSerial.print(P[SENSOR_U5], 1);
+      hwSerial.print(F(","));
+      hwSerial.print(P[SENSOR_U6], 1);
+      hwSerial.print(F(","));
+      hwSerial.print(P[SENSOR_U7], 1);
+      hwSerial.print(F(","));
+      hwSerial.println(P[SENSOR_U8], 1);
+      break;
   }
 }
+
 
 void loop() {
   String command;
@@ -1470,16 +1553,16 @@ void loop() {
     }
 
     // Detect the VISP type from the EEPROM and use the appropriate function
-    switch (visp_eeprom.bodyType)
-    {
-      case 'P':
-        loopPitotVersion(P, T);
-        break;
-      case 'V':
-        loopVenturiVersion(P, T);
-        break;
-      default:
-        loopPitotVersion(P, T);
-    }
+    // Till we get the EEPROMS loaded right
+    //    switch (visp_eeprom.bodyType)
+    //    {
+    //      case 'P':
+    //        loopPitotVersion(P, T);
+    //        break;
+    //      case 'V':
+    //      default:
+    loopVenturiVersion(P, T);
+    //        break;
+    //    }
   }
 }

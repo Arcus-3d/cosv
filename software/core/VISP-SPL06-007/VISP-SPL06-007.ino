@@ -442,9 +442,10 @@ char busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values,
     int address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
     if (busDev->busdev.i2c.enablePin != -1)
       digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
+
+    muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
     wire->beginTransmission(address);
     if (busDev->hwType == HWTYPE_EEPROM)
@@ -468,7 +469,7 @@ char busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values,
     }
 
     if (busDev->busdev.i2c.enablePin != -1)
-      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
+      digitalWrite(busDev->busdev.i2c.enablePin, LOW);
 
     if (0 == error)
       return (1);

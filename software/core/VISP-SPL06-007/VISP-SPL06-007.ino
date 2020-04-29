@@ -156,6 +156,7 @@ uint8_t visp_calibration[128 - sizeof(visp_eeprom)];
 float calibrationTotals[4];
 int calibrationSampleCounter = 0;
 float calibrationOffset[4];
+float volumeSmoothed = 0;
 
 typedef enum {
   RUNSTATE_CALIBRATE = 0,
@@ -594,10 +595,10 @@ void myprintln(uint64_t value)
 #define SPL06_SAMPLE_RATE_128 7
 
 // See datasheet Table 8
-#define SPL06_PRESSURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_128
+#define SPL06_PRESSURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_64
 #define SPL06_PRESSURE_OVERSAMPLING            8
-#define SPL06_TEMPERATURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_2
-#define SPL06_TEMPERATURE_OVERSAMPLING         2
+#define SPL06_TEMPERATURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_8
+#define SPL06_TEMPERATURE_OVERSAMPLING         1
 
 #define SPL06_MEASUREMENT_TIME(oversampling)   ((2 + lrintf(oversampling * 1.6)) + 1) // ms
 
@@ -1507,7 +1508,7 @@ void loopPitotVersion(float *P, float *T)
 #define VENTURI_OUTPUT  SENSOR_U8
 void loopVenturiVersion(float *P, float *T)
 {
-  float volumeSmoothed = 0;
+
   float airflow, volume, pitot_diff, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
 
   switch (runState)
@@ -1551,7 +1552,7 @@ void loopVenturiVersion(float *P, float *T)
       //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m
       //airflow = a_diff * sqrt(2.0 * (inletPressure - throatPressure)) / 998.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
       // Why multiply by 2 then devide by a number, why not just divide by half the number?
-      airflow = a_diff * sqrt((inletPressure - throatPressure) / 449.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
+      //airflow = a_diff * sqrt((inletPressure - throatPressure) / 449.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
 
 
       if (inletPressure > outletPressure && inletPressure > throatPressure)
@@ -1571,7 +1572,7 @@ void loopVenturiVersion(float *P, float *T)
         volume = 0;
       }
 
-      const float alpha = 0.25; // smoothing factor for exponential filter
+      const float alpha = 0.1; // smoothing factor for exponential filter
       volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
 
       pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;

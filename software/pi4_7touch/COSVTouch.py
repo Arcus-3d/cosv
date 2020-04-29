@@ -143,10 +143,11 @@ class ScrollGraph(Graph):
         self.x_grid=True
         self.y_grid=True
         self.xmin=0
-        if (self.ymax-self.ymin > 50 ):
-            self.y_ticks_major=10
-        else:
-            self.y_ticks_major=5
+        if (not self.y_ticks_major):
+            if (self.ymax-self.ymin > 50 ):
+                self.y_ticks_major=10
+            else:
+                self.y_ticks_major=5
         super(ScrollGraph,self).__init__(**kwargs)
         self.plot=LinePlot(color=self.color,line_width=self.line_width)
         self.add_plot(self.plot)
@@ -220,7 +221,7 @@ class ScrollGraphBoxLayout(BoxLayout):
             pass 
 
 class COSVTouchApp(App):
-    run_state = OptionProperty("stopped",options=["stopped","running"])
+    run_state = OptionProperty("stop",options=["stop","run"])
     def build_config(self,config):
         config.setdefaults('state', {
             'running'   : 0,
@@ -245,9 +246,9 @@ class COSVTouchApp(App):
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
         self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=12000,graph_size=1200)
-        self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
+        self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=40))
         self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-30, ymax=30))
-        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=40))
+        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=15,size_hint=(1,0.75)))
         if (self.enableCO2):
             self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
         layoutLeft.add_widget(self.graphs)
@@ -291,11 +292,11 @@ class COSVTouchApp(App):
         return layoutMain
     def runButton(self,event):
         if self.buttonRun.value == 'Stopped':
-            self.run_state = 'stopped'
+            self.run_state = 'stop'
         else:
-            self.run_state = 'running'
+            self.run_state = 'run'
     def on_run_state(self,instance,value):
-        if value == 'running':
+        if value == 'run':
             try:
                 availablePorts = listSerialPorts()
                 self.serial = serial.Serial(port=availablePorts[0], baudrate=230400,timeout=1)
@@ -326,6 +327,7 @@ class COSVTouchApp(App):
                         self.vt = self.vt + col[2]/100-0.01
                         self.vt = 0.0 if self.vt < 0.0 else self.vt
                         self.graphs.add_points(col[1],col[2],self.vt)
+                        print(row)
                     except:
                         print(row)
                 except Exception as e:      

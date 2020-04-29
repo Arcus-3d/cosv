@@ -7,7 +7,7 @@ from math import sin
 from itertools import cycle
 
 from kivy.app import App
-from kivy.properties import StringProperty, ObjectProperty
+from kivy.properties import StringProperty, ObjectProperty, OptionProperty
 from kivy.uix.spinner import Spinner
 from kivy.uix.slider import Slider
 from kivy.uix.boxlayout import BoxLayout
@@ -133,8 +133,94 @@ class RotaryButton(DisplayButton):
         self.text =str(self.value)
         if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
 class ScrollGraph(Graph):
-    pass
+    def __init__(self,**kwargs):
+        self.color=kwargs.pop('color',[1,1,1,1])
+        self.line_width=kwargs.pop('line_width',1)
+        self.draw_border=True
+        self.y_grid_label=True
+        self.x_grid_label=False
+        self.padding=5
+        self.x_grid=True
+        self.y_grid=True
+        self.xmin=0
+        if (self.ymax-self.ymin > 50 ):
+            self.y_ticks_major=10
+        else:
+            self.y_ticks_major=5
+        super(ScrollGraph,self).__init__(**kwargs)
+        self.plot=LinePlot(color=self.color,line_width=self.line_width)
+        self.add_plot(self.plot)
+    def add_point(self,point):
+        self.plot.points.append(point)
+class ScrollGraphBoxLayout(BoxLayout):
+    def __init__(self,**kwargs):
+        self.graphHistorySize=kwargs.pop('history_size',600000)
+        self.graphSize=kwargs.pop('graph_size',1200)
+        super(ScrollGraphBoxLayout,self).__init__(**kwargs)
+        self.autoScroll = True
+        self.graphPosition = 1
+        self.graphDataPosition = 1
+        self.graphs = [];
+        self.touchLast = None
+    def reset(self):
+        for graph in self.graphs:
+            graph.plot.points = [(0,0)]
+        self.graphPosition = 1
+        self.graphDataPosition = 1
+        self.update()
+    def update(self):
+        if (self.graphDataPosition == self.graphHistorySize):
+            for graph in self.graphs:
+                del(graph.plot.points[0])
+                graph.plot.points[:] = [(i[0]-1, i[1]) for i in graph.plot.points[:]]
+            self.graphDataPosition = self.graphHistorySize - 1;
+        if self.autoScroll:
+            self.graphPosition = self.graphDataPosition
+        #if self.graphPosition > self.graphSize:
+        for graph in self.graphs:
+            graph.xmin=self.graphPosition-self.graphSize
+            graph.xmax=self.graphPosition
+    def add_graph(self,graph):
+        graph.xmin=0
+        graph.xmax=self.graphSize
+        self.add_widget(graph)
+        self.graphs.append(graph)
+        
+    def add_points(self,*argv):
+        for i,graph in enumerate(self.graphs):
+            point = 0.0 if len(argv) < i else argv[i]
+            graph.add_point((self.graphDataPosition, point ))
+        self.graphDataPosition += 1
+        self.update()
+    def on_touch_move(self,touch):
+        if touch.grab_current is self:
+            if self.touchLast:
+                dx = touch.x - self.touchLast.x
+            else:
+                dx = 0.0
+            self.touchLast = touch
+            #self.autoScroll=False
+            self.graphPosition = self.graphPosition - dx
+            self.update()
+            return True
+        else:
+            pass
+    def on_touch_down(self,touch):
+        if touch.is_double_tap:
+            self.autoScroll = True
+        else:
+            touch.grab(self)
+        return True
+    def on_touch_up(self,touch):
+        if touch.grab_current is self:
+            touch.ungrab(self)
+            self.touchLast = None
+            return True
+        else:
+            pass 
+
 class COSVTouchApp(App):
+    run_state = OptionProperty("stopped",options=["stopped","running"])
     def build_config(self,config):
         config.setdefaults('state', {
             'running'   : 0,
@@ -150,45 +236,22 @@ class COSVTouchApp(App):
             'PCV-VG': 'Pressure Controlled Ventilation'
         })
     def build(self): 
-        availablePorts = listSerialPorts()
+        #availablePorts = listSerialPorts()
         self.serial = serial.Serial()
-        self.counter = 1
-        self.runState = False
         self.enableCO2 = False
-        self.vt=0;
+        self.vt=0
         layoutMain = BoxLayout(orientation='horizontal',spacing=0, padding=0)
         
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
-        layoutGraph = BoxLayout(orientation='vertical', spacing=0, padding=(5,0))
-        graphPaw = ScrollGraph(ylabel='Paw cmH2O', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False,  padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=60)
-        graphFlow = ScrollGraph(ylabel='Flow L/min', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=-30, ymax=30)
-        graphVt = ScrollGraph(ylabel='Vt mL', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40)
+        self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=12000,graph_size=1200)
+        self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
+        self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-30, ymax=30))
+        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=40))
         if (self.enableCO2):
-            graphCO2 = ScrollGraph(ylabel='CO2 mmHg', draw_border=True, y_ticks_major=10, y_grid_label=True, x_grid_label=False, padding=5, x_grid=True, y_grid=True, xmin=0, xmax=600, ymin=0, ymax=40,size_hint_y=0,)
-        self.plot = []
-        self.plot.append(LinePlot(color=[1, 0, 1, 1],line_width=1))
-        self.plot.append(LinePlot(color=[0, 1, 1, 1],line_width=1))
-        self.plot.append(LinePlot(color=[1, 1, 0, 1],line_width=1))
-        if (self.enableCO2): 
-            self.plot.append(LinePlot(color=[0.5, 0.5, 1, 1],line_width=1))
-  
-        self.reset_plots()
-  
-        graphPaw.add_plot(self.plot[0])
-        graphFlow.add_plot(self.plot[1])
-        graphVt.add_plot(self.plot[2])
-        if (self.enableCO2):
-            graphCO2.add_plot(self.plot[3])
-
-        layoutGraph.add_widget(graphPaw)
-        layoutGraph.add_widget(graphFlow)
-        layoutGraph.add_widget(graphVt)
-        if (self.enableCO2):
-            layoutGraph.add_widget(graphCO2)
-        #self.graphCO2.height='0dp'
-        #self.graphCO2.size_hint_y=0
-        layoutLeft.add_widget(layoutGraph)
+            self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
+        layoutLeft.add_widget(self.graphs)
+        self.graphs.reset()
         
         # Bottom Controls
         layoutControlBottom = BoxLayout(orientation='horizontal', spacing=10, padding=(5,10),size_hint=(1,0.2))
@@ -225,15 +288,21 @@ class COSVTouchApp(App):
         layoutControlRight.add_widget(self.buttonRun)
 
         layoutMain.add_widget(layoutControlRight)
-       
         return layoutMain
     def runButton(self,event):
         if self.buttonRun.value == 'Stopped':
+            self.run_state = 'stopped'
+        else:
+            self.run_state = 'running'
+    def on_run_state(self,instance,value):
+        if value == 'running':
             try:
                 availablePorts = listSerialPorts()
                 self.serial = serial.Serial(port=availablePorts[0], baudrate=230400,timeout=1)
                 Clock.schedule_interval(self.get_data, 1 / 100.)
-                self.counter = 1
+                if (self.serial.is_open): 
+                    self.serial.write(b'calibrate\n')
+                self.graphs.reset()
             except Exception as e:
                 print(e)
                 popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
@@ -242,37 +311,27 @@ class COSVTouchApp(App):
             try:
                 self.serial.close()
                 Clock.unschedule(self.get_data)
-                self.reset_plots()
             except Exception as e:
                 print(e)
                 popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
                 popup.open()
-    def reset_plots(self):
-        for plot in self.plot:
-            plot.points = [(0,0)]
   
     def get_data(self, dt):
-        if (self.counter == 600):
-            for plot in self.plot:
-                del(plot.points[0])
-                plot.points[:] = [(i[0]-1, i[1]) for i in plot.points[:]]
-            self.counter = 599
-        try:
-            if (self.serial.is_open and self.serial.in_waiting > 0): 
-                row = str(self.serial.readline().decode('ascii'))
-                col=[float(i) for i in row.strip().split(',',10)]
-                self.vt = (self.vt + col[2]/100);
-                if (self.vt < 0):
-                    self.vt = 0
-                self.plot[0].points.append((self.counter, col[1] ))
-                self.plot[1].points.append((self.counter, col[2] ))
-                self.plot[2].points.append((self.counter, self.vt ))
-                #self.plot[3].points.append((self.counter, col[4] ))
-                self.counter += 1
-        except Exception as e:      
-            print(e)
-            print(row)
-
+        if self.serial.is_open:
+            while self.serial.in_waiting > 0: 
+                try:
+                    row = str(self.serial.readline().decode('ascii'))
+                    try:
+                        col=[float(i) for i in row.strip().split(',',10)]
+                        self.vt = self.vt + col[2]/100-0.01
+                        self.vt = 0.0 if self.vt < 0.0 else self.vt
+                        self.graphs.add_points(col[1],col[2],self.vt)
+                    except:
+                        print(row)
+                except Exception as e:      
+                    print(e)
+        else:
+            print("Serial connection not open.")
 class ErrorPopup(Popup):
     pass
   

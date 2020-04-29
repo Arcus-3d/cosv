@@ -195,6 +195,7 @@ class ScrollGraphBoxLayout(BoxLayout):
         self.update()
     def on_touch_move(self,touch):
         if touch.grab_current is self:
+            print(touch)
             if self.touchLast:
                 dx = touch.x - self.touchLast.x
             else:

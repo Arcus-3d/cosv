@@ -156,7 +156,6 @@ uint8_t visp_calibration[128 - sizeof(visp_eeprom)];
 float calibrationTotals[4];
 int calibrationSampleCounter = 0;
 float calibrationOffset[4];
-float volumeSmoothed = 0;
 
 typedef enum {
   RUNSTATE_CALIBRATE = 0,
@@ -1508,8 +1507,8 @@ void loopPitotVersion(float *P, float *T)
 #define VENTURI_OUTPUT  SENSOR_U8
 void loopVenturiVersion(float *P, float *T)
 {
-
-  float airflow, volume, pitot_diff, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
+  static float volumeSmoothed = 0;
+  float volume, pitot_diff, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
 
   switch (runState)
   {

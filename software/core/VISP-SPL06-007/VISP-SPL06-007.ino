@@ -701,8 +701,9 @@ bool spl06_calculate(baroDev_t * baro, float * pressure, float * temperature)
 }
 
 
-bool read_calibration_coefficients(baroDev_t *baro) {
+bool spl06_read_calibration_coefficients(baroDev_t *baro) {
   uint8_t sstatus;
+
   if (!(busRead(baro->busDev, SPL06_MODE_AND_STATUS_REG, &sstatus) && (sstatus & SPL06_MEAS_CFG_COEFFS_RDY)))
     return false;   // error reading status or coefficients not ready
 
@@ -711,6 +712,14 @@ bool read_calibration_coefficients(baroDev_t *baro) {
   if (!busReadBuf(baro->busDev, SPL06_CALIB_COEFFS_START, (uint8_t *)&caldata, SPL06_CALIB_COEFFS_LEN)) {
     return false;
   }
+
+  busPrint(baro->busDev, F("spl06_read_calibration_coefficients"));
+  for (int x=0; x<SPL06_CALIB_COEFFS_LEN; x++)
+  {
+      dprint(caldata[x], HEX);
+      dprint(F(", "));
+  }
+  dprintln(F(""));
 
   baro->spl06_cal.c0 = (caldata[0] & 0x80 ? 0xF000 : 0) | ((uint16_t)caldata[0] << 4) | (((uint16_t)caldata[1] & 0xF0) >> 4);
   baro->spl06_cal.c1 = ((caldata[1] & 0x8 ? 0xF000 : 0) | ((uint16_t)caldata[1] & 0x0F) << 8) | (uint16_t)caldata[2];
@@ -784,7 +793,7 @@ bool spl06Detect(baroDev_t *baro, busDevice_t *busDev)
   }
   baro->busDev = busDev;
 
-  if (!(read_calibration_coefficients(baro) && spl06_configure_measurements(baro))) {
+  if (!(spl06_read_calibration_coefficients(baro) && spl06_configure_measurements(baro))) {
     baro->busDev = NULL;
     return false;
   }

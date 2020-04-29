@@ -241,19 +241,23 @@ typedef bool (*baroCalculateFuncPtr)(struct baroDev_s * baro, float *pressure, f
 typedef struct baroDev_s {
   busDevice_t * busDev;
   baroCalculateFuncPtr calculate;
-
-  bmp280_calib_param_t bmp280_cal;
-  // uncompensated pressure and temperature
-  int32_t bmp280_up;
-  int32_t bmp280_ut;
-  //error free measurements
-  int32_t bmp280_up_valid;
-  int32_t bmp280_ut_valid;
-
-  spl06_coeffs_t spl06_cal;
-  // uncompensated pressure and temperature
-  int32_t spl06_pressure_raw;
-  int32_t spl06_temperature_raw;
+  union {
+    struct {
+      bmp280_calib_param_t cal;
+      // uncompensated pressure and temperature
+      int32_t up;
+      int32_t ut;
+      //error free measurements
+      int32_t up_valid;
+      int32_t ut_valid;
+    } bmp280;
+    struct {
+      spl06_coeffs_t cal;
+      // uncompensated pressure and temperature
+      int32_t pressure_raw;
+      int32_t temperature_raw;
+    } spl06;
+  } chip;
 } baroDev_t;
 
 
@@ -402,13 +406,13 @@ char busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, 
     if (busDev->hwType == HWTYPE_EEPROM)
       wire->write( (byte) (reg >> 8) );   //high addr byte
     wire->write((uint8_t)(reg & 0xFF));
-    
+
     if (0 == (error = wire->endTransmission()))
     {
       if (busDev->hwType == HWTYPE_EEPROM)
         delay(10);
       wire->requestFrom(address, length);
-      
+
       while (wire->available() != length) ; // wait until bytes are ready
       for (x = 0; x < length; x++)
         values[x] = wire->read();
@@ -490,26 +494,26 @@ char readEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, 
 {
   // loop through the length using EEPROM_PAGE_SIZE intervals
   // The lower level WIRE library has a buffer limitation, so staying in EEPROM_PAGE_SIZE intervals is a good thing
-  for (unsigned short x=0; x<length; x+=EEPROM_PAGE_SIZE)
+  for (unsigned short x = 0; x < length; x += EEPROM_PAGE_SIZE)
   {
-    if (!busReadBuf(busDev, reg+x, &values[x], min(EEPROM_PAGE_SIZE,(length-x))))
-        return 0;
+    if (!busReadBuf(busDev, reg + x, &values[x], min(EEPROM_PAGE_SIZE, (length - x))))
+      return 0;
   }
-  return 1; 
+  return 1;
 }
 char writeEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, char length)
 {
-   // loop through the length using EEPROM_PAGE_SIZE intervals
-   // Writes must align on page size boundaries (otherwise it wraps to the beginning of the page)
-   if (reg%EEPROM_PAGE_SIZE)
-     return 0;
-  
-  for (unsigned short x=0; x<length; x+=EEPROM_PAGE_SIZE)
+  // loop through the length using EEPROM_PAGE_SIZE intervals
+  // Writes must align on page size boundaries (otherwise it wraps to the beginning of the page)
+  if (reg % EEPROM_PAGE_SIZE)
+    return 0;
+
+  for (unsigned short x = 0; x < length; x += EEPROM_PAGE_SIZE)
   {
-    if (!busWriteBuf(busDev, reg+x, &values[x], min(EEPROM_PAGE_SIZE,(length-x))))
-        return 0;
+    if (!busWriteBuf(busDev, reg + x, &values[x], min(EEPROM_PAGE_SIZE, (length - x))))
+      return 0;
   }
-  return 1; 
+  return 1;
 }
 
 
@@ -644,7 +648,7 @@ bool spl06_read_temperature(baroDev_t * baro)
 
   if (ack) {
     spl06_temperature = (int32_t)((data[0] & 0x80 ? 0xFF000000 : 0) | (((uint32_t)(data[0])) << 16) | (((uint32_t)(data[1])) << 8) | ((uint32_t)data[2]));
-    baro->spl06_temperature_raw = spl06_temperature;
+    baro->chip.spl06.temperature_raw = spl06_temperature;
   }
 
   return ack;
@@ -659,7 +663,7 @@ bool spl06_read_pressure(baroDev_t * baro)
 
   if (ack) {
     spl06_pressure = (int32_t)((data[0] & 0x80 ? 0xFF000000 : 0) | (((uint32_t)(data[0])) << 16) | (((uint32_t)(data[1])) << 8) | ((uint32_t)data[2]));
-    baro->spl06_pressure_raw = spl06_pressure;
+    baro->chip.spl06.pressure_raw = spl06_pressure;
   }
 
   return ack;
@@ -669,7 +673,7 @@ bool spl06_read_pressure(baroDev_t * baro)
 float spl06_compensate_temperature(baroDev_t * baro, int32_t temperature_raw)
 {
   const float t_raw_sc = (float)temperature_raw / spl06_raw_value_scale_factor(SPL06_TEMPERATURE_OVERSAMPLING);
-  const float temp_comp = (float)baro->spl06_cal.c0 / 2 + t_raw_sc * baro->spl06_cal.c1;
+  const float temp_comp = (float)baro->chip.spl06.cal.c0 / 2 + t_raw_sc * baro->chip.spl06.cal.c1;
   return temp_comp;
 }
 
@@ -679,8 +683,8 @@ float spl06_compensate_pressure(baroDev_t * baro, int32_t pressure_raw, int32_t 
   const float p_raw_sc = (float)pressure_raw / spl06_raw_value_scale_factor(SPL06_PRESSURE_OVERSAMPLING);
   const float t_raw_sc = (float)temperature_raw / spl06_raw_value_scale_factor(SPL06_TEMPERATURE_OVERSAMPLING);
 
-  const float pressure_cal = (float)baro->spl06_cal.c00 + p_raw_sc * ((float)baro->spl06_cal.c10 + p_raw_sc * ((float)baro->spl06_cal.c20 + p_raw_sc * baro->spl06_cal.c30));
-  const float p_temp_comp = t_raw_sc * ((float)baro->spl06_cal.c01 + p_raw_sc * ((float)baro->spl06_cal.c11 + p_raw_sc * baro->spl06_cal.c21));
+  const float pressure_cal = (float)baro->chip.spl06.cal.c00 + p_raw_sc * ((float)baro->chip.spl06.cal.c10 + p_raw_sc * ((float)baro->chip.spl06.cal.c20 + p_raw_sc * baro->chip.spl06.cal.c30));
+  const float p_temp_comp = t_raw_sc * ((float)baro->chip.spl06.cal.c01 + p_raw_sc * ((float)baro->chip.spl06.cal.c11 + p_raw_sc * baro->chip.spl06.cal.c21));
 
   return pressure_cal + p_temp_comp;
 }
@@ -689,12 +693,12 @@ bool spl06_calculate(baroDev_t * baro, float * pressure, float * temperature)
 {
   if (pressure) {
     spl06_read_pressure(baro);
-    *pressure = spl06_compensate_pressure(baro, baro->spl06_pressure_raw, baro->spl06_temperature_raw);
+    *pressure = spl06_compensate_pressure(baro, baro->chip.spl06.pressure_raw, baro->chip.spl06.temperature_raw);
   }
 
   if (temperature) {
     spl06_read_temperature(baro);
-    *temperature = spl06_compensate_temperature(baro, baro->spl06_temperature_raw);
+    *temperature = spl06_compensate_temperature(baro, baro->chip.spl06.temperature_raw);
   }
 
   return true;
@@ -714,22 +718,22 @@ bool spl06_read_calibration_coefficients(baroDev_t *baro) {
   }
 
   busPrint(baro->busDev, F("spl06_read_calibration_coefficients"));
-  for (int x=0; x<SPL06_CALIB_COEFFS_LEN; x++)
+  for (int x = 0; x < SPL06_CALIB_COEFFS_LEN; x++)
   {
-      dprint(caldata[x], HEX);
-      dprint(F(", "));
+    dprint(caldata[x], HEX);
+    dprint(F(", "));
   }
   dprintln(F(""));
 
-  baro->spl06_cal.c0 = (caldata[0] & 0x80 ? 0xF000 : 0) | ((uint16_t)caldata[0] << 4) | (((uint16_t)caldata[1] & 0xF0) >> 4);
-  baro->spl06_cal.c1 = ((caldata[1] & 0x8 ? 0xF000 : 0) | ((uint16_t)caldata[1] & 0x0F) << 8) | (uint16_t)caldata[2];
-  baro->spl06_cal.c00 = (caldata[3] & 0x80 ? 0xFFF00000 : 0) | ((uint32_t)caldata[3] << 12) | ((uint32_t)caldata[4] << 4) | (((uint32_t)caldata[5] & 0xF0) >> 4);
-  baro->spl06_cal.c10 = (caldata[5] & 0x8 ? 0xFFF00000 : 0) | (((uint32_t)caldata[5] & 0x0F) << 16) | ((uint32_t)caldata[6] << 8) | (uint32_t)caldata[7];
-  baro->spl06_cal.c01 = ((uint16_t)caldata[8] << 8) | ((uint16_t)caldata[9]);
-  baro->spl06_cal.c11 = ((uint16_t)caldata[10] << 8) | (uint16_t)caldata[11];
-  baro->spl06_cal.c20 = ((uint16_t)caldata[12] << 8) | (uint16_t)caldata[13];
-  baro->spl06_cal.c21 = ((uint16_t)caldata[14] << 8) | (uint16_t)caldata[15];
-  baro->spl06_cal.c30 = ((uint16_t)caldata[16] << 8) | (uint16_t)caldata[17];
+  baro->chip.spl06.cal.c0 = (caldata[0] & 0x80 ? 0xF000 : 0) | ((uint16_t)caldata[0] << 4) | (((uint16_t)caldata[1] & 0xF0) >> 4);
+  baro->chip.spl06.cal.c1 = ((caldata[1] & 0x8 ? 0xF000 : 0) | ((uint16_t)caldata[1] & 0x0F) << 8) | (uint16_t)caldata[2];
+  baro->chip.spl06.cal.c00 = (caldata[3] & 0x80 ? 0xFFF00000 : 0) | ((uint32_t)caldata[3] << 12) | ((uint32_t)caldata[4] << 4) | (((uint32_t)caldata[5] & 0xF0) >> 4);
+  baro->chip.spl06.cal.c10 = (caldata[5] & 0x8 ? 0xFFF00000 : 0) | (((uint32_t)caldata[5] & 0x0F) << 16) | ((uint32_t)caldata[6] << 8) | (uint32_t)caldata[7];
+  baro->chip.spl06.cal.c01 = ((uint16_t)caldata[8] << 8) | ((uint16_t)caldata[9]);
+  baro->chip.spl06.cal.c11 = ((uint16_t)caldata[10] << 8) | (uint16_t)caldata[11];
+  baro->chip.spl06.cal.c20 = ((uint16_t)caldata[12] << 8) | (uint16_t)caldata[13];
+  baro->chip.spl06.cal.c21 = ((uint16_t)caldata[14] << 8) | (uint16_t)caldata[15];
+  baro->chip.spl06.cal.c30 = ((uint16_t)caldata[16] << 8) | (uint16_t)caldata[17];
 
   return true;
 }
@@ -877,15 +881,15 @@ bool bmp280_get_up(baroDev_t * baro)
 
   //check if pressure and temperature readings are valid, otherwise use previous measurements from the moment
   if (ack) {
-    baro->bmp280_up = (int32_t)((((uint32_t)(data[0])) << 12) | (((uint32_t)(data[1])) << 4) | ((uint32_t)data[2] >> 4));
-    baro->bmp280_ut = (int32_t)((((uint32_t)(data[3])) << 12) | (((uint32_t)(data[4])) << 4) | ((uint32_t)data[5] >> 4));
-    baro->bmp280_up_valid = baro->bmp280_up;
-    baro->bmp280_ut_valid = baro->bmp280_ut;
+    baro->chip.bmp280.up = (int32_t)((((uint32_t)(data[0])) << 12) | (((uint32_t)(data[1])) << 4) | ((uint32_t)data[2] >> 4));
+    baro->chip.bmp280.ut = (int32_t)((((uint32_t)(data[3])) << 12) | (((uint32_t)(data[4])) << 4) | ((uint32_t)data[5] >> 4));
+    baro->chip.bmp280.up_valid = baro->chip.bmp280.up;
+    baro->chip.bmp280.ut_valid = baro->chip.bmp280.ut;
   }
   else {
     //assign previous valid measurements
-    baro->bmp280_up = baro->bmp280_up_valid;
-    baro->bmp280_ut = baro->bmp280_ut_valid;
+    baro->chip.bmp280.up = baro->chip.bmp280.up_valid;
+    baro->chip.bmp280.ut = baro->chip.bmp280.ut_valid;
   }
 
   return ack;
@@ -897,10 +901,10 @@ int32_t bmp280_compensate_T(baroDev_t * baro, int32_t adc_T)
 {
   int32_t var1, var2, T;
 
-  var1 = ((((adc_T >> 3) - ((int32_t)baro->bmp280_cal.dig_T1 << 1))) * ((int32_t)baro->bmp280_cal.dig_T2)) >> 11;
-  var2  = (((((adc_T >> 4) - ((int32_t)baro->bmp280_cal.dig_T1)) * ((adc_T >> 4) - ((int32_t)baro->bmp280_cal.dig_T1))) >> 12) * ((int32_t)baro->bmp280_cal.dig_T3)) >> 14;
-  baro->bmp280_cal.t_fine = var1 + var2;
-  T = (baro->bmp280_cal.t_fine * 5 + 128) >> 8;
+  var1 = ((((adc_T >> 3) - ((int32_t)baro->chip.bmp280.cal.dig_T1 << 1))) * ((int32_t)baro->chip.bmp280.cal.dig_T2)) >> 11;
+  var2  = (((((adc_T >> 4) - ((int32_t)baro->chip.bmp280.cal.dig_T1)) * ((adc_T >> 4) - ((int32_t)baro->chip.bmp280.cal.dig_T1))) >> 12) * ((int32_t)baro->chip.bmp280.cal.dig_T3)) >> 14;
+  baro->chip.bmp280.cal.t_fine = var1 + var2;
+  T = (baro->chip.bmp280.cal.t_fine * 5 + 128) >> 8;
   return T;
 }
 
@@ -910,21 +914,21 @@ int32_t bmp280_compensate_T(baroDev_t * baro, int32_t adc_T)
 uint32_t bmp280_compensate_P(baroDev_t * baro, int32_t adc_P)
 {
   int64_t var1, var2, p;
-  var1 = ((int64_t)baro->bmp280_cal.t_fine) - 128000;
-  var2 = var1 * var1 * (int64_t)baro->bmp280_cal.dig_P6;
-  var2 = var2 + ((var1 * (int64_t)baro->bmp280_cal.dig_P5) << 17);
-  var2 = var2 + (((int64_t)baro->bmp280_cal.dig_P4) << 35);
-  var1 = ((var1 * var1 * (int64_t)baro->bmp280_cal.dig_P3) >> 8) + ((var1 * (int64_t)baro->bmp280_cal.dig_P2) << 12);
-  var1 = (((((int64_t)1) << 47) + var1)) * ((int64_t)baro->bmp280_cal.dig_P1) >> 33;
+  var1 = ((int64_t)baro->chip.bmp280.cal.t_fine) - 128000;
+  var2 = var1 * var1 * (int64_t)baro->chip.bmp280.cal.dig_P6;
+  var2 = var2 + ((var1 * (int64_t)baro->chip.bmp280.cal.dig_P5) << 17);
+  var2 = var2 + (((int64_t)baro->chip.bmp280.cal.dig_P4) << 35);
+  var1 = ((var1 * var1 * (int64_t)baro->chip.bmp280.cal.dig_P3) >> 8) + ((var1 * (int64_t)baro->chip.bmp280.cal.dig_P2) << 12);
+  var1 = (((((int64_t)1) << 47) + var1)) * ((int64_t)baro->chip.bmp280.cal.dig_P1) >> 33;
   if (var1 == 0) {
     return 0; // avoid exception caused by division by zero
   }
 
   p = 1048576 - adc_P;
   p = (((p << 31) - var2) * 3125) / var1;
-  var1 = (((int64_t)baro->bmp280_cal.dig_P9) * (p >> 13) * (p >> 13)) >> 25;
-  var2 = (((int64_t)baro->bmp280_cal.dig_P8) * p) >> 19;
-  p = ((p + var1 + var2) >> 8) + (((int64_t)baro->bmp280_cal.dig_P7) << 4);
+  var1 = (((int64_t)baro->chip.bmp280.cal.dig_P9) * (p >> 13) * (p >> 13)) >> 25;
+  var2 = (((int64_t)baro->chip.bmp280.cal.dig_P8) * p) >> 19;
+  p = ((p + var1 + var2) >> 8) + (((int64_t)baro->chip.bmp280.cal.dig_P7) << 4);
   return (uint32_t)p;
 }
 
@@ -934,8 +938,8 @@ bool bmp280_calculate(baroDev_t * baro, float * pressure, float * temperature)
   uint32_t p;
 
   bmp280_get_up(baro);
-  t = bmp280_compensate_T(baro, baro->bmp280_ut); // Must happen before bmp280_compensate_P() (see t_fine)
-  p = bmp280_compensate_P(baro, baro->bmp280_up);
+  t = bmp280_compensate_T(baro, baro->chip.bmp280.ut); // Must happen before bmp280_compensate_P() (see t_fine)
+  p = bmp280_compensate_P(baro, baro->chip.bmp280.up);
 
   if (pressure) {
     *pressure = (p / 256.0);
@@ -978,7 +982,7 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
   busPrint(busDev, F("BMP280 Detected"));
 
   // read calibration
-  busReadBuf(baro->busDev, BMP280_TEMPERATURE_CALIB_DIG_T1_LSB_REG, (uint8_t *)&baro->bmp280_cal, 24);
+  busReadBuf(baro->busDev, BMP280_TEMPERATURE_CALIB_DIG_T1_LSB_REG, (uint8_t *)&baro->chip.bmp280.cal, 24);
 
   delay(100);
 

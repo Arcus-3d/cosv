@@ -592,11 +592,11 @@ void myprintln(uint64_t value)
 #define SPL06_SAMPLE_RATE_64  6
 #define SPL06_SAMPLE_RATE_128 7
 
-// See datasheet Table 9
-#define SPL06_PRESSURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_16
-#define SPL06_PRESSURE_OVERSAMPLING            32
-#define SPL06_TEMPERATURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_1
-#define SPL06_TEMPERATURE_OVERSAMPLING         1
+// See datasheet Table 8
+#define SPL06_PRESSURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_128
+#define SPL06_PRESSURE_OVERSAMPLING            8
+#define SPL06_TEMPERATURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_2
+#define SPL06_TEMPERATURE_OVERSAMPLING         2
 
 #define SPL06_MEASUREMENT_TIME(oversampling)   ((2 + lrintf(oversampling * 1.6)) + 1) // ms
 

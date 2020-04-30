@@ -78,6 +78,7 @@ class SliderButton(PopupButton):
         self.min=kwargs.pop('min',0)
         self.max=kwargs.pop('max',100)
         self.step=kwargs.pop('step',1)
+        self.on_update=kwargs.pop('on_update',None)
         self.sliderBind=False
         super(SliderButton,self).__init__(**kwargs)
         self.slider=Slider(min=self.min,value=self.value,max=self.max,step=self.step,cursor_width='32sp',orientation=self.popup_orientation,size_hint=(1,1),size=('25sp','100sp'))
@@ -91,7 +92,7 @@ class SliderButton(PopupButton):
         self.slider.unbind(on_touch_up=self.updateValue)
         self.slider.unbind(on_touch_move=self.updatePopup)
         super(SliderButton,self).updateValue(self,*args)
-        
+        self.on_update(self.value)
     def updatePopup(self,*args):
         self.popup.title=str(self.text_top) + str(' : ') + str(self.slider.value)
         Clock.schedule_once(self.bindTouchUp,0.5)
@@ -157,12 +158,17 @@ class ScrollGraphBoxLayout(BoxLayout):
     def __init__(self,**kwargs):
         self.graphHistorySize=kwargs.pop('history_size',600000)
         self.graphSize=kwargs.pop('graph_size',1200)
+        self.title=kwargs.pop('title',' ')
         super(ScrollGraphBoxLayout,self).__init__(**kwargs)
         self.autoScroll = True
         self.graphPosition = 1
         self.graphDataPosition = 1
         self.graphs = [];
         self.scrollSpeed = 0
+        #self.titleBar = Label(text=self.title,size_hint=(1,'10sp'))
+        #self.add_widget(self.titleBar)
+    def set_title(self,title):
+        self.titlebar.text = title	
     def reset(self):
         for graph in self.graphs:
             graph.plot.points = [(0,0)]
@@ -226,6 +232,7 @@ class ScrollGraphBoxLayout(BoxLayout):
 
 class COSVTouchApp(App):
     run_state = OptionProperty("stop",options=["stop","run"])
+    run_mode = OptionProperty("stop",options=["stop","run"])
     def build_config(self,config):
         config.setdefaults('state', {
             'running'   : 0,
@@ -263,17 +270,17 @@ class COSVTouchApp(App):
         buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV'),text_bottom=" ")
         layoutControlBottom.add_widget(buttonMode);
         
-        buttonTidalVolume = SliderButton(name='tidalv',text_top="TidalV",min=200,max=800,value=500,text_bottom="ml");
+        buttonTidalVolume = SliderButton(name='tidalv',text_top="TidalV",min=200,max=700,value=500,text_bottom="ml");
         layoutControlBottom.add_widget(buttonTidalVolume);
         
-        buttonRespRate = SliderButton(name='rate',text_top="Rate",min=8,max=40,value=18,text_bottom="/min");
+        buttonRespRate = SliderButton(name='rate',text_top="Rate",min=8,max=40,value=18,text_bottom="/min",on_change=self.updateRate);
         layoutControlBottom.add_widget(buttonRespRate);
         
         buttonInhaleExhale = SelectButton(name='ie',text_top="I:E",value="1:2",values=('1:1','1:2','1:3','1:4'),text_bottom=" ");
         layoutControlBottom.add_widget(buttonInhaleExhale);
         
-        buttonPEEP = SliderButton(name='peep',text_top="PEEP",min=0,value="5",max=25,text_bottom="cmH2O");
-        layoutControlBottom.add_widget(buttonPEEP);
+        #buttonPEEP = SliderButton(name='peep',text_top="PEEP",min=0,value="5",max=25,text_bottom="cmH2O");
+        #layoutControlBottom.add_widget(buttonPEEP);
         
         buttonPressureMax = SliderButton(name='pmax',text_top="Pmax",min=10,value="20",max=60,text_bottom="cmH2O");
         layoutControlBottom.add_widget(buttonPressureMax);
@@ -294,6 +301,9 @@ class COSVTouchApp(App):
 
         layoutMain.add_widget(layoutControlRight)
         return layoutMain
+    def updateRate(self,event):
+        self.serial.write(b'rate\n')
+
     def runButton(self,event):
         if self.buttonRun.value == 'Running':
             self.run_state = 'stop'
@@ -306,7 +316,7 @@ class COSVTouchApp(App):
                 self.serial = serial.Serial(port=availablePorts[0], baudrate=230400,timeout=1)
                 Clock.schedule_interval(self.get_data, 1 / 100.)
                 if (self.serial.is_open): 
-                    self.serial.write(b'calibrate\n')
+                    self.serial.write(b'run\n')
                 self.graphs.reset()
             except Exception as e:
                 print(e)
@@ -314,6 +324,7 @@ class COSVTouchApp(App):
                 popup.open()
         else:
             try:
+                self.serial.write(b'stop\n')
                 self.serial.close()
                 Clock.unschedule(self.get_data)
             except Exception as e:

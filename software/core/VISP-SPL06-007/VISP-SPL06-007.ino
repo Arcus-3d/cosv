@@ -49,6 +49,11 @@ TwoWire *i2cBus2 = NULL;
 #define ENABLE_PIN_BUS_A 4
 #define ENABLE_PIN_BUS_B 5
 
+#define M_PWM_1 6
+#define M_PWM_2 9
+#define M_DIR_1 10
+#define M_DIR_2 10
+
 // DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
 //
 // Simple way to make both I2C buses use a single I2C port
@@ -1357,12 +1362,15 @@ void clearCalibrationData()
 void setup() {
   bool sensorsFound = false, formatVisp = false;;
   uint8_t sensorCount = 0;
-
   // Address select lines for Dual I2C switching using NPN Transistors
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_A, LOW);
   pinMode(ENABLE_PIN_BUS_B, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_B, LOW);
+  pinMode(M_PWM_1, OUTPUT);
+  pinMode(M_PWM_2, OUTPUT);
+  pinMode(M_DIR_1, OUTPUT);
+  pinMode(M_DIR_2, OUTPUT);
 
 
   hwSerial.begin(230400);
@@ -1515,27 +1523,27 @@ void loopVenturiVersion(float *P, float *T)
   switch (runState)
   {
     case RUNSTATE_CALIBRATE:
-      calibrationTotals[0] += P[0];
-      calibrationTotals[1] += P[1];
-      calibrationTotals[2] += P[2];
-      calibrationTotals[3] += P[3];
-      calibrationSampleCounter++;
-      if (calibrationSampleCounter == 99) {
-        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400.0;
-        for (int x = 0; x < 4; x++)
-        {
-          calibrationOffset[x] = average - calibrationTotals[x] / 100.0;
-        }
-        calibrationSampleCounter = 0;
+      //calibrationTotals[0] += P[0];
+      //calibrationTotals[1] += P[1];
+      //calibrationTotals[2] += P[2];
+      //calibrationTotals[3] += P[3];
+      //calibrationSampleCounter++;
+      //if (calibrationSampleCounter == 99) {
+      //  float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400.0;
+      //  for (int x = 0; x < 4; x++)
+      //  {
+      //    calibrationOffset[x] = average - calibrationTotals[x] / 100.0;
+      //  }
+      //  calibrationSampleCounter = 0;
         runState = RUNSTATE_RUN;
-      }
+      //}
       break;
 
     case RUNSTATE_RUN:
-      P[0] += calibrationOffset[0];
-      P[1] += calibrationOffset[1];
-      P[2] += calibrationOffset[2];
-      P[3] += calibrationOffset[3];
+      //P[0] += calibrationOffset[0];
+      //P[1] += calibrationOffset[1];
+      //P[2] += calibrationOffset[2];
+      //P[3] += calibrationOffset[3];
       const float paTocmH2O = 0.0101972;
       // venturi calculations
       const float a1 = 232.35219306; // area of pipe
@@ -1558,7 +1566,7 @@ void loopVenturiVersion(float *P, float *T)
 
       if (inletPressure > outletPressure && inletPressure > throatPressure)
       {
-        volume = a_diff * sqrt((inletPressure - throatPressure) / 449.0*1.2) * 0.6;
+        volume = a_diff * sqrt((inletPressure - throatPressure) / 449.0*1.2) * 0.6; // instantaneous volume
       }
       else if (outletPressure > inletPressure && outletPressure > throatPressure)
       {
@@ -1566,18 +1574,17 @@ void loopVenturiVersion(float *P, float *T)
       }
       else
       {
-        volume = 0;
+        volume = 0.0;
       }
-      if (isnan(volume) || abs(volume) < 0.1 )
+      if (isnan(volume) || abs(volume) < 1.0 )
       {
-        volume = 0;
+        volume = 0.0;
       }
-
       const float alpha = 0.15; // smoothing factor for exponential filter
       volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
       if (lastSampleTime)
       {
-        tidalVolume = tidalVolume + volumeSmoothed *(sampleTime - lastSampleTime)/60 - 0.01;
+        tidalVolume = tidalVolume + volumeSmoothed *(sampleTime - lastSampleTime)/60 - 0.05; // tidal volume is the volume delivered to the patient at this time.  So it is cumulative.
       }
       if (tidalVolume < 0.0)
       {
@@ -1641,7 +1648,26 @@ void loop() {
         hwSerial.print("!identity ");
         hwSerial.println(visp_eeprom.VISP);
       }
+      if (command == 'run')
+      {
+        digitalWrite(M_DIR_1,0);
+        digitalWrite(M_DIR_2,1);  
+        analogWrite(M_PWM_1,200);
+        analogWrite(M_PWM_2,200);
 
+      }
+      if (command == 'stop')
+      {
+        digitalWrite(M_DIR_1,0);
+        digitalWrite(M_DIR_2,0);
+        analogWrite(M_PWM_1,0);
+        analogWrite(M_PWM_2,0);
+      }
+      if (command == 'rate')
+      {
+        analogWrite(M_PWM_1,255);
+        analogWrite(M_PWM_2,255);
+      }
       // TODO: format command from display
       // void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
     }

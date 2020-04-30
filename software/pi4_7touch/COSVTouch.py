@@ -256,10 +256,10 @@ class COSVTouchApp(App):
         
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
-        self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=12000,graph_size=1200)
+        self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=600,graph_size=1200)
         self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
-        self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-60, ymax=60,y_ticks_major=15))
-        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=800,size_hint=(1,0.75),y_ticks_major=150))
+        self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-60, ymax=60,y_ticks_major=20))
+        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=400,size_hint=(1,0.75),y_ticks_major=100))
         if (self.enableCO2):
             self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
         layoutLeft.add_widget(self.graphs)

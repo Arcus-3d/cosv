@@ -1523,27 +1523,31 @@ void loopVenturiVersion(float *P, float *T)
   switch (runState)
   {
     case RUNSTATE_CALIBRATE:
-      //calibrationTotals[0] += P[0];
-      //calibrationTotals[1] += P[1];
-      //calibrationTotals[2] += P[2];
-      //calibrationTotals[3] += P[3];
-      //calibrationSampleCounter++;
-      //if (calibrationSampleCounter == 99) {
-      //  float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400.0;
-      //  for (int x = 0; x < 4; x++)
-      //  {
-      //    calibrationOffset[x] = average - calibrationTotals[x] / 100.0;
-      //  }
-      //  calibrationSampleCounter = 0;
+      calibrationTotals[0] += P[0];
+      calibrationTotals[1] += P[1];
+      calibrationTotals[2] += P[2];
+      calibrationTotals[3] += P[3];
+      calibrationSampleCounter++;
+      if (calibrationSampleCounter == 99) {
+        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400.0;
+        for (int x = 0; x < 4; x++)
+        {
+          calibrationOffset[x] = average - calibrationTotals[x] / 100.0;
+        }
+        calibrationSampleCounter = 0;
         runState = RUNSTATE_RUN;
-      //}
+      }
       break;
 
     case RUNSTATE_RUN:
-      //P[0] += calibrationOffset[0];
-      //P[1] += calibrationOffset[1];
-      //P[2] += calibrationOffset[2];
-      //P[3] += calibrationOffset[3];
+      digitalWrite(M_DIR_1,0);
+      digitalWrite(M_DIR_2,1);  
+      analogWrite(M_PWM_1,200);
+      analogWrite(M_PWM_2,200);
+      P[0] += calibrationOffset[0];
+      P[1] += calibrationOffset[1];
+      P[2] += calibrationOffset[2];
+      P[3] += calibrationOffset[3];
       const float paTocmH2O = 0.0101972;
       // venturi calculations
       const float a1 = 232.35219306; // area of pipe
@@ -1634,36 +1638,39 @@ void loop() {
 
     if (hwSerial.available())
     {
+      //digitalWrite(M_DIR_1,0);
+      //digitalWrite(M_DIR_2,1);  
+      //analogWrite(M_PWM_1,200);
+      //analogWrite(M_PWM_2,200);
       command = hwSerial.readString(); //reads serial input
-      if (command == 'calibrate')
+      if (command == "calibrate")
       {
         runState = RUNSTATE_CALIBRATE;
         clearCalibrationData();
       }
-      if (command == 'ping')
+      if (command == "ping")
         hwSerial.println(F("!pong"));
 
-      if (command == 'identify')
+      if (command == "identify")
       {
         hwSerial.print("!identity ");
         hwSerial.println(visp_eeprom.VISP);
       }
-      if (command == 'run')
+      if (runState == RUNSTATE_RUN)
       {
-        digitalWrite(M_DIR_1,0);
-        digitalWrite(M_DIR_2,1);  
-        analogWrite(M_PWM_1,200);
-        analogWrite(M_PWM_2,200);
-
+ 
+        //hwSerial.println("!run");
+       
       }
-      if (command == 'stop')
+      if (command == "stop")
       {
         digitalWrite(M_DIR_1,0);
         digitalWrite(M_DIR_2,0);
         analogWrite(M_PWM_1,0);
         analogWrite(M_PWM_2,0);
+        hwSerial.println("!stop");
       }
-      if (command == 'rate')
+      if (command == "rate")
       {
         analogWrite(M_PWM_1,255);
         analogWrite(M_PWM_2,255);

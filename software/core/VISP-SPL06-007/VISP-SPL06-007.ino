@@ -1173,12 +1173,8 @@ bool bmp388GetUP(baroDev_t *baro)
 
   if (busReadBuf(baro->busDev, BMP388_INT_STATUS_REG, &status, 1))
   {
-    if (status &  (1 << 3))
-    {
-      Serial.println("Data is ready");
-    }
-    else
-      Serial.println("Data is NOT ready");
+    if (0==(status &  (1 << 3)))
+      dprintln("Data is NOT ready");
   }
 
 

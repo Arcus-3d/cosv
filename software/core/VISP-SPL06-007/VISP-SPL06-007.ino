@@ -206,6 +206,23 @@ typedef struct busDevice_s {
 // Simple bus device for initially reading the VISP eeprom
 busDevice_t *eeprom = NULL;
 
+typedef struct  bmp388_calib_param_s {
+  float param_T1;
+  float param_T2;
+  float param_T3;
+  float param_P1;
+  float param_P2;
+  float param_P3;
+  float param_P4;
+  float param_P5;
+  float param_P6;
+  float param_P7;
+  float param_P8;
+  float param_P9;
+  float param_P10;
+  float param_P11;
+} bmp388_calib_param_t;
+
 
 typedef struct bmp280_calib_param_s {
   uint16_t dig_T1; /* calibration T1 data */
@@ -256,6 +273,15 @@ typedef struct baroDev_s {
       int32_t up_valid;
       int32_t ut_valid;
     } bmp280;
+    struct {
+      bmp388_calib_param_t cal;
+      // uncompensated pressure and temperature
+      int32_t up;
+      int32_t ut;
+      //error free measurements
+      int32_t up_valid;
+      int32_t ut_valid;
+    } bmp388;
     struct {
       spl06_coeffs_t cal;
       // uncompensated pressure and temperature
@@ -598,11 +624,11 @@ void myprintln(uint64_t value)
 #define SPL06_SAMPLE_RATE_64  6
 #define SPL06_SAMPLE_RATE_128 7
 
-// See datasheet Table 8
 #define SPL06_PRESSURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_64
 #define SPL06_PRESSURE_OVERSAMPLING            8
 #define SPL06_TEMPERATURE_SAMPLING_RATE     SPL06_SAMPLE_RATE_8
 #define SPL06_TEMPERATURE_OVERSAMPLING         1
+
 
 #define SPL06_MEASUREMENT_TIME(oversampling)   ((2 + lrintf(oversampling * 1.6)) + 1) // ms
 
@@ -649,10 +675,9 @@ bool spl06_read_temperature(baroDev_t * baro)
 {
   uint8_t data[SPL06_TEMPERATURE_LEN];
   int32_t spl06_temperature;
+  bool ack;
 
-  bool ack = busReadBuf(baro->busDev, SPL06_TEMPERATURE_START_REG, data, SPL06_TEMPERATURE_LEN);
-
-  if (ack) {
+  if ((ack = busReadBuf(baro->busDev, SPL06_TEMPERATURE_START_REG, data, SPL06_TEMPERATURE_LEN))) {
     spl06_temperature = (int32_t)((data[0] & 0x80 ? 0xFF000000 : 0) | (((uint32_t)(data[0])) << 16) | (((uint32_t)(data[1])) << 8) | ((uint32_t)data[2]));
     baro->chip.spl06.temperature_raw = spl06_temperature;
   }
@@ -695,14 +720,25 @@ float spl06_compensate_pressure(baroDev_t * baro, int32_t pressure_raw, int32_t 
   return pressure_cal + p_temp_comp;
 }
 
-bool spl06_calculate(baroDev_t * baro, float * pressure, float * temperature)
+bool spl06Calculate(baroDev_t * baro, float * pressure, float * temperature)
 {
+
   if (pressure) {
+    // Is the pressure ready?
+    //if (!(busRead(baro->busDev, SPL06_MODE_AND_STATUS_REG, &sstatus) && (sstatus & SPL06_MEAS_CFG_PRESSURE_RDY)))
+    //  return false;   // error reading status or pressure is not ready
+    // if (!spl06_read_pressure(baro))
+    //  return false;
     spl06_read_pressure(baro);
     *pressure = spl06_compensate_pressure(baro, baro->chip.spl06.pressure_raw, baro->chip.spl06.temperature_raw);
   }
 
   if (temperature) {
+    // Is the temperature ready?
+    //if (!(busRead(baro->busDev, SPL06_MODE_AND_STATUS_REG, &sstatus) && (sstatus & SPL06_MEAS_CFG_TEMPERATURE_RDY)))
+    //  return false;   // error reading status or pressure is not ready
+    // if (!spl06_read_temperature(baro))
+    //  return false;
     spl06_read_temperature(baro);
     *temperature = spl06_compensate_temperature(baro, baro->chip.spl06.temperature_raw);
   }
@@ -808,7 +844,7 @@ bool spl06Detect(baroDev_t *baro, busDevice_t *busDev)
     return false;
   }
 
-  baro->calculate = spl06_calculate;
+  baro->calculate = spl06Calculate;
   return true;
 }
 
@@ -878,7 +914,7 @@ bool spl06Detect(baroDev_t *baro, busDevice_t *busDev)
 // 10/16 = 0.625 ms
 
 
-bool bmp280_get_up(baroDev_t * baro)
+bool bmp280GetUp(baroDev_t * baro)
 {
   uint8_t data[BMP280_DATA_FRAME_SIZE];
 
@@ -903,7 +939,7 @@ bool bmp280_get_up(baroDev_t * baro)
 
 // Returns temperature in DegC, resolution is 0.01 DegC. Output value of "5123" equals 51.23 DegC
 // t_fine carries fine temperature as global value
-int32_t bmp280_compensate_T(baroDev_t * baro, int32_t adc_T)
+int32_t bmp280CompensateTemperature(baroDev_t * baro, int32_t adc_T)
 {
   int32_t var1, var2, T;
 
@@ -914,10 +950,10 @@ int32_t bmp280_compensate_T(baroDev_t * baro, int32_t adc_T)
   return T;
 }
 
-// NOTE: bmp280_compensate_T() must be called before this, so that t_fine is computed)
+// NOTE: bmp280CompensateTemperature() must be called before this, so that t_fine is computed)
 // Returns pressure in Pa as unsigned 32 bit integer in Q24.8 format (24 integer bits and 8 fractional bits).
 // Output value of "24674867" represents 24674867/256 = 96386.2 Pa = 963.862 hPa
-uint32_t bmp280_compensate_P(baroDev_t * baro, int32_t adc_P)
+uint32_t bmp280CompensatePressure(baroDev_t * baro, int32_t adc_P)
 {
   int64_t var1, var2, p;
   var1 = ((int64_t)baro->chip.bmp280.cal.t_fine) - 128000;
@@ -938,14 +974,14 @@ uint32_t bmp280_compensate_P(baroDev_t * baro, int32_t adc_P)
   return (uint32_t)p;
 }
 
-bool bmp280_calculate(baroDev_t * baro, float * pressure, float * temperature)
+bool bmp280Calculate(baroDev_t * baro, float * pressure, float * temperature)
 {
   int32_t t;
   uint32_t p;
 
-  bmp280_get_up(baro);
-  t = bmp280_compensate_T(baro, baro->chip.bmp280.ut); // Must happen before bmp280_compensate_P() (see t_fine)
-  p = bmp280_compensate_P(baro, baro->chip.bmp280.up);
+  bmp280GetUp(baro);
+  t = bmp280CompensateTemperature(baro, baro->chip.bmp280.ut); // Must happen before bmp280CompensatePressure() (see t_fine)
+  p = bmp280CompensatePressure(baro, baro->chip.bmp280.up);
 
   if (pressure) {
     *pressure = (p / 256.0);
@@ -1002,9 +1038,337 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
 
   delay(100);
 
-  baro->calculate = bmp280_calculate;
+  baro->calculate = bmp280Calculate;
   return true;
 }
+
+#define BMP388_DEFAULT_CHIP_ID                          (0x50) // from https://github.com/BoschSensortec/BMP3-Sensor-API/blob/master/bmp3_defs.h#L130
+
+#define BMP388_CMD_REG                                  (0x7E)
+#define BMP388_RESERVED_UPPER_REG                       (0x7D)
+// everything between BMP388_RESERVED_UPPER_REG and BMP388_RESERVED_LOWER_REG is reserved.
+#define BMP388_RESERVED_LOWER_REG                       (0x20)
+#define BMP388_CONFIG_REG                               (0x1F)
+#define BMP388_RESERVED_0x1E_REG                        (0x1E)
+#define BMP388_ODR_REG                                  (0x1D)
+#define BMP388_OSR_REG                                  (0x1C)
+#define BMP388_PWR_CTRL_REG                             (0x1B)
+#define BMP388_IF_CONFIG_REG                            (0x1A)
+#define BMP388_INT_CTRL_REG                             (0x19)
+#define BMP388_FIFO_CONFIG_2_REG                        (0x18)
+#define BMP388_FIFO_CONFIG_1_REG                        (0x17)
+#define BMP388_FIFO_WTM_1_REG                           (0x16)
+#define BMP388_FIFO_WTM_0_REG                           (0x15)
+#define BMP388_FIFO_DATA_REG                            (0x14)
+#define BMP388_FIFO_LENGTH_1_REG                        (0x13)
+#define BMP388_FIFO_LENGTH_0_REG                        (0x12)
+#define BMP388_INT_STATUS_REG                           (0x11)
+#define BMP388_EVENT_REG                                (0x10)
+#define BMP388_SENSORTIME_3_REG                         (0x0F) // BME780 only
+#define BMP388_SENSORTIME_2_REG                         (0x0E)
+#define BMP388_SENSORTIME_1_REG                         (0x0D)
+#define BMP388_SENSORTIME_0_REG                         (0x0C)
+#define BMP388_RESERVED_0x0B_REG                        (0x0B)
+#define BMP388_RESERVED_0x0A_REG                        (0x0A)
+
+// see friendly register names below
+#define BMP388_DATA_5_REG                               (0x09)
+#define BMP388_DATA_4_REG                               (0x08)
+#define BMP388_DATA_3_REG                               (0x07)
+#define BMP388_DATA_2_REG                               (0x06)
+#define BMP388_DATA_1_REG                               (0x05)
+#define BMP388_DATA_0_REG                               (0x04)
+
+#define BMP388_STATUS_REG                               (0x03)
+#define BMP388_ERR_REG                                  (0x02)
+#define BMP388_RESERVED_0x01_REG                        (0x01)
+#define BMP388_CHIP_ID_REG                              (0x00)
+
+// friendly register names, from datasheet 4.3.4
+#define BMP388_PRESS_MSB_23_16_REG                      BMP388_DATA_2_REG
+#define BMP388_PRESS_LSB_15_8_REG                       BMP388_DATA_1_REG
+#define BMP388_PRESS_XLSB_7_0_REG                       BMP388_DATA_0_REG
+
+// friendly register names, from datasheet 4.3.5
+#define BMP388_TEMP_MSB_23_16_REG                       BMP388_DATA_5_REG
+#define BMP388_TEMP_LSB_15_8_REG                        BMP388_DATA_4_REG
+#define BMP388_TEMP_XLSB_7_0_REG                        BMP388_DATA_3_REG
+
+#define BMP388_DATA_FRAME_SIZE                          ((BMP388_DATA_5_REG - BMP388_DATA_0_REG) + 1) // +1 for inclusive
+
+// from Datasheet 3.3
+#define BMP388_MODE_SLEEP                               (0x00)
+#define BMP388_MODE_FORCED                              (0x01)
+#define BMP388_MODE_NORMAL                              (0x03)
+
+#define BMP388_CALIRATION_LOWER_REG                     (0x30) // See datasheet 4.3.19, "calibration data"
+#define BMP388_TRIMMING_NVM_PAR_T1_LSB_REG              (0x31) // See datasheet 3.11.1 "Memory map trimming coefficients"
+#define BMP388_TRIMMING_NVM_PAR_P11_REG                 (0x45) // See datasheet 3.11.1 "Memory map trimming coefficients"
+#define BMP388_CALIRATION_UPPER_REG                     (0x57)
+
+#define BMP388_TRIMMING_DATA_LENGTH                     ((BMP388_TRIMMING_NVM_PAR_P11_REG - BMP388_TRIMMING_NVM_PAR_T1_LSB_REG) + 1) // +1 for inclusive
+
+#define BMP388_OVERSAMP_1X               (0x00)
+#define BMP388_OVERSAMP_2X               (0x01)
+#define BMP388_OVERSAMP_4X               (0x02)
+#define BMP388_OVERSAMP_8X               (0x03)
+#define BMP388_OVERSAMP_16X              (0x04)
+#define BMP388_OVERSAMP_32X              (0x05)
+
+// INT_CTRL register
+#define BMP388_INT_OD_BIT                   0
+#define BMP388_INT_LEVEL_BIT                1
+#define BMP388_INT_LATCH_BIT                2
+#define BMP388_INT_FWTM_EN_BIT              3
+#define BMP388_INT_FFULL_EN_BIT             4
+#define BMP388_INT_RESERVED_5_BIT           5
+#define BMP388_INT_DRDY_EN_BIT              6
+#define BMP388_INT_RESERVED_7_BIT           7
+
+
+// ODR register
+#define BMP388_TIME_STANDBY_5MS        0x00
+#define BMP388_TIME_STANDBY_10MS       0x01
+#define BMP388_TIME_STANDBY_20MS       0x02
+#define BMP388_TIME_STANDBY_40MS       0x03
+#define BMP388_TIME_STANDBY_80MS       0x04
+#define BMP388_TIME_STANDBY_160MS      0x05
+#define BMP388_TIME_STANDBY_320MS      0x06
+#define BMP388_TIME_STANDBY_640MS      0x07
+#define BMP388_TIME_STANDBY_1280MS     0x08
+#define BMP388_TIME_STANDBY_2560MS     0x09
+#define BMP388_TIME_STANDBY_5120MS     0x0A
+#define BMP388_TIME_STANDBY_10240MS    0x0B
+#define BMP388_TIME_STANDBY_20480MS    0x0C
+#define BMP388_TIME_STANDBY_40960MS    0x0D
+#define BMP388_TIME_STANDBY_81920MS    0x0E
+#define BMP388_TIME_STANDBY_163840MS   0x0F
+#define BMP388_TIME_STANDBY_327680MS   0x10
+#define BMP388_TIME_STANDBY_655360MS   0x11
+
+#define BMP388_FILTER_COEFF_OFF              (0x00)
+#define BMP388_FILTER_COEFF_1                (0x01)
+#define BMP388_FILTER_COEFF_3                (0x02)
+#define BMP388_FILTER_COEFF_7                (0x03)
+#define BMP388_FILTER_COEFF_15               (0x04)
+#define BMP388_FILTER_COEFF_31               (0x05)
+#define BMP388_FILTER_COEFF_63               (0x06)
+#define BMP388_FILTER_COEFF_127              (0x07)
+
+#define BMP388_RESET_CODE 0xB6
+
+// Indoor navigation
+// Normal : Mode
+// x16    : osrs_pos
+// x2     : rs_t
+// 4      : IIR filtercoeff.(see4.3.18)
+// 560    : IDD[μA](see 3.8)
+// 25     : ODR [Hz](see 3.4.1)
+// 5      : RMS Noise [cm](see 3.4.4)
+
+
+bool bmp388GetUP(baroDev_t *baro)
+{
+  uint8_t data[BMP388_DATA_FRAME_SIZE], status;
+
+  if (busReadBuf(baro->busDev, BMP388_INT_STATUS_REG, &status, 1))
+  {
+    if (status &  (1 << 3))
+    {
+      Serial.println("Data is ready");
+    }
+    else
+      Serial.println("Data is NOT ready");
+  }
+
+
+  if (!busReadBuf(baro->busDev, BMP388_DATA_0_REG, data, BMP388_DATA_FRAME_SIZE))
+    busPrint(baro->busDev, F("FAILED to Get Sensor Data"));
+
+  baro->chip.bmp388.ut = (int32_t)data[5] << 16 | (int32_t)data[4] << 8 | (int32_t)data[3];  // Copy the temperature and pressure data into the adc variables
+  baro->chip.bmp388.up = (int32_t)data[2] << 16 | (int32_t)data[1] << 8 | (int32_t)data[0];
+
+  return true;
+}
+
+// Returns temperature in DegC, resolution is 0.01 DegC. Output value of "5123" equals 51.23 DegC
+int64_t bmp388CompensateTemperature(baroDev_t *baro)
+{
+  float partial_data1 = (float)baro->chip.bmp388.ut - baro->chip.bmp388.cal.param_T1;
+  float partial_data2 = partial_data1 * baro->chip.bmp388.cal.param_T2;
+  return partial_data2 + partial_data1 * partial_data1 * baro->chip.bmp388.cal.param_T3;
+}
+
+float bmp388CompensatePressure(baroDev_t *baro, float t_lin)
+{
+  float uncomp_pressure = (float)baro->chip.bmp388.up;
+  float partial_data1 = baro->chip.bmp388.cal.param_P6 * t_lin;
+  float partial_data2 = baro->chip.bmp388.cal.param_P7 * t_lin * t_lin;
+  float partial_data3 = baro->chip.bmp388.cal.param_P8 * t_lin * t_lin * t_lin;
+  float partial_out1 = baro->chip.bmp388.cal.param_P5 + partial_data1 + partial_data2 + partial_data3;
+  partial_data1 = baro->chip.bmp388.cal.param_P2 * t_lin;
+  partial_data2 = baro->chip.bmp388.cal.param_P3 * t_lin * t_lin;
+  partial_data3 = baro->chip.bmp388.cal.param_P4 * t_lin * t_lin * t_lin;
+  float partial_out2 = uncomp_pressure * (baro->chip.bmp388.cal.param_P1 +
+                                          partial_data1 + partial_data2 + partial_data3);
+  partial_data1 = uncomp_pressure * uncomp_pressure;
+  partial_data2 = baro->chip.bmp388.cal.param_P9 + baro->chip.bmp388.cal.param_P10 * t_lin;
+  partial_data3 = partial_data1 * partial_data2;
+  float partial_data4 = partial_data3 + uncomp_pressure * uncomp_pressure * uncomp_pressure * baro->chip.bmp388.cal.param_P11;
+  return partial_out1 + partial_out2 + partial_data4;
+}
+
+
+
+bool bmp388Calculate(baroDev_t * baro, float * pressure, float * temperature)
+{
+  float t;
+
+  bmp388GetUP(baro);
+  t = bmp388CompensateTemperature(baro);
+
+  if (pressure) {
+    *pressure = bmp388CompensatePressure(baro, t);
+  }
+
+  if (temperature) {
+    *temperature = t / 100.0;
+  }
+
+  return true;
+}
+
+bool bmp388Reset(busDevice_t * busDev)
+{
+  uint8_t event;
+  busWrite(busDev, BMP388_CMD_REG, BMP388_RESET_CODE);
+  delay(10);
+  if (busRead(busDev, BMP388_EVENT_REG, &event))
+    return event ? true : false;
+}
+
+
+bool bmp388DeviceDetect(busDevice_t * busDev)
+{
+  for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
+    uint8_t chipId = 0;
+
+    bmp388Reset(busDev);
+
+    bool ack = busRead(busDev, BMP388_CHIP_ID_REG, &chipId);
+    if (ack && chipId == BMP388_DEFAULT_CHIP_ID) {
+      return true;
+    }
+
+    delay(100);
+  }
+
+  return false;
+}
+
+
+// see Datasheet 3.11.1 Memory Map Trimming Coefficients
+typedef struct bmp388_raw_param_s {
+  uint16_t param_T1;
+  uint16_t param_T2;
+  int8_t param_T3;
+  int16_t param_P1;
+  int16_t param_P2;
+  int8_t param_P3;
+  int8_t param_P4;
+  uint16_t param_P5;
+  uint16_t param_P6;
+  int8_t param_P7;
+  int8_t param_P8;
+  int16_t param_P9;
+  int8_t param_P10;
+  int8_t param_P11;
+} __attribute__((packed)) bmp388_raw_param_t;
+
+
+bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
+{
+  bmp388_raw_param_t params;
+  if (busDev == NULL) {
+    return false;
+  }
+
+  if (!bmp388DeviceDetect(busDev)) {
+    return false;
+  }
+  baro->busDev = busDev;
+
+  busPrint(busDev, F("BMP388 Detected"));
+
+  // read calibration
+
+  busReadBuf(baro->busDev, BMP388_TRIMMING_NVM_PAR_T1_LSB_REG, (char *)&params, sizeof(params));
+
+  baro->chip.bmp388.cal.param_T1 = (float)params.param_T1 / powf(2.0f, -8.0f); // Calculate the floating point trim parameters
+  baro->chip.bmp388.cal.param_T2 = (float)params.param_T2 / powf(2.0f, 30.0f);
+  baro->chip.bmp388.cal.param_T3 = (float)params.param_T3 / powf(2.0f, 48.0f);
+  baro->chip.bmp388.cal.param_P1 = ((float)params.param_P1 - powf(2.0f, 14.0f)) / powf(2.0f, 20.0f);
+  baro->chip.bmp388.cal.param_P2 = ((float)params.param_P2 - powf(2.0f, 14.0f)) / powf(2.0f, 29.0f);
+  baro->chip.bmp388.cal.param_P3 = (float)params.param_P3 / powf(2.0f, 32.0f);
+  baro->chip.bmp388.cal.param_P4 = (float)params.param_P4 / powf(2.0f, 37.0f);
+  baro->chip.bmp388.cal.param_P5 = (float)params.param_P5 / powf(2.0f, -3.0f);
+  baro->chip.bmp388.cal.param_P6 = (float)params.param_P6 / powf(2.0f, 6.0f);
+  baro->chip.bmp388.cal.param_P7 = (float)params.param_P7 / powf(2.0f, 8.0f);
+  baro->chip.bmp388.cal.param_P8 = (float)params.param_P8 / powf(2.0f, 15.0f);
+  baro->chip.bmp388.cal.param_P9 = (float)params.param_P9 / powf(2.0f, 48.0f);
+  baro->chip.bmp388.cal.param_P10 = (float)params.param_P10 / powf(2.0f, 48.0f);
+  baro->chip.bmp388.cal.param_P11 = (float)params.param_P11 / powf(2.0f, 65.0f);
+
+  dprintln(F("BMP388 calibration data"));
+  for (int x = 0; x < sizeof(params); x++)
+  {
+    unsigned char *buf = (char *)&params;
+    dprint(F(" 0x"));
+    dprint(buf[x], HEX);
+  }
+  dprintln(F(""));
+
+  //writeByte(0x76, 0x7E, 0xB6) // Reset
+  //writeByte(0x76, 0x1F, 0x0) // IIR filter OFF
+  //writeByte(0x76, 0x1D, 0x0) // ODR
+  //writeByte(0x76, 0x1C, 0x15) // OSR
+  //writeByte(0x76, 0x1B, 0x3) // Enable Temp and Pressure
+  //writeByte(0x76, 0x1D, 0x4) // ODR again
+  //writeByte(0x76, 0x1B, 0x33)
+  //busWrite(0x76, 0x1F, 0x0)
+  //busWrite(0x76, 0x1D, 0x0)
+  //busWrite(0x76, 0x1C, 0x8)
+  //busWrite(0x76, 0x1B, 0x3)
+  //busWrite(0x76, 0x1B, 0x33)
+
+  //set IIR Filter
+  busWrite(baro->busDev, BMP388_CONFIG_REG, (BMP388_FILTER_COEFF_OFF) << 1);
+
+
+  // Set Oversampling rate
+  /* PRESSURE<<3 | TEMP */
+  busWrite(baro->busDev, BMP388_OSR_REG,
+           (BMP388_OVERSAMP_8X) | (BMP388_OVERSAMP_1X << 3)
+          );
+
+
+  // Set mode 0b00110011, normal, pressure and temperature
+  busWrite(busDev, BMP388_PWR_CTRL_REG, 0x03);
+  // Set Data Rate
+  busWrite(baro->busDev, BMP388_ODR_REG, BMP388_TIME_STANDBY_20MS);
+
+  busWrite(busDev, BMP388_PWR_CTRL_REG, 0x33);
+
+  baro->calculate = bmp388Calculate;
+
+  return true;
+}
+
+
+
+
+
+
 
 //  Looking at the component side of the PCB
 // +-----------------------+
@@ -1054,12 +1418,16 @@ busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t addr
   busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enablePin);
   busPrint(device, F("Detecting device on"));
   if (!bmp280Detect(baro, device))
-  { if (!spl06Detect(baro, device))
+  {
+    if (!bmp388Detect(baro, device))
     {
-      busDeviceFree(device);
-      device = NULL;
-      dprint(F("Device refused to be detected at 0x"));
-      dprintln(address, HEX);
+      if (!spl06Detect(baro, device))
+      {
+        busDeviceFree(device);
+        device = NULL;
+        dprint(F("Device refused to be detected at 0x"));
+        dprintln(address, HEX);
+      }
     }
   }
   device->hwType = HWTYPE_SENSOR;
@@ -1244,56 +1612,6 @@ bool detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
 bool timeToReadSensors = false;
 
 
-void scan_i2c(TwoWire * wire, int8_t enablePin = -1)
-{
-  byte error, address; //variable for error and I2C address
-  int nDevices;
-
-  dprintln(F("Scanning Hardware I2C bus..."));
-
-  if (enablePin != -1)
-  {
-    dprint(F("Enabling Bus Pin "));
-    dprintln(enablePin);
-    digitalWrite(enablePin, HIGH);
-  }
-
-  nDevices = 0;
-  for (address = 1; address < 127; address++ )
-  {
-    // The i2c_scanner uses the return value of
-    // the Write.endTransmisstion to see if
-    // a device did acknowledge to the address.
-    wire->beginTransmission(address);
-    error = wire->endTransmission();
-
-    if (error == 0)
-    {
-      dprint(F("I2C device found at address 0x"));
-      if (address < 16)
-        dprint(F("0"));
-      dprint(address, HEX);
-      dprintln(F("  !"));
-      nDevices++;
-    }
-    else if (error == 4)
-    {
-      dprint(F("Unknown error at address 0x"));
-      if (address < 16)
-        dprint("0");
-      dprintln(address, HEX);
-    }
-  }
-  if (nDevices == 0)
-    dprintln(F("No I2C devices found\n"));
-  else
-    dprintln(F("done\n"));
-
-  if (enablePin != -1)
-    digitalWrite(enablePin, LOW);
-}
-
-
 /*** Timer callback subsystem ***/
 
 typedef void (*tCBK)() ;
@@ -1361,7 +1679,7 @@ void clearCalibrationData()
 
 void setup() {
   bool sensorsFound = false, formatVisp = false;;
-  uint8_t sensorCount = 0;
+
   // Address select lines for Dual I2C switching using NPN Transistors
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_A, LOW);
@@ -1371,7 +1689,6 @@ void setup() {
   pinMode(M_PWM_2, OUTPUT);
   pinMode(M_DIR_1, OUTPUT);
   pinMode(M_DIR_2, OUTPUT);
-
 
   hwSerial.begin(230400);
   dprintln(F("VISP Sensor Reader Test Application V0.1b"));
@@ -1393,15 +1710,24 @@ void setup() {
     }
 
     // Make sure they are all there
-    sensorCount = 0;
-    for (uint8_t x = 0; x < 5; x++)
-    {
-      if (sensors[x].busDev)
-        sensorCount++;
+    if (sensors[0].busDev == NULL) {
+      dprintln(F("Sensor 0 missing"));
+      sensorsFound = false;
     }
-    if (sensorCount != 4)
-      dprintln(F("Error finding all of the sensors, retrying"));
-  } while (!sensorsFound || sensorCount == 0);
+    if (sensors[1].busDev == NULL) {
+      dprintln(F("Sensor 1 missing"));
+      sensorsFound = false;
+    }
+    if (sensors[2].busDev == NULL) {
+      dprintln(F("Sensor 2 missing"));
+      sensorsFound = false;
+    }
+    if (sensors[3].busDev == NULL) {
+      dprintln(F("Sensor 3 missing"));
+      sensorsFound = false;
+    }
+
+  } while (!sensorsFound);
 
   if (eeprom)
   {
@@ -1513,13 +1839,14 @@ void loopPitotVersion(float *P, float *T)
 #define VENTURI_AMBIANT SENSOR_U6
 #define VENTURI_INPUT   SENSOR_U7
 #define VENTURI_OUTPUT  SENSOR_U8
-void loopVenturiVersion(float *P, float *T)
+void loopVenturiVersion(float * P, float * T)
 {
-  static float volumeSmoothed = 0.0;
+  static float volumeSmoothed = 0.0; // It only needs to be in this function, but needs to be persistant, so make it static
   static float tidalVolume = 0.0;
-  static int lastSampleTime = 0;
+  static unsigned long lastSampleTime = 0;
   float volume, pitot_diff, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
-  int sampleTime = millis();
+  unsigned long sampleTime = millis();
+
   switch (runState)
   {
     case RUNSTATE_CALIBRATE:
@@ -1565,16 +1892,16 @@ void loopVenturiVersion(float *P, float *T)
       //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m
       //airflow = a_diff * sqrt(2.0 * (inletPressure - throatPressure)) / 998.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
       // Why multiply by 2 then devide by a number, why not just divide by half the number?
-      //airflow = a_diff * sqrt((inletPressure - throatPressure) / 449.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
+      //airflow = a_diff * sqrt((inletPressure - throatPressure) / (449.0*1.2)) * 600000.0; // airflow in cubic m/s *60000 to get L/m
 
 
       if (inletPressure > outletPressure && inletPressure > throatPressure)
       {
-        volume = a_diff * sqrt((inletPressure - throatPressure) / 449.0*1.2) * 0.6; // instantaneous volume
+        volume = a_diff * sqrt((inletPressure - throatPressure) / (449.0 * 1.2)) * 0.6; // instantaneous volume
       }
       else if (outletPressure > inletPressure && outletPressure > throatPressure)
       {
-        volume = -a_diff * sqrt((outletPressure - throatPressure) / 449.0*1.2) * 0.6;
+        volume = -a_diff * sqrt((outletPressure - throatPressure) / (449.0 * 1.2)) * 0.6;
       }
       else
       {
@@ -1584,11 +1911,13 @@ void loopVenturiVersion(float *P, float *T)
       {
         volume = 0.0;
       }
+
       const float alpha = 0.15; // smoothing factor for exponential filter
       volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
+
       if (lastSampleTime)
       {
-        tidalVolume = tidalVolume + volumeSmoothed *(sampleTime - lastSampleTime)/60 - 0.05; // tidal volume is the volume delivered to the patient at this time.  So it is cumulative.
+        tidalVolume = tidalVolume + volumeSmoothed * (sampleTime - lastSampleTime) / 60 - 0.05; // tidal volume is the volume delivered to the patient at this time.  So it is cumulative.
       }
       if (tidalVolume < 0.0)
       {

@@ -1507,9 +1507,11 @@ void loopPitotVersion(float *P, float *T)
 #define VENTURI_OUTPUT  SENSOR_U8
 void loopVenturiVersion(float *P, float *T)
 {
-  static float volumeSmoothed = 0;
+  static float volumeSmoothed = 0.0;
+  static float tidalVolume = 0.0;
+  static int lastSampleTime = 0;
   float volume, pitot_diff, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
-
+  int sampleTime = millis();
   switch (runState)
   {
     case RUNSTATE_CALIBRATE:
@@ -1556,11 +1558,11 @@ void loopVenturiVersion(float *P, float *T)
 
       if (inletPressure > outletPressure && inletPressure > throatPressure)
       {
-        volume = a_diff * sqrt((inletPressure - throatPressure) / 449.0) * 0.6;
+        volume = a_diff * sqrt((inletPressure - throatPressure) / 449.0*1.2) * 0.6;
       }
       else if (outletPressure > inletPressure && outletPressure > throatPressure)
       {
-        volume = -a_diff * sqrt((outletPressure - throatPressure) / 449.0) * 0.6;
+        volume = -a_diff * sqrt((outletPressure - throatPressure) / 449.0*1.2) * 0.6;
       }
       else
       {
@@ -1571,17 +1573,27 @@ void loopVenturiVersion(float *P, float *T)
         volume = 0;
       }
 
-      const float alpha = 0.1; // smoothing factor for exponential filter
+      const float alpha = 0.15; // smoothing factor for exponential filter
       volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
-
+      if (lastSampleTime)
+      {
+        tidalVolume = tidalVolume + volumeSmoothed *(sampleTime - lastSampleTime)/60 - 0.01;
+      }
+      if (tidalVolume < 0.0)
+      {
+        tidalVolume = 0.0;
+      }
+      lastSampleTime = sampleTime;
       pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;
 
       // Take some time to write to the serial port
-      hwSerial.print(millis());
+      hwSerial.print(sampleTime);
       hwSerial.print(F(","));
       hwSerial.print(pressure, 4);
       hwSerial.print(F(","));
       hwSerial.print(volumeSmoothed, 4);
+      hwSerial.print(F(","));
+      hwSerial.print(tidalVolume, 4);
       hwSerial.print(F(","));
       hwSerial.print(P[SENSOR_U5], 1);
       hwSerial.print(F(","));

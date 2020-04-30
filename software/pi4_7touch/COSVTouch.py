@@ -162,7 +162,7 @@ class ScrollGraphBoxLayout(BoxLayout):
         self.graphPosition = 1
         self.graphDataPosition = 1
         self.graphs = [];
-        self.touchLast = None
+        self.scrollSpeed = 0
     def reset(self):
         for graph in self.graphs:
             graph.plot.points = [(0,0)]
@@ -186,7 +186,13 @@ class ScrollGraphBoxLayout(BoxLayout):
         graph.xmax=self.graphSize
         self.add_widget(graph)
         self.graphs.append(graph)
-        
+    def do_scroll(self,*args):
+        self.graphPosition = self.graphPosition + self.scrollSpeed
+        if self.graphPosition > self.graphDataPosition:
+            self.graphPosition = self.graphDataPosition 
+        if self.graphSize < 0.0:
+            self.graphPosition = 0.0 
+        self.update()  
     def add_points(self,*argv):
         for i,graph in enumerate(self.graphs):
             point = 0.0 if len(argv) < i else argv[i]
@@ -194,32 +200,29 @@ class ScrollGraphBoxLayout(BoxLayout):
         self.graphDataPosition += 1
         self.update()
     def on_touch_move(self,touch):
-        if touch.grab_current is self:
-            print(touch)
-            if self.touchLast:
-                dx = touch.x - self.touchLast.x
-            else:
-                dx = 0.0
-            self.touchLast = touch
-            #self.autoScroll=False
-            self.graphPosition = self.graphPosition - dx
+        if touch.grab_current is self and 'start_pos' in touch.ud:
+            self.scrollSpeed = (touch.x - touch.ud['start_pos'])/4
             self.update()
             return True
         else:
             pass
+        super(ScrollGraphBoxLayout,self).on_touch_move(touch)
     def on_touch_down(self,touch):
-        if touch.is_double_tap:
-            self.autoScroll = True
-        else:
-            touch.grab(self)
-        return True
+        touch.grab(self)
+        self.autoScroll=False
+        touch.ud['start_pos'] = touch.x
+        Clock.schedule_interval(self.do_scroll,1/30)
+        super(ScrollGraphBoxLayout,self).on_touch_down(touch)
     def on_touch_up(self,touch):
+        self.autoScroll=True
+        self.scrollSpeed=0
+        Clock.unschedule(self.do_scroll)
         if touch.grab_current is self:
             touch.ungrab(self)
-            self.touchLast = None
             return True
         else:
             pass 
+        super(ScrollGraphBoxLayout,self).on_touch_up(touch)
 
 class COSVTouchApp(App):
     run_state = OptionProperty("stop",options=["stop","run"])
@@ -241,15 +244,15 @@ class COSVTouchApp(App):
         #availablePorts = listSerialPorts()
         self.serial = serial.Serial()
         self.enableCO2 = False
-        self.vt=0
+        self.tidalVolume=0
         layoutMain = BoxLayout(orientation='horizontal',spacing=0, padding=0)
         
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
         self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=12000,graph_size=1200)
-        self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=40))
-        self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-30, ymax=30))
-        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=15,size_hint=(1,0.75)))
+        self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
+        self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-60, ymax=60,y_ticks_major=15))
+        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=800,size_hint=(1,0.75),y_ticks_major=150))
         if (self.enableCO2):
             self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
         layoutLeft.add_widget(self.graphs)
@@ -292,7 +295,7 @@ class COSVTouchApp(App):
         layoutMain.add_widget(layoutControlRight)
         return layoutMain
     def runButton(self,event):
-        if self.buttonRun.value == 'Stopped':
+        if self.buttonRun.value == 'Running':
             self.run_state = 'stop'
         else:
             self.run_state = 'run'
@@ -325,9 +328,11 @@ class COSVTouchApp(App):
                     row = str(self.serial.readline().decode('ascii'))
                     try:
                         col=[float(i) for i in row.strip().split(',',10)]
-                        self.vt = self.vt + col[2]/100-0.01
-                        self.vt = 0.0 if self.vt < 0.0 else self.vt
-                        self.graphs.add_points(col[1],col[2],self.vt)
+                        sampleTime = col[0]
+                        pressure = col[1]
+                        volume = col[2]
+                        tidalVolume = col[3]
+                        self.graphs.add_points(pressure,volume,tidalVolume)
                         print(row)
                     except:
                         print(row)

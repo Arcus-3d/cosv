@@ -76,6 +76,7 @@ class PopupButton(DisplayButton):
 class SliderButton(PopupButton):
     def __init__(self,**kwargs):
         self.min=kwargs.pop('min',0)
+        self.register_event_type('on_change')
         self.max=kwargs.pop('max',100)
         self.step=kwargs.pop('step',1)
         #self.on_update=kwargs.pop('on_update',None)
@@ -84,6 +85,8 @@ class SliderButton(PopupButton):
         self.slider=Slider(min=self.min,value=self.value,max=self.max,step=self.step,cursor_width='32sp',orientation=self.popup_orientation,size_hint=(1,1),size=('25sp','100sp'))
         self.popupBox.add_widget(self.slider)
         #self.popupBox.title=str(self.value)
+    def on_change(self,value):
+        pass
     def bindTouchUp(self,*args):
         self.slider.bind(on_touch_up=self.updateValue)
     def updateValue(self,*args):
@@ -92,6 +95,7 @@ class SliderButton(PopupButton):
         self.slider.unbind(on_touch_up=self.updateValue)
         self.slider.unbind(on_touch_move=self.updatePopup)
         super(SliderButton,self).updateValue(self,*args)
+        self.dispatch('on_change',self.value)
         #self.on_update(self.value)
     def updatePopup(self,*args):
         self.popup.title=str(self.text_top) + str(' : ') + str(self.slider.value)
@@ -264,7 +268,7 @@ class COSVTouchApp(App):
         # Graphing area
         self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=1000,graph_size=1000)
         self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
-        self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-60, ymax=60,y_ticks_major=20))
+        self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-50, ymax=50,y_ticks_major=20))
         self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=500,size_hint=(1,0.75),y_ticks_major=100))
         if (self.enableCO2):
             self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
@@ -307,9 +311,10 @@ class COSVTouchApp(App):
 
         layoutMain.add_widget(layoutControlRight)
         return layoutMain
-    def updateRate(self,event):
-        self.serial.write(b'rate,')
-        self.serial.write(self.run_rate)
+    def updateRate(self,event,value):
+        self.run_rate = value
+        self.serial.write(b'S,motor_speed,')
+        self.serial.write(self.run_rate*6)
         self.serial.write('\n')
     def runButton(self,event):
         #pass
@@ -329,7 +334,7 @@ class COSVTouchApp(App):
                     self.serial.write(int(self.run_rate))
                     self.serial.write(b'\n')
                     self.serial.write(b'run\n')
-                    self.serial.write(b'motor_speed,230\n')
+                    self.serial.write(b'S,motor_speed,230\n')
                     print('serial started')
                 self.graphs.reset()
             except Exception as e:
@@ -339,7 +344,7 @@ class COSVTouchApp(App):
         if self.run_state == 'stop':
             try:
                 self.serial.write(b'stop\n')
-                self.serial.write(b'motor_speed,0\n')
+                self.serial.write(b'S,motor_speed,0\n')
                 self.serial.close()
                 Clock.unschedule(self.get_data)
             except Exception as e:
@@ -361,7 +366,7 @@ class COSVTouchApp(App):
                         if dataType == 'd':
                             sampleTime = float(col[1])
                             print(col)
-                            self.graphs.add_points(float(col[2]),float(col[3]),float(col[4]))
+                            self.graphs.add_points(float(col[2]),float(col[3])*1.5,float(col[4])*1.5)
                         else:
                             if dataType == 's':
                                 print(row)

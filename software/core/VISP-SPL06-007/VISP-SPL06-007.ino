@@ -23,26 +23,20 @@
 
 
 // #define TEENSY 1
-#define DEBUG_DISPLAY 1
 
 
 #ifdef TEENSY
 #define hwSerial Serial1
 TwoWire *i2cBus1 = &Wire1;
 TwoWire *i2cBus2 = &Wire2;
+#define SERIAL_BAUD 230400
 #else
 #define hwSerial Serial
 TwoWire *i2cBus1 = &Wire;
 TwoWire *i2cBus2 = NULL;
+#define SERIAL_BAUD 115200
 #endif
 
-#ifdef DEBUG_DISPLAY
-#define dprint(...) hwSerial.print( __VA_ARGS__)
-#define dprintln(...) hwSerial.println( __VA_ARGS__)
-#else
-#define dprint(...)
-#define dprintln(...)
-#endif
 
 // Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
 // This is detected if needed
@@ -82,26 +76,25 @@ TwoWire *i2cBus2 = NULL;
 // Shamelessly swiped from: https://i.stack.imgur.com/WnsM0.png
 
 
-// Communications to/from the display
-//
-//
-// Lines that start with a number are CSV sensor reports
-// Lines that start with [a-z][A-Z] are comments
-// Lines that start with ! are command responses
-// Example: snprintf(response, "!ERROR %s\n", errorStr(errno));
-// Example: snprintf(response, "!SUCCESS %s\n", errorStr(errno));
-//
-// The goal is to have every command given have a reply
-// ping
-// !PONG
-//
-// calibrate
-// !CALIBRATED
-//
-// mode VC-CMV
-// !MODE VC-CMV
-//
-//
+// Parameters we can monkey with from the display
+typedef struct parameters_s {
+  bool     debug;
+  uint32_t volume;
+  uint32_t rate;
+  uint32_t breath_interval;
+  uint32_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
+} parameters_t;
+
+parameters_t parameters = {false, 0.0, 0.0, 0.0, 0};
+
+typedef enum modeState_e {
+  MODE_UNKNOWN = 0,
+  MODE_PCCMV = 1,
+  MODE_VCCMV = 2
+};
+modeState_e currentMode = MODE_UNKNOWN;
+int currentMotorRate = 200;
+
 
 // EEPROM is 24c01 128x8
 typedef struct sensor_mapping_s {
@@ -126,10 +119,13 @@ typedef struct visp_eeprom_s {
   sensor_mapping_t sensorMapping[4]; // 16 bytes for sensor mapping.
   uint8_t padding[6]; // Future whatever
   uint16_t checksum; // TODO: future, paranoia about integrity
-} visp_eeprom_t; // WARNING: Must be a multiple of the eeprom's write page.   Assume 8-byte multiples
+  // 32-bytes above!
+
+  // This is VISP specific (venturi/pitot/etc).
+  uint8_t visp_calibration[128 - 32];
+} visp_eeprom_t; // WARNING: Must be a multiple of the eeprom's write page.   Assume (EEPROM_PAGE_SIZE) multiples
 
 visp_eeprom_t visp_eeprom;
-
 
 typedef enum {
   VISP_BUS_TYPE_NONE = ' ',
@@ -149,10 +145,6 @@ typedef enum {
   VISP_BODY_TYPE_EXPERIMENTAL = 'x'
 } vispBodyType_e;
 
-
-
-// This is at address sizeof(visp_eeprom_t), and is VISP specific (venturi/pitot/etc).
-uint8_t visp_calibration[128 - sizeof(visp_eeprom)];
 
 // Chip type detection
 #define DETECTION_MAX_RETRY_COUNT   2
@@ -293,6 +285,38 @@ typedef struct baroDev_s {
 
 
 
+void respond(char command, const __FlashStringHelper *fmt, ...)
+{
+  char sbuffer[128];
+  const char PROGMEM *p = (const char PROGMEM *)fmt;
+
+  if (command == 'g' && !parameters.debug)
+    return;
+
+  //Declare a va_list macro and initialize it with va_start
+  va_list l_Arg;
+  va_start(l_Arg, fmt);
+  vsnprintf_P(sbuffer, sizeof(sbuffer), p, l_Arg);
+  va_end(l_Arg);
+
+  hwSerial.print(command);
+  hwSerial.print(',');
+  hwSerial.print(millis());
+  hwSerial.print(',');
+  hwSerial.println(sbuffer);
+}
+
+
+#define info(...)     respond('i', __VA_ARGS__)
+#define debug(...)    respond('g', __VA_ARGS__)
+#define warning(...)  respond('w', __VA_ARGS__)
+#define critical(...) respond('c', __VA_ARGS__)
+
+
+
+
+
+
 uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
 {
   if (busDev && channel > 0 && channel < 5)
@@ -300,10 +324,7 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
     if (busDev->currentChannel != channel)
     {
       uint8_t error;
-      //dprint("muxSelectChannel Changing from ");
-      //dprint(busDev->currentChannel);
-      //dprint(" to ");
-      //dprintln(channel);
+
       busDev->busdev.i2c.i2cBus->beginTransmission(busDev->busdev.i2c.address);
       busDev->busdev.i2c.i2cBus->write(1 << (channel - 1));
       error = busDev->busdev.i2c.i2cBus->endTransmission();
@@ -320,32 +341,14 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
 
 void busPrint(busDevice_t *bus, const __FlashStringHelper *function)
 {
-  dprint(function);
   if (bus->busType == BUSTYPE_I2C)
   {
-    dprint(F("(I2C:"));
-    dprint(F(" address="));
-    dprint(bus->busdev.i2c.address);
-    // MUX based VISP
-    if (bus->busdev.i2c.channel)
-    {
-      dprint(F(" channel="));
-      dprint(bus->busdev.i2c.channel);
-    }
-    if (bus->busdev.i2c.enablePin != -1)
-    {
-      dprint(F(" enablePin="));
-      dprint(bus->busdev.i2c.enablePin);
-    }
-    dprintln(F(")"));
-    delay(100);
+    debug(F("%S(I2C: address=0x%x channel=%d enablePin=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin);
     return;
   }
   if (bus->busType == BUSTYPE_SPI)
   {
-    dprint(F("(SPI CSPIN="));
-    dprint(bus->busdev.spi.csnPin);
-    dprintln(F(")"));
+    debug(F("%S(SPI CSPIN=%d)"), function, bus->busdev.spi.csnPin);
     return;
   }
 }
@@ -411,7 +414,7 @@ bool busDeviceDetect(busDevice_t *busDev)
     return (error == 0);
   }
   else
-    dprintln(F("busDeviceDetect() unsupported bustype"));
+    critical(F("busDeviceDetect() unsupported bustype"));
 
   return false;
 }
@@ -458,8 +461,7 @@ char busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, 
     if (busDev->busdev.i2c.enablePin != -1)
       digitalWrite(busDev->busdev.i2c.enablePin, LOW);
 
-    dprint(F("endTransmission() returned "));
-    dprintln(error);
+    debug(F("endTransmission() returned %s"), error);
     return (0);
   }
   return (0);
@@ -547,28 +549,6 @@ char writeEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values,
   }
   return 1;
 }
-
-
-void myprint(uint64_t value)
-{
-  const int NUM_DIGITS    = log10(value) + 1;
-
-  char sz[NUM_DIGITS + 1];
-
-  sz[NUM_DIGITS] =  0;
-  for ( size_t i = NUM_DIGITS; i--; value /= 10)
-  {
-    sz[i] = '0' + (value % 10);
-  }
-
-  dprint(sz);
-}
-void myprintln(uint64_t value)
-{
-  myprint(value);
-  dprintln(F(""));
-}
-
 
 
 #define SPL06_I2C_ADDR                         0x76
@@ -759,14 +739,6 @@ bool spl06_read_calibration_coefficients(baroDev_t *baro) {
     return false;
   }
 
-  busPrint(baro->busDev, F("spl06_read_calibration_coefficients"));
-  for (int x = 0; x < SPL06_CALIB_COEFFS_LEN; x++)
-  {
-    dprint(caldata[x], HEX);
-    dprint(F(", "));
-  }
-  dprintln(F(""));
-
   baro->chip.spl06.cal.c0 = (caldata[0] & 0x80 ? 0xF000 : 0) | ((uint16_t)caldata[0] << 4) | (((uint16_t)caldata[1] & 0xF0) >> 4);
   baro->chip.spl06.cal.c1 = ((caldata[1] & 0x8 ? 0xF000 : 0) | ((uint16_t)caldata[1] & 0x0F) << 8) | (uint16_t)caldata[2];
   baro->chip.spl06.cal.c00 = (caldata[3] & 0x80 ? 0xFFF00000 : 0) | ((uint32_t)caldata[3] << 12) | ((uint32_t)caldata[4] << 4) | (((uint32_t)caldata[5] & 0xF0) >> 4);
@@ -816,12 +788,14 @@ bool spl06DeviceDetect(busDevice_t * busDev)
 {
   uint8_t chipId;
   for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
-    delay(100);
     bool ack = busRead(busDev, SPL06_CHIP_ID_REG, &chipId);
+
     if (ack && chipId == SPL06_DEFAULT_CHIP_ID) {
       busPrint(busDev, F("SPL206 Detected"));
       return true;
     }
+
+    delay(100);
   }
 
   return false;
@@ -999,12 +973,12 @@ bool bmp280DeviceDetect(busDevice_t * busDev)
   for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
     uint8_t chipId = 0;
 
-    delay(100);
-
     bool ack = busRead(busDev, BMP280_CHIP_ID_REG, &chipId);
     if (ack && chipId == BMP280_DEFAULT_CHIP_ID) {
       return true;
     }
+
+    delay(100);
   }
 
   return false;
@@ -1173,8 +1147,8 @@ bool bmp388GetUP(baroDev_t *baro)
 
   if (busReadBuf(baro->busDev, BMP388_INT_STATUS_REG, &status, 1))
   {
-    if (0==(status &  (1 << 3)))
-      dprintln("Data is NOT ready");
+    if (0 == (status &  (1 << 3)))
+      busPrint(baro->busDev, F("Data is NOT ready"));
   }
 
 
@@ -1315,28 +1289,6 @@ bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
   baro->chip.bmp388.cal.param_P10 = (float)params.param_P10 / powf(2.0f, 48.0f);
   baro->chip.bmp388.cal.param_P11 = (float)params.param_P11 / powf(2.0f, 65.0f);
 
-  dprintln(F("BMP388 calibration data"));
-  for (int x = 0; x < sizeof(params); x++)
-  {
-    unsigned char *buf = (char *)&params;
-    dprint(F(" 0x"));
-    dprint(buf[x], HEX);
-  }
-  dprintln(F(""));
-
-  //writeByte(0x76, 0x7E, 0xB6) // Reset
-  //writeByte(0x76, 0x1F, 0x0) // IIR filter OFF
-  //writeByte(0x76, 0x1D, 0x0) // ODR
-  //writeByte(0x76, 0x1C, 0x15) // OSR
-  //writeByte(0x76, 0x1B, 0x3) // Enable Temp and Pressure
-  //writeByte(0x76, 0x1D, 0x4) // ODR again
-  //writeByte(0x76, 0x1B, 0x33)
-  //busWrite(0x76, 0x1F, 0x0)
-  //busWrite(0x76, 0x1D, 0x0)
-  //busWrite(0x76, 0x1C, 0x8)
-  //busWrite(0x76, 0x1B, 0x3)
-  //busWrite(0x76, 0x1B, 0x33)
-
   //set IIR Filter
   busWrite(baro->busDev, BMP388_CONFIG_REG, (BMP388_FILTER_COEFF_OFF) << 1);
 
@@ -1350,9 +1302,11 @@ bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
 
   // Set mode 0b00110011, normal, pressure and temperature
   busWrite(busDev, BMP388_PWR_CTRL_REG, 0x03);
+
   // Set Data Rate
   busWrite(baro->busDev, BMP388_ODR_REG, BMP388_TIME_STANDBY_20MS);
 
+  // Set mode 0b00110011, normal, pressure and temperature
   busWrite(busDev, BMP388_PWR_CTRL_REG, 0x33);
 
   baro->calculate = bmp388Calculate;
@@ -1419,10 +1373,9 @@ busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t addr
     {
       if (!spl06Detect(baro, device))
       {
+        busPrint(device, F("chip identification failed"));
         busDeviceFree(device);
         device = NULL;
-        dprint(F("Device refused to be detected at 0x"));
-        dprintln(address, HEX);
       }
     }
   }
@@ -1454,35 +1407,34 @@ bool detectMuxedSensors(TwoWire *wire)
   busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70);
   if (!busDeviceDetect(muxDevice))
   {
-    dprintln(F("Failed to find MUX on I2C, detecting enable pin"));
+    debug(F("Failed to find MUX on I2C, detecting enable pin"));
     enablePin = ENABLE_PIN_BUS_A;
     busDeviceFree(muxDevice);
     muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enablePin);
     if (!busDeviceDetect(muxDevice))
     {
-      dprintln(F("Failed to detect MUX Based VISP"));
+      debug(F("Failed to detect MUX Based VISP"));
       busDeviceFree(muxDevice);
       return false;
     }
   }
-  dprintln(F("MUX Based VISP Detected"));
+  debug(F("MUX Based VISP Detected"));
 
   // Assign the device it's correct type
   muxDevice->hwType = HWTYPE_MUX;
 
-  dprintln(F("Looking for EEPROM"));
   eeprom = detectEEPROM(wire, 0x54, 1, muxDevice, enablePin);
 
 
   // Detect U5, U6
-  dprintln(F("Looking for U5"));
+  debug(F("Looking for U5"));
   detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enablePin);
-  dprintln(F("Looking for U6"));
+  debug(F("Looking for U6"));
   detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 1, muxDevice, enablePin);
   // Detect U7, U8
-  dprintln(F("Looking for U7"));
+  debug(F("Looking for U7"));
   detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x76, 2, muxDevice, enablePin);
-  dprintln(F("Looking for U8"));
+  debug(F("Looking for U8"));
   detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x77, 2, muxDevice, enablePin);
 
   detectedVispType = VISP_BUS_TYPE_MUX;
@@ -1505,16 +1457,15 @@ bool detectXLateSensors(TwoWire * wire)
     seventyFour = busDeviceInitI2C(wire, 0x74, 0, NULL, ENABLE_PIN_BUS_A);
     if (!busDeviceDetect(seventyFour))
     {
-      dprintln(F("Failed to detect XLate Based VISP"));
+      debug(F("Failed to detect XLate Based VISP"));
       busDeviceFree(seventyFour);
       return false;
     }
     enablePin = ENABLE_PIN_BUS_A;
   }
 
-  dprintln(F("XLate Based VISP Detected"));
+  debug(F("XLate Based VISP Detected"));
 
-  dprintln(F("Looking for EEPROM"));
   eeprom = detectEEPROM(wire, 0x54, 0, NULL, enablePin);
 
   // Detect U5, U6
@@ -1538,9 +1489,8 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
   int8_t enablePinB = -1;
 
 
-  dprintln(F("Assuming DUAL I2C VISP"));
+  debug(F("Assuming DUAL I2C VISP"));
 
-  dprintln(F("Looking for EEPROM"));
   eeprom = detectEEPROM(wireA, 0x54);
   if (!eeprom)
   {
@@ -1551,12 +1501,17 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
     {
       eeprom = detectEEPROM(wireA, 0x54, 0, NULL, enablePinB);
       if (eeprom)
-        dprintln(F("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
+      {
+        TwoWire *swap = wireA;
+        wireA = wireB;
+        wireB = swap;
+        debug(F("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
+      }
       else
-        dprintln(F("Failed to detect DUAL I2C VISP"));
+        debug(F("Failed to detect DUAL I2C VISP"));
       return false;
     }
-    dprintln(F("Enable pins detected!"));
+    debug(F("Enable pins detected!"));
   }
 
   // Detect U5, U6
@@ -1567,13 +1522,13 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
   // Detect U7, U8
   if (wireB)
   {
-    dprintln(F("TEENSY second I2C bus"));
+    debug(F("TEENSY second I2C bus"));
     detectIndividualSensor(&sensors[SENSOR_U7], wireB, 0x76, 0, NULL, enablePinB);
     detectIndividualSensor(&sensors[SENSOR_U8], wireB, 0x77, 0, NULL, enablePinB);
   }
   else
   {
-    dprintln(F("No second HW I2C, using Primary I2C bus with enable pin"));
+    debug(F("No second HW I2C, using Primary I2C bus with enable pin"));
     detectIndividualSensor(&sensors[SENSOR_U7], wireA, 0x76, 0, NULL, enablePinB);
     detectIndividualSensor(&sensors[SENSOR_U8], wireA, 0x77, 0, NULL, enablePinB);
   }
@@ -1588,15 +1543,15 @@ bool detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
 {
   memset(&sensors, 0, sizeof(sensors));
 
-  dprintln(F("Detecting MUX VISP"));
+  debug(F("Detecting MUX VISP"));
   if (detectMuxedSensors(i2cBusA))
     return true;
 
-  dprintln(F("Detecting XLate VISP"));
+  debug(F("Detecting XLate VISP"));
   if (detectXLateSensors(i2cBusA))
     return true;
 
-  dprintln(F("Detecting DUAL-I2C VISP"));
+  debug(F("Detecting DUAL-I2C VISP"));
   if (detectDualI2CSensors(i2cBusA, i2cBusB))
     return true;
   return false;
@@ -1646,10 +1601,9 @@ t tasks[] = {
 
 void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
 {
-  dprintln(F("Formatting VISP"));
+  debug(F("Formatting VISP"));
 
   memset(&visp_eeprom, 0, sizeof(visp_eeprom));
-  memset(visp_calibration, 0, sizeof(visp_calibration));
 
   visp_eeprom.VISP[0] = 'V';
   visp_eeprom.VISP[1] = 'I';
@@ -1662,7 +1616,6 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
   // TODO: checksum;
 
   writeEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
-  writeEEPROM(eeprom, sizeof(visp_eeprom), (char *)visp_calibration, sizeof(visp_calibration));
 }
 
 
@@ -1686,8 +1639,8 @@ void setup() {
   pinMode(M_DIR_1, OUTPUT);
   pinMode(M_DIR_2, OUTPUT);
 
-  hwSerial.begin(230400);
-  dprintln(F("VISP Sensor Reader Test Application V0.1b"));
+  hwSerial.begin(SERIAL_BAUD);
+  info(F("VISP Sensor Reader Test Application V0.1c"));
   i2cBus1->begin();
   i2cBus1->setClock(400000); // Typical
 
@@ -1698,40 +1651,41 @@ void setup() {
   {
     sensorsFound = detectSensors(i2cBus1, i2cBus2);
     if (sensorsFound)
-      dprintln(F("Sensors detected!"));
+    {
+      debug(F("Sensors detected!"));
+      // Make sure they are all there
+      if (sensors[0].busDev == NULL) {
+        warning(F("Sensor 0 missing"));
+        sensorsFound = false;
+      }
+      if (sensors[1].busDev == NULL) {
+        warning(F("Sensor 1 missing"));
+        sensorsFound = false;
+      }
+      if (sensors[2].busDev == NULL) {
+        warning(F("Sensor 2 missing"));
+        sensorsFound = false;
+      }
+      if (sensors[3].busDev == NULL) {
+        warning(F("Sensor 3 missing"));
+        sensorsFound = false;
+      }
+    }
     else
     {
-      dprintln(F("Error finding sensors, retrying"));
+      debug(F("Error finding sensors, retrying"));
       delay(500);
     }
 
-    // Make sure they are all there
-    if (sensors[0].busDev == NULL) {
-      dprintln(F("Sensor 0 missing"));
-      sensorsFound = false;
-    }
-    if (sensors[1].busDev == NULL) {
-      dprintln(F("Sensor 1 missing"));
-      sensorsFound = false;
-    }
-    if (sensors[2].busDev == NULL) {
-      dprintln(F("Sensor 2 missing"));
-      sensorsFound = false;
-    }
-    if (sensors[3].busDev == NULL) {
-      dprintln(F("Sensor 3 missing"));
-      sensorsFound = false;
-    }
 
   } while (!sensorsFound);
 
   if (eeprom)
   {
     uint8_t *buf;
-    dprintln(F("Reading VISP EEPROM"));
+    debug(F("Reading VISP EEPROM"));
 
     readEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
-    readEEPROM(eeprom, sizeof(visp_eeprom), (char *)visp_calibration, sizeof(visp_calibration));
 
     if (visp_eeprom.VISP[0] != 'V'
         ||  visp_eeprom.VISP[1] != 'I'
@@ -1740,12 +1694,12 @@ void setup() {
     {
       // ok, unformatted VISP
       formatVisp = true;
-      dprintln(F("!ERROR eeprom not formatted"));
+      warning(F("ERROR eeprom not formatted"));
     }
   }
   else
   {
-    dprintln(F("!ERROR eeprom not available"));
+    critical(F("ERROR eeprom not available"));
     formatVisp = true;
   }
 
@@ -1756,10 +1710,56 @@ void setup() {
 
 
   // Just put it out there, what type we are for the status system to figure out
-  hwSerial.print("!identity ");
-  hwSerial.println(visp_eeprom.VISP);
-
+  respond('I', F("%s"), visp_eeprom.VISP);
 }
+
+void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, float tidalVolume, float *P)
+{
+  // Take some time to write to the serial port
+  hwSerial.print(F("d,"));
+  hwSerial.print(sampleTime);
+  hwSerial.print(F(","));
+  hwSerial.print(pressure, 4);
+  hwSerial.print(F(","));
+  hwSerial.print(volumeSmoothed, 4);
+  hwSerial.print(F(","));
+  if (!parameters.debug)
+    hwSerial.println(tidalVolume, 4);
+  else
+  {
+    hwSerial.print(tidalVolume, 4);
+    hwSerial.print(F(","));
+    hwSerial.print(P[SENSOR_U5], 1);
+    hwSerial.print(F(","));
+    hwSerial.print(P[SENSOR_U6], 1);
+    hwSerial.print(F(","));
+    hwSerial.print(P[SENSOR_U7], 1);
+    hwSerial.print(F(","));
+    hwSerial.println(P[SENSOR_U8], 1);
+  }
+}
+
+
+
+void doCalibration(float *P)
+{
+  calibrationTotals[0] += P[0];
+  calibrationTotals[1] += P[1];
+  calibrationTotals[2] += P[2];
+  calibrationTotals[3] += P[3];
+  calibrationSampleCounter++;
+  if (calibrationSampleCounter == 99) {
+    float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400.0;
+    for (int x = 0; x < 4; x++)
+    {
+      calibrationOffset[x] = average - calibrationTotals[x] / 100.0;
+    }
+    calibrationSampleCounter = 0;
+    runState = RUNSTATE_RUN;
+    respond('C', F("2,Calibration Finished"));
+  }
+}
+
 
 // Use these definitions to map sensors to their usage
 #define PATIENT_PRESSURE SENSOR_U5
@@ -1774,21 +1774,7 @@ void loopPitotVersion(float *P, float *T)
   switch (runState)
   {
     case RUNSTATE_CALIBRATE:
-      calibrationTotals[0] += P[0];
-      calibrationTotals[1] += P[1];
-      calibrationTotals[2] += P[2];
-      calibrationTotals[3] += P[3];
-      calibrationSampleCounter++;
-      if (calibrationSampleCounter == 99) {
-        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400;
-        for (int x = 0; x < 4; x++)
-        {
-          calibrationOffset[x] = calibrationTotals[x] / 100 - average;
-        }
-        calibrationSampleCounter = 0;
-        hwSerial.println(F("!calibrated"));
-        runState = RUNSTATE_RUN;
-      }
+      doCalibration(P);
       break;
 
     case RUNSTATE_RUN:
@@ -1812,22 +1798,9 @@ void loopPitotVersion(float *P, float *T)
       pressure = (patientPressure - ambientPressure) * paTocmH2O; // average of all sensors in the tube for pressure reading
 
       // Take some time to write to the serial port
-      hwSerial.print(millis());
-      hwSerial.print(F(","));
-      hwSerial.print(pressure, 4);
-      hwSerial.print(F(","));
-      hwSerial.print(volume, 4);
-      hwSerial.print(F(","));
-      hwSerial.print(ambientPressure, 1);
-      hwSerial.print(F(","));
-      hwSerial.print(patientPressure, 1);
-      hwSerial.print(F(","));
-      hwSerial.print(pitot1, 1);
-      hwSerial.print(F(","));
-      hwSerial.println(pitot2, 1);
+      dataSend(millis(), pressure, volume, 0.0, P);
       break;
   }
-
 }
 
 //U7 is input tube, U8 is output tube, U5 is venturi, U6 is ambient
@@ -1846,27 +1819,14 @@ void loopVenturiVersion(float * P, float * T)
   switch (runState)
   {
     case RUNSTATE_CALIBRATE:
-      calibrationTotals[0] += P[0];
-      calibrationTotals[1] += P[1];
-      calibrationTotals[2] += P[2];
-      calibrationTotals[3] += P[3];
-      calibrationSampleCounter++;
-      if (calibrationSampleCounter == 99) {
-        float average = (calibrationTotals[0] + calibrationTotals[1] + calibrationTotals[2] + calibrationTotals[3]) / 400.0;
-        for (int x = 0; x < 4; x++)
-        {
-          calibrationOffset[x] = average - calibrationTotals[x] / 100.0;
-        }
-        calibrationSampleCounter = 0;
-        runState = RUNSTATE_RUN;
-      }
+      doCalibration(P);
       break;
 
     case RUNSTATE_RUN:
-      digitalWrite(M_DIR_1,0);
-      digitalWrite(M_DIR_2,1);  
-      analogWrite(M_PWM_1,200);
-      analogWrite(M_PWM_2,200);
+      digitalWrite(M_DIR_1, 0);
+      digitalWrite(M_DIR_2, 1);
+      analogWrite(M_PWM_1, 200);
+      analogWrite(M_PWM_2, 200);
       P[0] += calibrationOffset[0];
       P[1] += calibrationOffset[1];
       P[2] += calibrationOffset[2];
@@ -1922,22 +1882,262 @@ void loopVenturiVersion(float * P, float * T)
       lastSampleTime = sampleTime;
       pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;
 
-      // Take some time to write to the serial port
-      hwSerial.print(sampleTime);
-      hwSerial.print(F(","));
-      hwSerial.print(pressure, 4);
-      hwSerial.print(F(","));
-      hwSerial.print(volumeSmoothed, 4);
-      hwSerial.print(F(","));
-      hwSerial.print(tidalVolume, 4);
-      hwSerial.print(F(","));
-      hwSerial.print(P[SENSOR_U5], 1);
-      hwSerial.print(F(","));
-      hwSerial.print(P[SENSOR_U6], 1);
-      hwSerial.print(F(","));
-      hwSerial.print(P[SENSOR_U7], 1);
-      hwSerial.print(F(","));
-      hwSerial.println(P[SENSOR_U8], 1);
+      dataSend(sampleTime, pressure, volumeSmoothed, tidalVolume, P);
+      break;
+  }
+}
+
+typedef enum parser_state_e {
+  PARSE_COMMAND,
+  PARSE_IGNORE_TILL_LF,
+  PARSE_SINGLE_ARG,
+  PARSE_FIRST_ARG,
+  PARSE_SECOND_ARG,
+  PARSE_EEPROM_ARGS
+};
+
+
+
+void sendEEPROMdata(uint16_t address, uint16_t len)
+{
+  uint8_t *cbuf = (uint8_t *)&visp_eeprom;
+  hwSerial.print(F("E,"));
+  hwSerial.print(millis());
+  hwSerial.print(F(", 0x"));
+  hwSerial.print(address, HEX);
+  for (int x = 0; x < len; x++)
+  {
+    hwSerial.print(F(",0x"));
+    hwSerial.print(cbuf[address + x], HEX);
+  }
+  hwSerial.println(F(""));
+}
+
+void updateEEPROMdata(uint16_t address, uint8_t data)
+{
+  uint8_t *cbuf = (uint8_t *)&visp_eeprom;
+  cbuf[address] = data;
+}
+
+
+void commandParser(int cmdByte)
+{
+  static parser_state_e currentState = PARSE_COMMAND;
+  static uint8_t command = 0;
+  static char arg1[16] = "", arg2[16] = "";
+  static uint8_t arg1Pos = 0, arg2Pos = 0;
+  static uint16_t eepromAddress = 0xFFFF; // Invalid Address
+  static uint16_t eepromCount = 0;
+  char outstr[16];
+  void(* resetFunc) (void) = 0;//declare reset function at address 0
+
+  // Any kind of garbage input resets the state machine
+  if (!isprint(cmdByte))
+    currentState = PARSE_IGNORE_TILL_LF;
+
+  // Ignore DOS CR
+  if (cmdByte == '\r')
+    return;
+
+  // Need to be able to gracefully handle empty lines
+  if (cmdByte == '\n')
+  {
+    debug(F("Executing command %c Arg1='%s' Arg2='%s'"), command, arg1, arg2);
+
+    // Process the command here
+    currentState = PARSE_COMMAND;
+
+    switch (command) {
+      case 'P': respond('P', F("I am alive!"));  break;
+      case 'I': respond('I', F("%s"), visp_eeprom.VISP); break;
+      case 'C':
+        respond('C', (runState == RUNSTATE_CALIBRATE ? F("1,Calibration in progress") : F("0,Starting Calibration")));
+        if (runState != RUNSTATE_CALIBRATE)
+        {
+          runState = RUNSTATE_CALIBRATE;
+          clearCalibrationData();
+        }
+        break;
+      case 'E':
+        if (eepromAddress == 0xFFFF)
+        {
+            // arg1 has an address
+            if (*arg1)
+                sendEEPROMdata(strtol(arg1, NULL, 0), 16); // If user supplied an address, only 16 bytes
+            else
+                sendEEPROMdata(0,128);
+        }
+        else
+        {
+            if (*arg1)
+            {
+              updateEEPROMdata(eepromAddress+eepromCount, strtol(arg1, NULL, 0));
+              eepromCount++;
+              // Write the whole thing.   Kinda wasteful as we should really do it on a Commit...
+              writeEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
+            }
+            sendEEPROMdata(eepromAddress,eepromCount);
+        }
+
+        break;
+      case 'Q':
+        respond('I', F("%s"), visp_eeprom.VISP);
+        respond('M', currentMode == MODE_PCCMV ? F("PC-CMV") : (currentMode == MODE_VCCMV ? F("VC-CMV") : "UNKNOWN"));
+        respond('S', F("volume,%d"), parameters.volume);
+        respond('S', F("rate,%d"), parameters.rate);
+        respond('S', F("breath_interval,%d"), parameters.breath_interval);
+        respond('S', (parameters.debug ? F("debug,enabled") : F("debug,disabled")));
+        respond('S', F("motor_speed,%d"), parameters.motor_speed);
+        respond('Q', F("Finished"));
+        break;
+      case 'M':
+        if (arg1[0] == 0) // Is this a Mode Query?
+          respond('M', currentMode == MODE_PCCMV ? F("PC-CMV") : (currentMode == MODE_VCCMV ? F("VC-CMV") : "UNKNOWN"));
+        else if (strcmp(arg1, "PC-CMV") == 0)
+          currentMode = MODE_PCCMV;
+        else if (strcmp(arg1, "VC-CMV") == 0)
+          currentMode = MODE_VCCMV;
+        respond('M', currentMode == MODE_PCCMV ? F("PC-CMV") : (currentMode == MODE_VCCMV ? F("VC-CMV") : "UNKNOWN"));
+        break;
+      case 'S': // Set parameter
+        if (arg1[0] == 0) // Is this a Query for all?
+        {
+          respond('S', F("volume,%d"), parameters.volume);
+          respond('S', F("rate,%d"), parameters.rate);
+          respond('S', F("breath_interval,%d"), parameters.breath_interval);
+          respond('S', (parameters.debug ? F("debug,enabled") : F("debug,disabled")));
+          respond('S', F("motor_speed,%d"), parameters.motor_speed);
+        }
+        else
+        {
+          if (strcasecmp(arg1, "volume") == 0)
+          {
+            if (*arg2)
+              parameters.volume = atof(arg2);
+            respond('S', F("%s,%d"), arg1, parameters.volume);
+          }
+          else if (strcasecmp(arg1, "rate") == 0)
+          {
+            if (*arg2)
+              parameters.rate = atof(arg2);
+            respond('S', F("%s,%d"), arg1, parameters.rate);
+          }
+          else if (strcasecmp(arg1, "breath_interval") == 0)
+          {
+            if (*arg2)
+              parameters.breath_interval = atof(arg2);
+            respond('S', F("%s,%d"), arg1, parameters.breath_interval);
+          }
+          else if (strcasecmp(arg1, "debug") == 0)
+          {
+            if (*arg2)
+            {
+              if (strcasecmp(arg2, "enabled") == 0)
+                parameters.debug = true;
+              else if (strcasecmp(arg2, "disabled") == 0)
+                parameters.debug = false;
+              else
+                warning(F("Invalid debug value %s"), arg2);
+            }
+            respond('S', (parameters.debug ? F("debug,enabled") : F("debug,disabled")));
+          }
+          else if (strcasecmp(arg1, "motor_speed") == 0)
+          {
+            if (*arg2)
+              parameters.motor_speed = strtol(arg2, NULL, 0);
+
+            digitalWrite(M_DIR_1, 0);
+            if (parameters.motor_speed == 0)
+              digitalWrite(M_DIR_2, 0);
+            else
+              digitalWrite(M_DIR_2, 1);
+            analogWrite(M_PWM_1, parameters.motor_speed);
+            analogWrite(M_PWM_2, parameters.motor_speed);
+            respond('S', F("%s,%d"), arg1, parameters.motor_speed);
+          }
+          else
+            respond('S', F("%s, Unimplemented"), arg1);
+        }
+        break;
+      case 'R': // Reboot chip
+        resetFunc(); //call reset
+        break;
+    }
+    return;
+  }
+
+  switch (currentState) {
+    case PARSE_COMMAND:
+      if (cmdByte == ',')
+      {
+
+        // Command with arguments
+        switch (command) {
+          case 'S':  currentState = PARSE_FIRST_ARG;    break;
+          case 'M':  currentState = PARSE_SINGLE_ARG;   break;
+          case 'E':  currentState = PARSE_EEPROM_ARGS;  break;
+          default: currentState = PARSE_IGNORE_TILL_LF; break;
+        }
+      }
+      else
+      {
+        // And reset!
+        command = cmdByte;
+        arg1Pos = 0;
+        memset(arg1, 0, sizeof(arg1));
+        arg2Pos = 0;
+        memset(arg2, 0, sizeof(arg2));
+        eepromAddress = 0xFFFF;
+        eepromCount=0;
+      }
+      break;
+    case PARSE_FIRST_ARG:
+    case PARSE_SINGLE_ARG:
+      if (cmdByte == ',')
+      {
+        currentState = (currentState == PARSE_SINGLE_ARG ? PARSE_IGNORE_TILL_LF : PARSE_SECOND_ARG); // Default
+      }
+      else
+      {
+        if (arg1Pos < (sizeof(arg1) - 1))
+        {
+          arg1[arg1Pos++] = cmdByte;
+        }
+      }
+      break;
+    case PARSE_SECOND_ARG:
+      if (cmdByte == ',')
+      {
+        currentState = PARSE_IGNORE_TILL_LF; // Default
+      }
+      else
+      {
+        if (arg2Pos < (sizeof(arg2) - 1))
+        {
+          arg2[arg2Pos++] = cmdByte;
+        }
+      }
+      break;
+    case PARSE_EEPROM_ARGS:
+      if (cmdByte == ',')
+      {
+        if (eepromAddress == 0xFFFF)
+          eepromAddress = strtol(arg1, NULL, 0);
+        else
+        {
+          updateEEPROMdata(eepromAddress+eepromCount, strtol(arg1, NULL, 0));
+          eepromCount++;
+        }
+        arg1Pos = 0;
+        memset(arg1, 0, sizeof(arg1));
+      }
+      else
+      {
+        if (arg1Pos < (sizeof(arg1) - 1))
+          arg1[arg1Pos++] = cmdByte;
+      }
+      break;
+    case PARSE_IGNORE_TILL_LF:
       break;
   }
 }
@@ -1961,60 +2161,21 @@ void loop() {
       sensors[x].calculate(&sensors[x], &P[x], &T[x]);
     }
 
-    if (hwSerial.available())
-    {
-      //digitalWrite(M_DIR_1,0);
-      //digitalWrite(M_DIR_2,1);  
-      //analogWrite(M_PWM_1,200);
-      //analogWrite(M_PWM_2,200);
-      command = hwSerial.readString(); //reads serial input
-      if (command == "calibrate")
-      {
-        runState = RUNSTATE_CALIBRATE;
-        clearCalibrationData();
-      }
-      if (command == "ping")
-        hwSerial.println(F("!pong"));
-
-      if (command == "identify")
-      {
-        hwSerial.print("!identity ");
-        hwSerial.println(visp_eeprom.VISP);
-      }
-      if (runState == RUNSTATE_RUN)
-      {
- 
-        //hwSerial.println("!run");
-       
-      }
-      if (command == "stop")
-      {
-        digitalWrite(M_DIR_1,0);
-        digitalWrite(M_DIR_2,0);
-        analogWrite(M_PWM_1,0);
-        analogWrite(M_PWM_2,0);
-        hwSerial.println("!stop");
-      }
-      if (command == "rate")
-      {
-        analogWrite(M_PWM_1,255);
-        analogWrite(M_PWM_2,255);
-      }
-      // TODO: format command from display
-      // void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
-    }
+    // Check to see if at least one character is available
+    while (hwSerial.available())
+      commandParser(hwSerial.read());
 
     // Detect the VISP type from the EEPROM and use the appropriate function
     // Till we get the EEPROMS loaded right
-    //    switch (visp_eeprom.bodyType)
-    //    {
-    //      case 'P':
-    //        loopPitotVersion(P, T);
-    //        break;
-    //      case 'V':
-    //      default:
-    loopVenturiVersion(P, T);
-    //        break;
-    //    }
+//    switch (visp_eeprom.bodyType)
+//    {
+//      case 'P':
+//        loopPitotVersion(P, T);
+//        break;
+//      case 'V':
+//      default:
+        loopVenturiVersion(P, T);
+//        break;
+//    }
   }
 }

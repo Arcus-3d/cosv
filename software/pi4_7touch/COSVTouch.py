@@ -366,7 +366,7 @@ class COSVTouchApp(App):
                         if dataType == 'd':
                             sampleTime = float(col[1])
                             print(col)
-                            self.graphs.add_points(float(col[2]),float(col[3])*1.5,float(col[4])*1.5)
+                            self.graphs.add_points(float(col[2]),float(col[3])*2,float(col[4])*2)
                         else:
                             if dataType == 's':
                                 print(row)

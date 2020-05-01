@@ -262,10 +262,10 @@ class COSVTouchApp(App):
         
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
-        self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=2000,graph_size=2000)
+        self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=1000,graph_size=1000)
         self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
         self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-60, ymax=60,y_ticks_major=20))
-        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=400,size_hint=(1,0.75),y_ticks_major=100))
+        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=600,size_hint=(1,0.75),y_ticks_major=100))
         if (self.enableCO2):
             self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
         layoutLeft.add_widget(self.graphs)
@@ -322,7 +322,7 @@ class COSVTouchApp(App):
         if self.run_state == 'run':
             try:
                 availablePorts = listSerialPorts()
-                self.serial = serial.Serial(port=availablePorts[0], baudrate=230400,timeout=1)
+                self.serial = serial.Serial(port=availablePorts[0], baudrate=115200,timeout=1)
                 Clock.schedule_interval(self.get_data, 1 / 50.)
                 if (self.serial.is_open): 
                     self.serial.write(b'rate,')
@@ -354,16 +354,18 @@ class COSVTouchApp(App):
                     col = row.split(',',10)
                     try:
                         dataType = col[0]
-                        if dataType == 'data':
+                        if dataType == 'i':
+                            print(row)
+                        if dataType == 'd':
                             sampleTime = float(col[1])
                             print(col)
                             self.graphs.add_points(float(col[2]),float(col[3]),float(col[4]))
                         else:
-                            if dataType == 'state':
+                            if dataType == 's':
                                 print(row)
                                 self.run_state = col[1]
                                 self.buttonRun.updateValue(state)
-                            if dataType == 'rate':
+                            if dataType == 'r':
                                 print(row)
                                 self.run_rate = col[1]
                     except Exception as e:

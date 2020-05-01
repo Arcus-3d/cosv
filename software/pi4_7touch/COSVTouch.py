@@ -314,8 +314,8 @@ class COSVTouchApp(App):
     def updateRate(self,event,value):
         self.run_rate = value
         self.serial.write(b'S,motor_speed,')
-        self.serial.write(self.run_rate*6)
-        self.serial.write('\n')
+        self.serial.write(bytes(self.run_rate*6))
+        self.serial.write(b'\n')
     def runButton(self,event):
         #pass
         if self.buttonRun.value == 'stop':
@@ -330,8 +330,8 @@ class COSVTouchApp(App):
                 self.serial = serial.Serial(port=availablePorts[0], baudrate=115200,timeout=1)
                 Clock.schedule_interval(self.get_data, 1 / 50.)
                 if (self.serial.is_open): 
-                    self.serial.write(b'rate,')
-                    self.serial.write(int(self.run_rate))
+                    self.serial.write(b'S,rate,')
+                    self.serial.write(bytes(self.run_rate))
                     self.serial.write(b'\n')
                     self.serial.write(b'run\n')
                     self.serial.write(b'S,motor_speed,230\n')

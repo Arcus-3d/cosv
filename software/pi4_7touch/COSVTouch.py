@@ -329,6 +329,7 @@ class COSVTouchApp(App):
                     self.serial.write(int(self.run_rate))
                     self.serial.write(b'\n')
                     self.serial.write(b'run\n')
+                    self.serial.write(b'motor_speed,230\n')
                     print('serial started')
                 self.graphs.reset()
             except Exception as e:
@@ -338,6 +339,7 @@ class COSVTouchApp(App):
         if self.run_state == 'stop':
             try:
                 self.serial.write(b'stop\n')
+                self.serial.write(b'motor_speed,0\n')
                 self.serial.close()
                 Clock.unschedule(self.get_data)
             except Exception as e:

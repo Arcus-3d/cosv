@@ -20,7 +20,8 @@
 #include <stdint.h>
 #include <Wire.h>
 #include <SPI.h>
-
+#include <avr/io.h>
+#include <avr/interrupt.h>
 
 // #define TEENSY 1
 
@@ -35,6 +36,8 @@ TwoWire *i2cBus2 = &Wire2;
 TwoWire *i2cBus1 = &Wire;
 TwoWire *i2cBus2 = NULL;
 #define SERIAL_BAUD 115200
+
+
 #endif
 
 
@@ -43,10 +46,32 @@ TwoWire *i2cBus2 = NULL;
 #define ENABLE_PIN_BUS_A 4
 #define ENABLE_PIN_BUS_B 5
 
-#define M_PWM_1 6
-#define M_PWM_2 9
+#define M_PWM_1 6 // Hardware PWM on a Nano
+#define M_PWM_2 9 // Hardware PWM on a Nano
 #define M_DIR_1 10
-#define M_DIR_2 10
+#define M_DIR_2 10 // Daren, is this correct?  Both share the same pin?  Use D13 if you need a separate line to drive
+
+#define STEPPER_DIR  7
+#define STEPPER_STEP 8
+
+#define BLDC_DIR     12 // 
+#define BLDC_PWM     11 // Hardware PWM output for BLDC motor
+#define BLDC_FEEDBACK 3 // Interrupt pin, let's us know the core motor has done 1 Rev
+
+// If all of the ADC's are set to zero, then the display controls things
+#define ADC_VOLUME   A0 // How much to push, 0->1023 milliliters, if it reads 0, then display can control this (parameter)
+#define ADC_RATE     A1 // How much time to push, 0->1023.   Scaled to 1/2 the interval???
+#define ADC_INTERVAL A2 // When to timeout and trigger a new breath.   0..1023 is scaled from 0 to 3 seconds.  0=display controls the parameter
+#define ADC_HALL     A3 // Used for sensing home with Hall Effect Sensors
+#define ADC_SDA      A4
+#define ADC_SCL      A5
+#define ADC_UNKNOWN1 A6
+#define ADC_UNKNOWN2 A7
+
+
+#define MISSING_PULSE_PIN  2   // Output a pulse every time we check the sensors.
+
+// We only have ADC inputs A6 and A7 left...
 
 // DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
 //
@@ -76,24 +101,24 @@ TwoWire *i2cBus2 = NULL;
 // Shamelessly swiped from: https://i.stack.imgur.com/WnsM0.png
 
 
-// Parameters we can monkey with from the display
-typedef struct parameters_s {
-  bool     debug;
-  uint32_t volume;
-  uint32_t rate;
-  uint32_t breath_interval;
-  uint32_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
-} parameters_t;
-
-parameters_t parameters = {false, 0.0, 0.0, 0.0, 0};
-
 typedef enum modeState_e {
   MODE_UNKNOWN = 0,
   MODE_PCCMV = 1,
   MODE_VCCMV = 2
 };
-modeState_e currentMode = MODE_UNKNOWN;
-int currentMotorRate = 200;
+
+// Parameters we can monkey with from the display
+typedef struct parameters_s {
+  bool     debug;
+  modeState_e mode;
+  uint32_t volume;
+  uint32_t rate;
+  uint32_t breath_interval;
+  uint32_t breath_threshold;
+  uint32_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
+} parameters_t;
+
+parameters_t parameters = {false, MODE_UNKNOWN, 0, 0, 0, 200};
 
 
 // EEPROM is 24c01 128x8
@@ -1581,6 +1606,13 @@ bool tCheck (struct t * t ) {
   }
 }
 
+// Periodically pulse a pin
+void timeToPulseWatchdog()
+{
+  digitalWrite(MISSING_PULSE_PIN, HIGH);
+  delayMicroseconds(1);
+  digitalWrite(MISSING_PULSE_PIN, LOW);
+}
 
 void timeToReadVISP()
 {
@@ -1592,6 +1624,7 @@ void timeToReadVISP()
 // If somethign takes priority over another task, put it at the top of the list
 t tasks[] = {
   {0, 20, timeToReadVISP},
+  {0, 100, timeToPulseWatchdog},
   { -1, 0, NULL} // End of list
 };
 
@@ -1634,6 +1667,8 @@ void setup() {
   digitalWrite(ENABLE_PIN_BUS_A, LOW);
   pinMode(ENABLE_PIN_BUS_B, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_B, LOW);
+  pinMode(MISSING_PULSE_PIN, OUTPUT);
+  digitalWrite(MISSING_PULSE_PIN, LOW);
   pinMode(M_PWM_1, OUTPUT);
   pinMode(M_PWM_2, OUTPUT);
   pinMode(M_DIR_1, OUTPUT);
@@ -1919,6 +1954,67 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
   cbuf[address] = data;
 }
 
+#define RESPOND_LIMITS             1
+#define RESPOND_DEBUG              2
+#define RESPOND_IDENTITY           4
+#define RESPOND_MODE               8
+#define RESPOND_VOLUME            16
+#define RESPOND_RATE              32
+#define RESPOND_BREATH_INTERVAL   64
+#define RESPOND_BREATH_THRESHOLD 128
+#define RESPOND_MOTOR_SPEED      256
+
+void respondAppropriately(uint16_t flags)
+{
+  if (flags & RESPOND_IDENTITY)
+    respond('I', F("%s"), visp_eeprom.VISP);
+  if (flags & RESPOND_MODE) {
+    if (flags & RESPOND_LIMITS)
+      respond('S', F("mode_dict,PC-CMV,Pressure Controlled,VC-CMV,Volume Controlled"));
+    respond('S', F("mode,%S"), parameters.mode == MODE_PCCMV ? F("PC-CMV") : (parameters.mode == MODE_VCCMV ? F("VC-CMV") : F("UNKNOWN")));
+  }
+  if (flags & RESPOND_VOLUME) {
+    if (flags & RESPOND_LIMITS) {
+      respond('S', F("volume_min,0"));
+      respond('S', F("volume_max,1000"));
+    }
+    respond('S', F("volume,%d"), parameters.volume);
+  }
+  if (flags & RESPOND_RATE) {
+    if (flags & RESPOND_LIMITS) {
+      respond('S', F("rate_min,0"));
+      respond('S', F("rate_max,1023"));
+    }
+    respond('S', F("rate,%d"), parameters.rate);
+  }
+  if (flags & RESPOND_BREATH_INTERVAL) {
+    if (flags & RESPOND_LIMITS) {
+      respond('S', F("breath_interval_min,0"));
+      respond('S', F("breath_interval_max,1000"));
+    }
+    respond('S', F("breath_interval,%d"), parameters.breath_interval);
+  }
+  if (flags & RESPOND_BREATH_THRESHOLD) {
+    if (flags & RESPOND_LIMITS) {
+      respond('S', F("breath_threshold_min,0"));
+      respond('S', F("breath_threshold_max,1000"));
+    }
+    respond('S', F("breath_threshold,%d"), parameters.breath_threshold);
+  }
+  if (flags & RESPOND_DEBUG) {
+    if (flags & RESPOND_LIMITS)
+      respond('S', F("debug_dict,enable,Enable debug output,disable,Disable debug output"));
+    respond('S', (parameters.debug ? F("debug,enabled") : F("debug,disabled")));
+  }
+  if (flags & RESPOND_MOTOR_SPEED) {
+    if (flags & RESPOND_LIMITS) {
+      respond('S', F("motor_speed_min,0"));
+      respond('S', F("motor_speed_max,1000"));
+    }
+    respond('S', F("motor_speed,%d"), parameters.motor_speed);
+  }
+
+}
 
 void commandParser(int cmdByte)
 {
@@ -1942,14 +2038,12 @@ void commandParser(int cmdByte)
   // Need to be able to gracefully handle empty lines
   if (cmdByte == '\n')
   {
-    debug(F("Executing command %c Arg1='%s' Arg2='%s'"), command, arg1, arg2);
-
     // Process the command here
     currentState = PARSE_COMMAND;
 
     switch (command) {
-      case 'P': respond('P', F("I am alive!"));  break;
-      case 'I': respond('I', F("%s"), visp_eeprom.VISP); break;
+      case 'P': respond('P', F("I am alive!")); break;
+      case 'I': respondAppropriately(RESPOND_IDENTITY); break;
       case 'C':
         respond('C', (runState == RUNSTATE_CALIBRATE ? F("1,Calibration in progress") : F("0,Starting Calibration")));
         if (runState != RUNSTATE_CALIBRATE)
@@ -1961,87 +2055,82 @@ void commandParser(int cmdByte)
       case 'E':
         if (eepromAddress == 0xFFFF)
         {
-            // arg1 has an address
-            if (*arg1)
-                sendEEPROMdata(strtol(arg1, NULL, 0), 16); // If user supplied an address, only 16 bytes
-            else
-                sendEEPROMdata(0,128);
+          // arg1 has an address
+          if (*arg1)
+            sendEEPROMdata(strtol(arg1, NULL, 0), 16); // If user supplied an address, only 16 bytes
+          else
+            sendEEPROMdata(0, 128);
         }
         else
         {
-            if (*arg1)
-            {
-              updateEEPROMdata(eepromAddress+eepromCount, strtol(arg1, NULL, 0));
-              eepromCount++;
-              // Write the whole thing.   Kinda wasteful as we should really do it on a Commit...
-              writeEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
-            }
-            sendEEPROMdata(eepromAddress,eepromCount);
+          if (*arg1)
+          {
+            updateEEPROMdata(eepromAddress + eepromCount, strtol(arg1, NULL, 0));
+            eepromCount++;
+            // Write the whole thing.   Kinda wasteful as we should really do it on a Commit...
+            writeEEPROM(eeprom, 0, (char *)&visp_eeprom, sizeof(visp_eeprom));
+          }
+          sendEEPROMdata(eepromAddress, eepromCount);
         }
 
         break;
       case 'Q':
-        respond('I', F("%s"), visp_eeprom.VISP);
-        respond('M', currentMode == MODE_PCCMV ? F("PC-CMV") : (currentMode == MODE_VCCMV ? F("VC-CMV") : "UNKNOWN"));
-        respond('S', F("volume,%d"), parameters.volume);
-        respond('S', F("rate,%d"), parameters.rate);
-        respond('S', F("breath_interval,%d"), parameters.breath_interval);
-        respond('S', (parameters.debug ? F("debug,enabled") : F("debug,disabled")));
-        respond('S', F("motor_speed,%d"), parameters.motor_speed);
+        respondAppropriately(0xFFFF);
         respond('Q', F("Finished"));
-        break;
-      case 'M':
-        if (arg1[0] == 0) // Is this a Mode Query?
-          respond('M', currentMode == MODE_PCCMV ? F("PC-CMV") : (currentMode == MODE_VCCMV ? F("VC-CMV") : "UNKNOWN"));
-        else if (strcmp(arg1, "PC-CMV") == 0)
-          currentMode = MODE_PCCMV;
-        else if (strcmp(arg1, "VC-CMV") == 0)
-          currentMode = MODE_VCCMV;
-        respond('M', currentMode == MODE_PCCMV ? F("PC-CMV") : (currentMode == MODE_VCCMV ? F("VC-CMV") : "UNKNOWN"));
         break;
       case 'S': // Set parameter
         if (arg1[0] == 0) // Is this a Query for all?
         {
-          respond('S', F("volume,%d"), parameters.volume);
-          respond('S', F("rate,%d"), parameters.rate);
-          respond('S', F("breath_interval,%d"), parameters.breath_interval);
-          respond('S', (parameters.debug ? F("debug,enabled") : F("debug,disabled")));
-          respond('S', F("motor_speed,%d"), parameters.motor_speed);
+          respondAppropriately(RESPOND_VOLUME | RESPOND_RATE | RESPOND_BREATH_INTERVAL | RESPOND_DEBUG | RESPOND_MOTOR_SPEED);
         }
         else
         {
-          if (strcasecmp(arg1, "volume") == 0)
+          if (strcasecmp_P(arg1, (const char PROGMEM *)F("mode")) == 0)
+          {
+            if (strcasecmp_P(arg2, (const char PROGMEM *)F("PC-CMV")) == 0)
+              parameters.mode = MODE_PCCMV;
+            else if (strcasecmp_P(arg2, (const char PROGMEM *)F("VC-CMV")) == 0)
+              parameters.mode = MODE_VCCMV;
+            respondAppropriately(RESPOND_MODE);
+          }
+          else if (strcasecmp_P(arg1,(const char PROGMEM *)F( "volume")) == 0)
           {
             if (*arg2)
               parameters.volume = atof(arg2);
-            respond('S', F("%s,%d"), arg1, parameters.volume);
+            respondAppropriately(RESPOND_VOLUME);
           }
-          else if (strcasecmp(arg1, "rate") == 0)
+          else if (strcasecmp_P(arg1, (const char PROGMEM *)F("rate")) == 0)
           {
             if (*arg2)
               parameters.rate = atof(arg2);
-            respond('S', F("%s,%d"), arg1, parameters.rate);
+            respondAppropriately(RESPOND_RATE);
           }
-          else if (strcasecmp(arg1, "breath_interval") == 0)
+          else if (strcasecmp_P(arg1, (const char PROGMEM *)F("breath_interval")) == 0)
           {
             if (*arg2)
               parameters.breath_interval = atof(arg2);
-            respond('S', F("%s,%d"), arg1, parameters.breath_interval);
+            respondAppropriately(RESPOND_BREATH_INTERVAL);
           }
-          else if (strcasecmp(arg1, "debug") == 0)
+          else if (strcasecmp_P(arg1, (const char PROGMEM *)F("breath_threshold")) == 0)
+          {
+            if (*arg2)
+              parameters.breath_threshold = atof(arg2);
+            respondAppropriately(RESPOND_BREATH_THRESHOLD);
+          }
+          else if (strcasecmp_P(arg1, (const char PROGMEM *)F("debug")) == 0)
           {
             if (*arg2)
             {
-              if (strcasecmp(arg2, "enabled") == 0)
+              if (strcasecmp_P(arg2, (const char PROGMEM *)F("enable")) == 0)
                 parameters.debug = true;
-              else if (strcasecmp(arg2, "disabled") == 0)
+              else if (strcasecmp_P(arg2, (const char PROGMEM *)F("disable")) == 0)
                 parameters.debug = false;
               else
                 warning(F("Invalid debug value %s"), arg2);
             }
-            respond('S', (parameters.debug ? F("debug,enabled") : F("debug,disabled")));
+            respondAppropriately(RESPOND_DEBUG);
           }
-          else if (strcasecmp(arg1, "motor_speed") == 0)
+          else if (strcasecmp_P(arg1, (const char PROGMEM *)F("motor_speed")) == 0)
           {
             if (*arg2)
               parameters.motor_speed = strtol(arg2, NULL, 0);
@@ -2053,7 +2142,7 @@ void commandParser(int cmdByte)
               digitalWrite(M_DIR_2, 1);
             analogWrite(M_PWM_1, parameters.motor_speed);
             analogWrite(M_PWM_2, parameters.motor_speed);
-            respond('S', F("%s,%d"), arg1, parameters.motor_speed);
+            respondAppropriately(RESPOND_MOTOR_SPEED);
           }
           else
             respond('S', F("%s, Unimplemented"), arg1);
@@ -2088,7 +2177,7 @@ void commandParser(int cmdByte)
         arg2Pos = 0;
         memset(arg2, 0, sizeof(arg2));
         eepromAddress = 0xFFFF;
-        eepromCount=0;
+        eepromCount = 0;
       }
       break;
     case PARSE_FIRST_ARG:
@@ -2125,7 +2214,7 @@ void commandParser(int cmdByte)
           eepromAddress = strtol(arg1, NULL, 0);
         else
         {
-          updateEEPROMdata(eepromAddress+eepromCount, strtol(arg1, NULL, 0));
+          updateEEPROMdata(eepromAddress + eepromCount, strtol(arg1, NULL, 0));
           eepromCount++;
         }
         arg1Pos = 0;
@@ -2167,15 +2256,15 @@ void loop() {
 
     // Detect the VISP type from the EEPROM and use the appropriate function
     // Till we get the EEPROMS loaded right
-//    switch (visp_eeprom.bodyType)
-//    {
-//      case 'P':
-//        loopPitotVersion(P, T);
-//        break;
-//      case 'V':
-//      default:
-        loopVenturiVersion(P, T);
-//        break;
-//    }
+    //    switch (visp_eeprom.bodyType)
+    //    {
+    //      case 'P':
+    //        loopPitotVersion(P, T);
+    //        break;
+    //      case 'V':
+    //      default:
+    loopVenturiVersion(P, T);
+    //        break;
+    //    }
   }
 }

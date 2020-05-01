@@ -1,0 +1,183 @@
+\documentclass[10pt]{article}
+\usepackage{listings}
+\usepackage{amsmath}
+\title{VISP Core Processor Serial Data Format}
+\date{April 29, 2020}
+\author{Alessandro Gangemi}
+\begin{document}
+\maketitle
+\section{Specification}
+\subsection{Logging Levels}
+\renewcommand\labelitemi{}
+\begin{itemize}
+\item g: debug
+\item i: info
+\item w: warning
+\item c: critical
+\end{itemize}
+
+\subsection{Ventilation Parameters and Settings}
+\begin{align*}
+	<volume&> \text{controls the volume in mL of breaths (tidal volume)}. \\
+	<rate&> \text{controls the rate in which the tidal volume is emitted}. \\
+	<breath\_rate&> \text{controls the time period between breaths. (Continuous Mandatory Ventilation)}\\
+	<debug&> \text{Whether or not to emit debugging values}
+\end{align*}
+
+\subsection{Sensor Readings}
+\subsubsection{Data}
+\begin{align*}
+	t&: \text{time (milis)}\\
+	p&: \text{pressure (cmH\(_2\)0)}\\
+	v&: \text{smoothed volume (mL)}\\
+	V_T&: \text{tidal volume (mL)}\\
+	s_0\text{-}s_3&: \text{sensor readings}
+\end{align*}
+
+Serialized as
+\begin{lstlisting}[mathescape=true]
+	d,<$t$>,<$p$>,<$v$>,<$V_T$>[,<$s_0$>...,<$s_3$>]
+\end{lstlisting}
+
+\subsection{Message Format}
+$<t>$ is time in milis
+\subsubsection{Info}
+
+\begin{lstlisting}
+	i,<t>,<string>
+\end{lstlisting}
+
+\subsubsection{Debug}
+\begin{lstlisting}
+	g,<t>,<string>
+\end{lstlisting}
+
+\subsubsection{Warning}
+\begin{lstlisting}
+	w,<t>,<string>
+\end{lstlisting}
+
+\subsubsection{Critical}
+\begin{lstlisting}
+	c,<t>,<string>
+\end{lstlisting}
+
+\subsection{Client Command Format}
+
+\subsubsection{Ping}
+Pings the core. Core responds with timestamp and status string.
+\begin{lstlisting}
+	P
+\end{lstlisting}
+
+\subsubsection{Force Calibrate}
+Forces re-calibration. Core responds with timestamp, status code, and status string.
+\begin{lstlisting}
+	C
+\end{lstlisting}
+
+\subsubsection{Identify}
+Reply with identification string.
+\begin{lstlisting}
+	I
+\end{lstlisting}
+
+\subsubsection{Mode Set}
+\begin{enumerate}
+	\item Volume-Controlled Continuous Mandatory Ventilation "VC-CMV"
+	\item Pressure-Controlled Continuous Mandatory Ventilation "PC-CMV"
+\end{enumerate}
+\begin{lstlisting}
+	M,VC-CMV
+	M,PC-CMV
+\end{lstlisting}
+
+\subsubsection{Parameter Setting}
+Queries or sets parameter value. Parameter name without supplied value will return the current value.
+\begin{align*}
+	<volume&> \text{controls the volume in mL of breaths (tidal volume)}.\\
+	<rate&> \text{controls the rate in which the breath is delivered}.\\
+	<breath\_interval&> \text{controls the time period between breaths in milliseconds. (Continuous Mandatory Ventilation)}
+	<debug&> \text{enable or disable the internall debugging output}
+	<motor_speed&> \text{Internal testing, turns motor on at a specific speed}
+\end{align*}
+
+\begin{lstlisting}
+	S,<parameter>[,<value>]
+\end{lstlisting}
+
+\subsubsection{Query}
+Replies with mechanical ventilation mode, parameters, and identifying information.
+\begin{lstlisting}
+	Q
+\end{lstlisting}
+
+\subsubsection{EEPROM}
+An empty parameter string makes the core echo back all 128 bytes of EEPROM data. Providing the address will reply with a full page (16-bytes) starting at that address, and providing the address and data will write the data to the EEPROM.
+\begin{lstlisting}[mathescape=true]
+	E
+	E,<address>
+	E,<address>,$<b_0>,<b_1>,<b_2>...$
+\end{lstlisting}
+
+\subsubsection{Reset}
+Reset the core.
+\begin{lstlisting}
+	R
+\end{lstlisting}
+
+\subsection{Core Responses}
+
+\subsubsection{Ping Response}
+Sends back a timestamp and a hard coded message.
+\begin{lstlisting}
+	P,<t>,<string>
+\end{lstlisting}
+
+\subsubsection{Force Calibrate Response}
+Returns timestamp, status code, and status message.
+\begin{enumerate}
+	\setcounter{enumi}{-1}
+	\item Starting
+	\item In Progress
+	\item Complete
+\end{enumerate}
+\begin{lstlisting}
+	C,<t>,<status>,<string>
+
+	C,<t>,0,Starting
+	C,<t>,1,In Progress
+	C,<t>,2,Complete
+\end{lstlisting}
+
+\subsubsection{Identify Response}
+Responds with a hardware identification string.
+\begin{lstlisting}
+	I,<t>,<string>
+\end{lstlisting}
+
+\subsubsection{Mode Set Response}
+Responds with the mode setting. ``VC-CMV'' or ``PC-CMV'' or ``Unknown''. On failure, a critical event will be sent back before the current mode will be echoed.
+\begin{lstlisting}
+	M,<t>,<mode>
+\end{lstlisting}
+
+\subsubsection{Parameter Setting Response}
+On a successful operation, the core will echo back the arguments. On failure, a critical event will be sent back before the core echoes back the current value.
+\begin{lstlisting}
+	S,<t>,<parameter>,<value>
+\end{lstlisting}
+
+\subsubsection{Query Response}
+Returns "Finished" when done sending the parameters and mode. The query responses are sent back as a separate I, S, and M commands followed by a final Q.
+\begin{lstlisting}
+	Q,<t>,Finished
+\end{lstlisting}
+
+\subsubsection{EEPROM Response}
+Response will always consist of a time, address, and data bytes
+\begin{lstlisting}[mathescape=true]
+	E,<time>,<address>,$<b_0>,<b_1>,<b_2>...$
+\end{lstlisting}
+
+\end{document}

@@ -7,7 +7,7 @@ from math import sin
 from itertools import cycle
 
 from kivy.app import App
-from kivy.properties import StringProperty, ObjectProperty, OptionProperty
+from kivy.properties import StringProperty, ObjectProperty, OptionProperty, BoundedNumericProperty
 from kivy.uix.spinner import Spinner
 from kivy.uix.slider import Slider
 from kivy.uix.boxlayout import BoxLayout
@@ -33,7 +33,7 @@ def listSerialPorts():
 
 class DisplayButton(BoxLayout,Button):
     def updateValue(self,*args):
-        self.text=str(self.value)
+        self.text=str(self.value).title();
     def pressEvent(self,*args):
         return True
     def __init__(self,**kwargs):
@@ -78,7 +78,7 @@ class SliderButton(PopupButton):
         self.min=kwargs.pop('min',0)
         self.max=kwargs.pop('max',100)
         self.step=kwargs.pop('step',1)
-        self.on_update=kwargs.pop('on_update',None)
+        #self.on_update=kwargs.pop('on_update',None)
         self.sliderBind=False
         super(SliderButton,self).__init__(**kwargs)
         self.slider=Slider(min=self.min,value=self.value,max=self.max,step=self.step,cursor_width='32sp',orientation=self.popup_orientation,size_hint=(1,1),size=('25sp','100sp'))
@@ -92,7 +92,7 @@ class SliderButton(PopupButton):
         self.slider.unbind(on_touch_up=self.updateValue)
         self.slider.unbind(on_touch_move=self.updatePopup)
         super(SliderButton,self).updateValue(self,*args)
-        self.on_update(self.value)
+        #self.on_update(self.value)
     def updatePopup(self,*args):
         self.popup.title=str(self.text_top) + str(' : ') + str(self.slider.value)
         Clock.schedule_once(self.bindTouchUp,0.5)
@@ -124,14 +124,19 @@ class RotaryButton(DisplayButton):
         self.values=kwargs.pop('values',('-----'))
         self.value_list=cycle(self.values)
         super(RotaryButton,self).__init__(**kwargs)
+        self.updateValue(self.value)
+    def pressEvent(self,*args):
+        self.value=next(self.value_list)
+        self.updateValue(self.value)
+        #super(RotaryButton,self).pressEvent(self,args)
+    def updateValue(self,value):
+        super(RotaryButton,self).updateValue(self,value)
+        counter = 0
         if (self.value in self.values):
             for v in self.value_list:
+                counter = counter + 1
                 if (v == self.value): break
-        if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
-    def pressEvent(self,*args):
-        super(RotaryButton,self).pressEvent(self,args)
-        self.value=next(self.value_list)
-        self.text =str(self.value)
+                if counter >> len(self.values): break
         if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
 class ScrollGraph(Graph):
     def __init__(self,**kwargs):
@@ -231,8 +236,9 @@ class ScrollGraphBoxLayout(BoxLayout):
         super(ScrollGraphBoxLayout,self).on_touch_up(touch)
 
 class COSVTouchApp(App):
-    run_state = OptionProperty("stop",options=["stop","run"])
-    run_mode = OptionProperty("stop",options=["stop","run"])
+    run_state = OptionProperty("stop",options=["stop","run","calibrate"])
+    run_rate = BoundedNumericProperty(8, min=8, max=40, errorvalue=8)
+    run_mode = OptionProperty("PCV",options=["PCV","VCV"])
     def build_config(self,config):
         config.setdefaults('state', {
             'running'   : 0,
@@ -256,7 +262,7 @@ class COSVTouchApp(App):
         
         layoutLeft = BoxLayout(orientation='vertical', spacing=0, padding=0)
         # Graphing area
-        self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=1200,graph_size=600)
+        self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=2000,graph_size=2000)
         self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
         self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-60, ymax=60,y_ticks_major=20))
         self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=400,size_hint=(1,0.75),y_ticks_major=100))
@@ -290,39 +296,46 @@ class COSVTouchApp(App):
         
         # Right Controls
         layoutControlRight = BoxLayout(orientation='vertical', spacing=10, padding=(10,5),size_hint=(0.2,1))
-        buttonAlarmPause = RotaryButton(name='alarm',text_top='Alarm Status',value="Silenced",values={'Normal','Alarm','Silenced'},value_colors={'Normal':(0.3,1,0.3,1),'Silenced':(1,1,0.3,1),'Alarm':(1,0.3,0.3,1)});
+        buttonAlarmPause = RotaryButton(name='alarm',text_top='Alarm Status',value="silenced",values={'normal','alarm','silenced'},value_colors={'normal':(0.3,1,0.3,1),'silenced':(1,1,0.3,1),'alarm':(1,0.3,0.3,1)});
         layoutControlRight.add_widget(buttonAlarmPause);
         buttonAlarmSetup = DisplayButton(value="Alarm\nSetup");
         layoutControlRight.add_widget(buttonAlarmSetup);
         buttonSystemSetup = DisplayButton(value="System\nSetup");
         layoutControlRight.add_widget(buttonSystemSetup);
-        self.buttonRun = RotaryButton(name='status',text_top="Status",on_press=self.runButton,value="Stopped",values=('Stopped','Running'),value_colors={'Stopped':(1,0.3,0.3,1),'Running':(0.3,1,0.3,1)})
+        self.buttonRun = RotaryButton(name='state',text_top="State",on_press=self.runButton,value="stop",values=('stop','run'),value_colors={'stop':(1,0.3,0.3,1),'calibrate':(1,1,0.3,1),'run':(0.3,1,0.3,1)})
         layoutControlRight.add_widget(self.buttonRun)
 
         layoutMain.add_widget(layoutControlRight)
         return layoutMain
     def updateRate(self,event):
-        self.serial.write(b'rate\n')
-
+        self.serial.write(b'rate,')
+        self.serial.write(self.run_rate)
+        self.serial.write('\n')
     def runButton(self,event):
-        if self.buttonRun.value == 'Running':
-            self.run_state = 'stop'
-        else:
+        #pass
+        if self.buttonRun.value == 'stop':
             self.run_state = 'run'
+        else:
+            self.run_state = 'stop'
     def on_run_state(self,instance,value):
-        if value == 'run':
+        print ('State:' + self.run_state)
+        if self.run_state == 'run':
             try:
                 availablePorts = listSerialPorts()
                 self.serial = serial.Serial(port=availablePorts[0], baudrate=230400,timeout=1)
-                Clock.schedule_interval(self.get_data, 1 / 100.)
+                Clock.schedule_interval(self.get_data, 1 / 50.)
                 if (self.serial.is_open): 
+                    self.serial.write(b'rate,')
+                    self.serial.write(int(self.run_rate))
+                    self.serial.write(b'\n')
                     self.serial.write(b'run\n')
+                    print('serial started')
                 self.graphs.reset()
             except Exception as e:
                 print(e)
                 popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
                 popup.open()
-        else:
+        if self.run_state == 'stop':
             try:
                 self.serial.write(b'stop\n')
                 self.serial.close()
@@ -336,17 +349,25 @@ class COSVTouchApp(App):
         if self.serial.is_open:
             while self.serial.in_waiting > 0: 
                 try:
-                    row = str(self.serial.readline().decode('ascii'))
+                    row = str(self.serial.readline().decode('ascii')).strip()
+                    #print(row)
+                    col = row.split(',',10)
                     try:
-                        col=[float(i) for i in row.strip().split(',',10)]
-                        sampleTime = col[0]
-                        pressure = col[1]
-                        volume = col[2]
-                        tidalVolume = col[3]
-                        self.graphs.add_points(pressure,volume,tidalVolume)
-                        print(row)
-                    except:
-                        print(row)
+                        dataType = col[0]
+                        if dataType == 'data':
+                            sampleTime = float(col[1])
+                            print(col)
+                            self.graphs.add_points(float(col[2]),float(col[3]),float(col[4]))
+                        else:
+                            if dataType == 'state':
+                                print(row)
+                                self.run_state = col[1]
+                                self.buttonRun.updateValue(state)
+                            if dataType == 'rate':
+                                print(row)
+                                self.run_rate = col[1]
+                    except Exception as e:
+                        print(e)
                 except Exception as e:      
                     print(e)
         else:

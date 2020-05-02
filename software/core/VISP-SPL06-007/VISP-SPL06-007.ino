@@ -32,6 +32,7 @@ TwoWire *i2cBus2 = &Wire2;
 #define SERIAL_BAUD 115200
 
 #define PUTINFLASH
+#define SFLASH "%s"
 
 #elif ARDUINO_AVR_NANO
 
@@ -43,6 +44,8 @@ TwoWire *i2cBus2 = NULL;
 #define SERIAL_BAUD 115200
 
 #define PUTINFLASH PROGMEM
+#define SFLASH "%S"
+
 #else
 
 #error Unsupported board selection.
@@ -376,12 +379,12 @@ void busPrint(busDevice_t *bus, const char *function)
 {
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("%S(I2C: address=0x%x channel=%d enablePin=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin);
+    debug(PSTR("" SFLASH "(I2C: address=0x%x channel=%d enablePin=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin);
     return;
   }
   if (bus->busType == BUSTYPE_SPI)
   {
-    debug(PSTR("%S(SPI CSPIN=%d)"), function, bus->busdev.spi.csnPin);
+    debug(PSTR("" SFLASH "(SPI CSPIN=%d)"), function, bus->busdev.spi.csnPin);
     return;
   }
 }
@@ -1730,6 +1733,8 @@ void setup() {
 
   delay(200);
 
+  visp_eeprom.debug = true;
+
   do
   {
     sensorsFound = detectSensors(i2cBus1, i2cBus2);
@@ -2068,8 +2073,8 @@ typedef void (*respondCallback)(struct settingsEntry_s *);
 struct settingsEntry_s {
   const int PUTINFLASH bitmask;
   const char * const PUTINFLASH theName;
-  const uint16_t PUTINFLASH theMin;
-  const uint16_t PUTINFLASH theMax;
+  const int16_t PUTINFLASH theMin;
+  const int16_t PUTINFLASH theMax;
   const PUTINFLASH struct dictionary_s  *personalDictionary;
   const verifyCallback PUTINFLASH verifyIt;
   const respondCallback PUTINFLASH respondIt;
@@ -2185,17 +2190,17 @@ bool verifyLimitsToInt16(struct settingsEntry_s *entry, const char *arg)
 
 void respondInt8(struct settingsEntry_s *entry)
 {
-  respond('S', PSTR("%S,%d"), entry->theName, *(int8_t *)entry->data);
+  respond('S', PSTR("" SFLASH ",%d"), entry->theName, *(int8_t *)entry->data);
 }
 void respondInt16(struct settingsEntry_s *entry)
 {
-  respond('S', PSTR("%S,%d"), entry->theName, *(int16_t *)entry->data);
+  respond('S', PSTR("" SFLASH ",%d"), entry->theName, *(int16_t *)entry->data);
 }
 void respondFloat(struct settingsEntry_s *entry)
 {
   char buff[32];
   dtostrf(*(float*)entry->data,7,2,buff);
-  respond('S', PSTR("%S,%s"), entry->theName, buff);
+  respond('S', PSTR("" SFLASH ",%s"), entry->theName, buff);
 }
 
 void respondInt8ToDict(struct settingsEntry_s *entry)
@@ -2212,7 +2217,7 @@ void respondInt8ToDict(struct settingsEntry_s *entry)
     {
       if (dict.theAssociatedValue == *(int8_t*)entry->data)
       {
-        respond('S', PSTR("%S,%S"), entry->theName, dict.theWord);
+        respond('S', PSTR("" SFLASH "," SFLASH ""), entry->theName, dict.theWord);
         return;
       }
     }
@@ -2231,7 +2236,7 @@ void respondSettingLimits(struct settingsEntry_s *entry)
     hwSerial.print(',');
     hwSerial.print(millis());
     hwSerial.print(',');
-    snprintf_P(buffer, sizeof(buffer), PSTR("%S"), entry->theName);
+    snprintf_P(buffer, sizeof(buffer), PSTR("" SFLASH ""), entry->theName);
     hwSerial.print(buffer);
     hwSerial.print(F("_dict"));
     do
@@ -2241,7 +2246,7 @@ void respondSettingLimits(struct settingsEntry_s *entry)
       if (dict.theWord)
       {
         // Must copy the string from flash memory
-        snprintf_P(buffer, sizeof(buffer), PSTR(",%S,%S"), dict.theWord, dict.theDescription);
+        snprintf_P(buffer, sizeof(buffer), PSTR("," SFLASH "," SFLASH ""), dict.theWord, dict.theDescription);
         hwSerial.print(buffer);
       }
     } while (dict.theWord);
@@ -2249,8 +2254,8 @@ void respondSettingLimits(struct settingsEntry_s *entry)
   }
   else
   {
-    respond('S', PSTR("%S_min,%d"), entry->theName, entry->theMin);
-    respond('S', PSTR("%S_max,%d"), entry->theName, entry->theMax);
+    respond('S', PSTR("" SFLASH "_min,%d"), entry->theName, entry->theMin);
+    respond('S', PSTR("" SFLASH "_max,%d"), entry->theName, entry->theMax);
   }
 }
 
@@ -2310,7 +2315,7 @@ void handleSettingCommand(const char *arg1, const char *arg2)
           return;
         }
         else
-          warning(PSTR("Invalid %S value %s"), entry.theName, arg2);
+          warning(PSTR("Invalid " SFLASH " value %s"), entry.theName, arg2);
       }
     }
   } while (entry.bitmask);

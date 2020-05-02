@@ -29,7 +29,7 @@ path_step=1; // turn down when rendering the actual path for a smooth one... up 
 //base_t(); // top plate/electronics mount.  Need 1.
 //bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
 //bag_mount(); // thin arms to support the bag ends and keep it from wandering. Need 2.
-//arm_l();
+arm_l();
 //supply_cover();
 
 //chest_bar();
@@ -58,7 +58,7 @@ path_step=1; // turn down when rendering the actual path for a smooth one... up 
 //laser_base_t(); // base, top plate
 //laser_base_b(); // base, bottom plate
 //laser_paddle(); // paddle for arm ends
-laser_arm(); // The arms (when symetrical).  Make sure to reset arm_w to a larger value that for FFF printing.
+//laser_arm(); // The arms (when symetrical).  Make sure to reset arm_w to a larger value that for FFF printing.
 //laser_bag_mount();
 
 // Abbreviations

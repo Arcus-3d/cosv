@@ -269,7 +269,8 @@ class COSVTouchApp(App):
         self.graphs = ScrollGraphBoxLayout(orientation='vertical', spacing=0, padding=(5,0),history_size=1000,graph_size=1000)
         self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
         self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-50, ymax=50,y_ticks_major=20))
-        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=500,size_hint=(1,0.75),y_ticks_major=100))
+        self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=300,size_hint=(1,0.75),y_ticks_major=100))
+        #self.graphs.add_graph(ScrollGraph(ylabel='Pressure/Volume', color=[0.5,0.5,1,1], ymin=-10, ymax=10,size_hint=(1,0.75),y_ticks_major=5))
         if (self.enableCO2):
             self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
         layoutLeft.add_widget(self.graphs)
@@ -366,7 +367,7 @@ class COSVTouchApp(App):
                         if dataType == 'd':
                             sampleTime = float(col[1])
                             print(col)
-                            self.graphs.add_points(float(col[2]),float(col[3])*2,float(col[4])*2)
+                            self.graphs.add_points(float(col[2]),float(col[3])*2,float(col[4])*2) #,float(col[2])/float(col[3])*10)
                         else:
                             if dataType == 's':
                                 print(row)

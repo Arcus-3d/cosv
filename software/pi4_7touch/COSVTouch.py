@@ -337,11 +337,11 @@ class COSVTouchApp(App):
                     self.serial.write(b'run\n')
                     self.serial.write(b'S,motor_speed,230\n')
                     print('serial started')
-                self.graphs.reset()
+                #self.graphs.reset()
             except Exception as e:
                 print(e)
-                popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
-                popup.open()
+                #popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
+                #popup.open()
         if self.run_state == 'stop':
             try:
                 self.serial.write(b'stop\n')
@@ -350,38 +350,41 @@ class COSVTouchApp(App):
                 Clock.unschedule(self.get_data)
             except Exception as e:
                 print(e)
-                popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
-                popup.open()
+                #popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
+                #popup.open()
   
     def get_data(self, dt):
-        if self.serial.is_open:
-            while self.serial.in_waiting > 0: 
-                try:
-                    row = str(self.serial.readline().decode('ascii')).strip()
-                    #print(row)
-                    col = row.split(',',10)
+        try:
+            if self.serial.is_open:
+                while self.serial.in_waiting > 0: 
                     try:
-                        dataType = col[0]
-                        if dataType == 'i':
-                            print(row)
-                        if dataType == 'd':
-                            sampleTime = float(col[1])
-                            print(col)
-                            self.graphs.add_points(float(col[2]),float(col[3])*2,float(col[4])*2) #,float(col[2])/float(col[3])*10)
-                        else:
-                            if dataType == 's':
+                        row = str(self.serial.readline().decode('ascii')).strip()
+                        #print(row)
+                        col = row.split(',',10)
+                        try:
+                            dataType = col[0]
+                           if dataType == 'i':
                                 print(row)
-                                self.run_state = col[1]
-                                self.buttonRun.updateValue(state)
-                            if dataType == 'r':
-                                print(row)
-                                self.run_rate = col[1]
-                    except Exception as e:
+                            if dataType == 'd':
+                                sampleTime = float(col[1])
+                                print(col)
+                                self.graphs.add_points(float(col[2]),float(col[3])*2,float(col[4])*2) #,float(col[2])/float(col[3])*10)
+                            else:
+                                if dataType == 's':
+                                    print(row)
+                                    self.run_state = col[1]
+                                    self.buttonRun.updateValue(state)
+                                if dataType == 'r':
+                                    print(row)
+                                    self.run_rate = col[1]
+                        except Exception as e:
+                            print(e)
+                    except Exception as e:      
                         print(e)
-                except Exception as e:      
-                    print(e)
-        else:
-            print("Serial connection not open.")
+            else:
+                print("Serial connection not open.")
+        except Exception as e:
+            print(e)
 class ErrorPopup(Popup):
     pass
   

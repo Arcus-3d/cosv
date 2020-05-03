@@ -1,19 +1,23 @@
 /*
-   This file is part of VISP.
+   This file is part of VISP Core.
 
-   VISP is free software: you can redistribute it and/or modify
+   VISP Core is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
 
-   Cleanflight is distributed in the hope that it will be useful,
+   VISP Core is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+   along with VISP Core.  If not, see <http://www.gnu.org/licenses/>.
+
+   Author: Steven.Carr@hammontonmakers.org
 */
+
+
 
 #include <math.h>
 #include <stdbool.h>
@@ -22,6 +26,10 @@
 #include <SPI.h>
 #include <AccelStepper.h>
 
+
+#define VERSION_MAJOR     0
+#define VERSION_MINOR     1
+#define VERSION_REVISION 'd'
 
 #ifdef ARDUINO_TEENSY40
 
@@ -35,6 +43,18 @@ TwoWire *i2cBus2 = &Wire2;
 #define SFLASH "%s"
 
 #elif ARDUINO_AVR_NANO
+
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#define hwSerial Serial
+TwoWire *i2cBus1 = &Wire;
+TwoWire *i2cBus2 = NULL;
+#define SERIAL_BAUD 115200
+
+#define PUTINFLASH PROGMEM
+#define SFLASH "%S"
+
+#elif ARDUINO_AVR_UNO
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -130,6 +150,13 @@ typedef struct sensor_mapping_s {
   uint8_t busNumber; //  If MUXed, then it's the muxChannel.  If straight I2C, then it could be multiple I2C channels, if SPI, then it's the enable pin on the VISP
 }  sensor_mapping_t;
 
+#define SENSOR_UNKNOWN 0
+#define SENSOR_BMP388  1
+#define SENSOR_BMP280  2
+#define SENSOR_SPL06   3
+
+void handleSensorFailure();
+
 // We are using the M24C01 128 byte eprom
 #define EEPROM_PAGE_SIZE 16
 
@@ -215,6 +242,7 @@ typedef struct busDevice_s {
   busType_e busType;
   hwType_e hwType;
   uint8_t currentChannel; // If this device is a HWTYPE_MUX
+  uint8_t refCount; // Reference count (mux is used by multiple sources)
   union {
     struct {
       SPIClass *spiBus;            // SPI bus
@@ -291,6 +319,7 @@ typedef bool (*baroCalculateFuncPtr)(struct baroDev_s * baro, float *pressure, f
 typedef struct baroDev_s {
   busDevice_t * busDev;
   baroCalculateFuncPtr calculate;
+  uint8_t sensorType; // Used by the interface to get the types of sensors we have
   union {
     struct {
       bmp280_calib_param_t cal;
@@ -319,6 +348,9 @@ typedef struct baroDev_s {
   } chip;
 } baroDev_t;
 
+// This is used in loop() and in handleSensorFailure()
+bool sensorsFound = false;
+baroDev_t sensors[4]; // See mappings SENSOR_U[5678] and PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
 
 
 void respond(char command, PGM_P fmt, ...)
@@ -343,14 +375,21 @@ void respond(char command, PGM_P fmt, ...)
 }
 
 
+// critical alerts should result in the display indicating such (big red X)
+// Think sensor communication loss or motor not detected (VISP not attached to bag while motor detection is happening?)
+// We also need a way to clear the error.
+
 #define info(...)     respond('i', __VA_ARGS__)
 #define debug(...)    respond('g', __VA_ARGS__)
 #define warning(...)  respond('w', __VA_ARGS__)
 #define critical(...) respond('c', __VA_ARGS__)
 
-
-
-
+// Core system health (we need a way to clear errors, like once the sensors are attached)
+// Also we have to add motor failure detection to this.
+void sendCurrentSystemHealth()
+{
+  respond('H',(sensorsFound ? PSTR("good") : PSTR("bad")));   
+}
 
 
 uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
@@ -377,6 +416,11 @@ uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
 
 void busPrint(busDevice_t *bus, const char *function)
 {
+  if (bus == NULL)
+  {
+    debug(PSTR("" SFLASH "(busDev is NULL)"), function);
+    return;
+  }
   if (bus->busType == BUSTYPE_I2C)
   {
     debug(PSTR("" SFLASH "(I2C: address=0x%x channel=%d enablePin=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin);
@@ -400,6 +444,9 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 
   dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
   dev->busdev.i2c.channelDev = channelDev;
   dev->busdev.i2c.enablePin = enablePin;
+  dev->refCount = 1;
+  if (channelDev)
+    channelDev->refCount++;
   return dev;
 }
 
@@ -411,25 +458,38 @@ busDevice_t *busDeviceInitSPI(SPIClass *spiBus, uint8_t csnPin, hwType_e hwType 
   dev->hwType = hwType;
   dev->busdev.spi.spiBus = spiBus;
   dev->busdev.spi.csnPin = csnPin;
+  dev->refCount = 1;
   return dev;
 }
 
 // TODO: check to see if this is a mux...
 void busDeviceFree(busDevice_t *dev)
 {
-  free(dev);
+  if (dev != NULL)
+  {
+    dev->refCount--;
+    if (dev->refCount == 0)
+    {
+      // If there is a muxDevice as a part of this channel, go free it.
+      // Note: mux devices might be daisy chained and support multiple layers.
+      // Consider a Core with a Mux to 2 VISP sensors with MUX's of their own
+      if (dev->busType == BUSTYPE_I2C && dev->busdev.i2c.channelDev)
+        busDeviceFree(dev->busdev.i2c.channelDev);
+      free(dev);
+    }
+  }
 }
 
 // Simply detect if the device is present on this device assignment
 bool busDeviceDetect(busDevice_t *busDev)
 {
-  if (busDev->busType == BUSTYPE_I2C)
+  if (busDev && busDev->busType == BUSTYPE_I2C)
   {
     int error;
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    busPrint(busDev, PSTR("Detecting if present"));
+    // busPrint(busDev, PSTR("Detecting if present"));
 
     // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
     if (busDev->busdev.i2c.enablePin != -1)
@@ -445,21 +505,22 @@ bool busDeviceDetect(busDevice_t *busDev)
 
     if (error == 0)
       busPrint(busDev, PSTR("DETECTED!!!"));
-    else
-      busPrint(busDev, PSTR("MISSING..."));
+    //else
+    //  busPrint(busDev, PSTR("MISSING..."));
     return (error == 0);
   }
   else
-    critical(PSTR("busDeviceDetect() unsupported bustype"));
+    warning(PSTR("busDeviceDetect() unsupported bustype"));
 
   return false;
 }
 
-char busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
+
+bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
 {
   int error;
 
-  if (busDev->busType == BUSTYPE_I2C)
+  if (busDev != NULL && busDev->busType == BUSTYPE_I2C)
   {
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
@@ -490,22 +551,23 @@ char busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, 
       if (busDev->busdev.i2c.enablePin != -1)
         digitalWrite(busDev->busdev.i2c.enablePin, LOW);
 
-      return (1);
+      return true;
     }
 
     if (busDev->busdev.i2c.enablePin != -1)
       digitalWrite(busDev->busdev.i2c.enablePin, LOW);
 
     //debug(PSTR("endTransmission() returned %s"), error);
-    return (0);
+    return false;
   }
-  return (0);
+  return false;
 }
 
-char busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, char length)
+bool busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, char length)
 {
   int error;
-  if (busDev->busType == BUSTYPE_I2C)
+
+  if (busDev != NULL && busDev->busType == BUSTYPE_I2C)
   {
     int address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
@@ -539,50 +601,49 @@ char busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values,
     if (busDev->busdev.i2c.enablePin != -1)
       digitalWrite(busDev->busdev.i2c.enablePin, LOW);
 
-    if (0 == error)
-      return (1);
-    else
-      return (0);
+    return (error == 0 ? true : false);
   }
-  return 1;
+
+  return false;
 }
 
 
-char busRead(busDevice_t *busDev, unsigned short reg, unsigned char *values)
+bool busRead(busDevice_t *busDev, unsigned short reg, unsigned char *values)
 {
   return busReadBuf(busDev, reg, values, 1);
 }
-char busWrite(busDevice_t *busDev, unsigned short reg, unsigned char value)
+bool busWrite(busDevice_t *busDev, unsigned short reg, unsigned char value)
 {
   return busWriteBuf(busDev, reg, &value, 1);
 }
 
 
 
-char readEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
+bool readEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
 {
   // loop through the length using EEPROM_PAGE_SIZE intervals
   // The lower level WIRE library has a buffer limitation, so staying in EEPROM_PAGE_SIZE intervals is a good thing
   for (unsigned short x = 0; x < length; x += EEPROM_PAGE_SIZE)
   {
     if (!busReadBuf(busDev, reg + x, &values[x], min(EEPROM_PAGE_SIZE, (length - x))))
-      return 0;
+      return false;
   }
-  return 1;
+  return true;
 }
-char writeEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, char length)
+
+bool writeEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values, char length)
 {
   // loop through the length using EEPROM_PAGE_SIZE intervals
   // Writes must align on page size boundaries (otherwise it wraps to the beginning of the page)
   if (reg % EEPROM_PAGE_SIZE)
-    return 0;
+    return false;
 
   for (unsigned short x = 0; x < length; x += EEPROM_PAGE_SIZE)
   {
     if (!busWriteBuf(busDev, reg + x, &values[x], min(EEPROM_PAGE_SIZE, (length - x))))
-      return 0;
+      return false;
   }
-  return 1;
+  return true;
 }
 
 
@@ -690,12 +751,14 @@ bool spl06_read_temperature(baroDev_t * baro)
 {
   uint8_t data[SPL06_TEMPERATURE_LEN];
   int32_t spl06_temperature;
-  bool ack;
 
-  if ((ack = busReadBuf(baro->busDev, SPL06_TEMPERATURE_START_REG, data, SPL06_TEMPERATURE_LEN))) {
+  bool ack = busReadBuf(baro->busDev, SPL06_TEMPERATURE_START_REG, data, SPL06_TEMPERATURE_LEN);
+  if (ack) {
     spl06_temperature = (int32_t)((data[0] & 0x80 ? 0xFF000000 : 0) | (((uint32_t)(data[0])) << 16) | (((uint32_t)(data[1])) << 8) | ((uint32_t)data[2]));
     baro->chip.spl06.temperature_raw = spl06_temperature;
   }
+  else
+    handleSensorFailure();
 
   return ack;
 }
@@ -711,6 +774,8 @@ bool spl06_read_pressure(baroDev_t * baro)
     spl06_pressure = (int32_t)((data[0] & 0x80 ? 0xFF000000 : 0) | (((uint32_t)(data[0])) << 16) | (((uint32_t)(data[1])) << 8) | ((uint32_t)data[2]));
     baro->chip.spl06.pressure_raw = spl06_pressure;
   }
+  else
+    handleSensorFailure();
 
   return ack;
 }
@@ -744,7 +809,8 @@ bool spl06Calculate(baroDev_t * baro, float * pressure, float * temperature)
     //  return false;   // error reading status or pressure is not ready
     // if (!spl06_read_pressure(baro))
     //  return false;
-    spl06_read_pressure(baro);
+    if (!spl06_read_pressure(baro))
+      return false;
     *pressure = spl06_compensate_pressure(baro, baro->chip.spl06.pressure_raw, baro->chip.spl06.temperature_raw);
   }
 
@@ -754,7 +820,8 @@ bool spl06Calculate(baroDev_t * baro, float * pressure, float * temperature)
     //  return false;   // error reading status or pressure is not ready
     // if (!spl06_read_temperature(baro))
     //  return false;
-    spl06_read_temperature(baro);
+    if (!spl06_read_temperature(baro))
+      return false;
     *temperature = spl06_compensate_temperature(baro, baro->chip.spl06.temperature_raw);
   }
 
@@ -763,12 +830,11 @@ bool spl06Calculate(baroDev_t * baro, float * pressure, float * temperature)
 
 
 bool spl06_read_calibration_coefficients(baroDev_t *baro) {
+  uint8_t caldata[SPL06_CALIB_COEFFS_LEN];
   uint8_t sstatus;
 
   if (!(busRead(baro->busDev, SPL06_MODE_AND_STATUS_REG, &sstatus) && (sstatus & SPL06_MEAS_CFG_COEFFS_RDY)))
     return false;   // error reading status or coefficients not ready
-
-  uint8_t caldata[SPL06_CALIB_COEFFS_LEN];
 
   if (!busReadBuf(baro->busDev, SPL06_CALIB_COEFFS_START, (uint8_t *)&caldata, SPL06_CALIB_COEFFS_LEN)) {
     return false;
@@ -793,68 +859,53 @@ bool spl06_configure_measurements(baroDev_t *baro)
 
   reg_value = SPL06_TEMP_USE_EXT_SENSOR | spl06_samples_to_cfg_reg_value(SPL06_TEMPERATURE_OVERSAMPLING);
   reg_value |= SPL06_TEMPERATURE_SAMPLING_RATE << 4;
-  if (!busWrite(baro->busDev, SPL06_TEMPERATURE_CFG_REG, reg_value)) {
+  if (!busWrite(baro->busDev, SPL06_TEMPERATURE_CFG_REG, reg_value))
     return false;
-  }
 
   reg_value = spl06_samples_to_cfg_reg_value(SPL06_PRESSURE_OVERSAMPLING);
   reg_value |= SPL06_PRESSURE_SAMPLING_RATE << 4;
-  if (!busWrite(baro->busDev, SPL06_PRESSURE_CFG_REG, reg_value)) {
+  if (!busWrite(baro->busDev, SPL06_PRESSURE_CFG_REG, reg_value))
     return false;
-  }
 
   reg_value = 0;
-  if (SPL06_TEMPERATURE_OVERSAMPLING > 8) {
+  if (SPL06_TEMPERATURE_OVERSAMPLING > 8)
     reg_value |= SPL06_TEMPERATURE_RESULT_BIT_SHIFT;
-  }
-  if (SPL06_PRESSURE_OVERSAMPLING > 8) {
+
+  if (SPL06_PRESSURE_OVERSAMPLING > 8)
     reg_value |= SPL06_PRESSURE_RESULT_BIT_SHIFT;
-  }
-  if (!busWrite(baro->busDev, SPL06_INT_AND_FIFO_CFG_REG, reg_value)) {
+
+  if (!busWrite(baro->busDev, SPL06_INT_AND_FIFO_CFG_REG, reg_value))
     return false;
-  }
 
   busWrite(baro->busDev, SPL06_MODE_AND_STATUS_REG, SPL06_MEAS_PRESSURE | SPL06_MEAS_TEMPERATURE | SPL06_MEAS_CFG_CONTINUOUS);
   return true;
 }
 
 
-bool spl06DeviceDetect(busDevice_t * busDev)
+bool spl06Detect(baroDev_t *baro, busDevice_t *busDev)
 {
   uint8_t chipId;
+
   for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
     bool ack = busRead(busDev, SPL06_CHIP_ID_REG, &chipId);
 
     if (ack && chipId == SPL06_DEFAULT_CHIP_ID) {
       busPrint(busDev, PSTR("SPL206 Detected"));
+
+      baro->busDev = busDev;
+
+      if (!(spl06_read_calibration_coefficients(baro) && spl06_configure_measurements(baro))) {
+        baro->busDev = NULL;
+        return false;
+      }
+      baro->sensorType = SENSOR_SPL06;
+      baro->calculate = spl06Calculate;
       return true;
     }
 
     delay(100);
   }
-
   return false;
-}
-
-
-bool spl06Detect(baroDev_t *baro, busDevice_t *busDev)
-{
-  if (busDev == NULL) {
-    return false;
-  }
-
-  if (!spl06DeviceDetect(busDev)) {
-    return false;
-  }
-  baro->busDev = busDev;
-
-  if (!(spl06_read_calibration_coefficients(baro) && spl06_configure_measurements(baro))) {
-    baro->busDev = NULL;
-    return false;
-  }
-
-  baro->calculate = spl06Calculate;
-  return true;
 }
 
 
@@ -937,11 +988,8 @@ bool bmp280GetUp(baroDev_t * baro)
     baro->chip.bmp280.up_valid = baro->chip.bmp280.up;
     baro->chip.bmp280.ut_valid = baro->chip.bmp280.ut;
   }
-  else {
-    //assign previous valid measurements
-    baro->chip.bmp280.up = baro->chip.bmp280.up_valid;
-    baro->chip.bmp280.ut = baro->chip.bmp280.ut_valid;
-  }
+  else
+    handleSensorFailure();
 
   return ack;
 }
@@ -988,7 +1036,9 @@ bool bmp280Calculate(baroDev_t * baro, float * pressure, float * temperature)
   int32_t t;
   uint32_t p;
 
-  bmp280GetUp(baro);
+  if (!bmp280GetUp(baro))
+    return false;
+
   t = bmp280CompensateTemperature(baro, baro->chip.bmp280.ut); // Must happen before bmp280CompensatePressure() (see t_fine)
   p = bmp280CompensatePressure(baro, baro->chip.bmp280.up);
 
@@ -1003,13 +1053,29 @@ bool bmp280Calculate(baroDev_t * baro, float * pressure, float * temperature)
   return true;
 }
 
-bool bmp280DeviceDetect(busDevice_t * busDev)
+
+bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
 {
   for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
     uint8_t chipId = 0;
 
     bool ack = busRead(busDev, BMP280_CHIP_ID_REG, &chipId);
     if (ack && chipId == BMP280_DEFAULT_CHIP_ID) {
+      busPrint(busDev, PSTR("BMP280 Detected"));
+
+      baro->busDev = busDev;
+
+      // read calibration
+      busReadBuf(baro->busDev, BMP280_TEMPERATURE_CALIB_DIG_T1_LSB_REG, (uint8_t *)&baro->chip.bmp280.cal, 24);
+
+      //set filter setting and sample rate
+      busWrite(baro->busDev, BMP280_CONFIG_REG, BMP280_FILTER | BMP280_SAMPLING);
+
+      // set oversampling + power mode (forced), and start sampling
+      busWrite(baro->busDev, BMP280_CTRL_MEAS_REG, BMP280_MODE);
+
+      baro->sensorType = SENSOR_BMP280;
+      baro->calculate = bmp280Calculate;
       return true;
     }
 
@@ -1017,38 +1083,6 @@ bool bmp280DeviceDetect(busDevice_t * busDev)
   }
 
   return false;
-}
-
-bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
-{
-  if (busDev == NULL) {
-    return false;
-  }
-
-  if (!bmp280DeviceDetect(busDev)) {
-    return false;
-  }
-  baro->busDev = busDev;
-
-  busPrint(busDev, PSTR("BMP280 Detected"));
-
-  // read calibration
-  busReadBuf(baro->busDev, BMP280_TEMPERATURE_CALIB_DIG_T1_LSB_REG, (uint8_t *)&baro->chip.bmp280.cal, 24);
-
-  delay(100);
-
-  //set filter setting and sample rate
-  busWrite(baro->busDev, BMP280_CONFIG_REG, BMP280_FILTER | BMP280_SAMPLING);
-
-  delay(100);
-
-  // set oversampling + power mode (forced), and start sampling
-  busWrite(baro->busDev, BMP280_CTRL_MEAS_REG, BMP280_MODE);
-
-  delay(100);
-
-  baro->calculate = bmp280Calculate;
-  return true;
 }
 
 #define BMP388_DEFAULT_CHIP_ID                          (0x50) // from https://github.com/BoschSensortec/BMP3-Sensor-API/blob/master/bmp3_defs.h#L130
@@ -1178,7 +1212,7 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
 
 bool bmp388GetUP(baroDev_t *baro)
 {
-  uint8_t data[BMP388_DATA_FRAME_SIZE], status;
+  uint8_t data[BMP388_DATA_FRAME_SIZE]; //, status;
 
   //if (busReadBuf(baro->busDev, BMP388_INT_STATUS_REG, &status, 1))
   //{
@@ -1186,13 +1220,17 @@ bool bmp388GetUP(baroDev_t *baro)
   //    busPrint(baro->busDev, PSTR("Data is NOT ready"));
   //}
 
-  if (!busReadBuf(baro->busDev, BMP388_DATA_0_REG, data, BMP388_DATA_FRAME_SIZE))
-    busPrint(baro->busDev, PSTR("FAILED to Get Sensor Data"));
+  bool ack = busReadBuf(baro->busDev, BMP388_DATA_0_REG, data, BMP388_DATA_FRAME_SIZE);
+  if (ack)
+  {
+    baro->chip.bmp388.ut = (int32_t)data[5] << 16 | (int32_t)data[4] << 8 | (int32_t)data[3];  // Copy the temperature and pressure data into the adc variables
+    baro->chip.bmp388.up = (int32_t)data[2] << 16 | (int32_t)data[1] << 8 | (int32_t)data[0];
+  }
+  else
+    handleSensorFailure();
 
-  baro->chip.bmp388.ut = (int32_t)data[5] << 16 | (int32_t)data[4] << 8 | (int32_t)data[3];  // Copy the temperature and pressure data into the adc variables
-  baro->chip.bmp388.up = (int32_t)data[2] << 16 | (int32_t)data[1] << 8 | (int32_t)data[0];
 
-  return true;
+  return ack;
 }
 
 // Returns temperature in DegC, resolution is 0.01 DegC. Output value of "5123" equals 51.23 DegC
@@ -1228,7 +1266,9 @@ bool bmp388Calculate(baroDev_t * baro, float * pressure, float * temperature)
 {
   float t;
 
-  bmp388GetUP(baro);
+  if (!bmp388GetUP(baro))
+    return false;
+
   t = bmp388CompensateTemperature(baro);
 
   if (pressure) {
@@ -1253,24 +1293,6 @@ bool bmp388Reset(busDevice_t * busDev)
 }
 
 
-bool bmp388DeviceDetect(busDevice_t * busDev)
-{
-  for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
-    uint8_t chipId = 0;
-
-    bmp388Reset(busDev);
-
-    bool ack = busRead(busDev, BMP388_CHIP_ID_REG, &chipId);
-    if (ack && chipId == BMP388_DEFAULT_CHIP_ID) {
-      return true;
-    }
-
-    delay(100);
-  }
-
-  return false;
-}
-
 
 // see Datasheet 3.11.1 Memory Map Trimming Coefficients
 typedef struct bmp388_raw_param_s {
@@ -1293,60 +1315,67 @@ typedef struct bmp388_raw_param_s {
 
 bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
 {
-  bmp388_raw_param_t params;
-  if (busDev == NULL) {
-    return false;
+  for (int retry = 0; retry < DETECTION_MAX_RETRY_COUNT; retry++) {
+    uint8_t chipId = 0;
+
+    bmp388Reset(busDev);
+
+    bool ack = busRead(busDev, BMP388_CHIP_ID_REG, &chipId);
+    if (ack && chipId == BMP388_DEFAULT_CHIP_ID) {
+      bmp388_raw_param_t params;
+
+      busPrint(busDev, PSTR("BMP388 Detected"));
+
+      baro->busDev = busDev;
+
+      // read calibration
+
+      busReadBuf(baro->busDev, BMP388_TRIMMING_NVM_PAR_T1_LSB_REG, (unsigned char *)&params, sizeof(params));
+
+      baro->chip.bmp388.cal.param_T1 = (float)params.param_T1 / powf(2.0f, -8.0f); // Calculate the floating point trim parameters
+      baro->chip.bmp388.cal.param_T2 = (float)params.param_T2 / powf(2.0f, 30.0f);
+      baro->chip.bmp388.cal.param_T3 = (float)params.param_T3 / powf(2.0f, 48.0f);
+      baro->chip.bmp388.cal.param_P1 = ((float)params.param_P1 - powf(2.0f, 14.0f)) / powf(2.0f, 20.0f);
+      baro->chip.bmp388.cal.param_P2 = ((float)params.param_P2 - powf(2.0f, 14.0f)) / powf(2.0f, 29.0f);
+      baro->chip.bmp388.cal.param_P3 = (float)params.param_P3 / powf(2.0f, 32.0f);
+      baro->chip.bmp388.cal.param_P4 = (float)params.param_P4 / powf(2.0f, 37.0f);
+      baro->chip.bmp388.cal.param_P5 = (float)params.param_P5 / powf(2.0f, -3.0f);
+      baro->chip.bmp388.cal.param_P6 = (float)params.param_P6 / powf(2.0f, 6.0f);
+      baro->chip.bmp388.cal.param_P7 = (float)params.param_P7 / powf(2.0f, 8.0f);
+      baro->chip.bmp388.cal.param_P8 = (float)params.param_P8 / powf(2.0f, 15.0f);
+      baro->chip.bmp388.cal.param_P9 = (float)params.param_P9 / powf(2.0f, 48.0f);
+      baro->chip.bmp388.cal.param_P10 = (float)params.param_P10 / powf(2.0f, 48.0f);
+      baro->chip.bmp388.cal.param_P11 = (float)params.param_P11 / powf(2.0f, 65.0f);
+
+      //set IIR Filter
+      busWrite(baro->busDev, BMP388_CONFIG_REG, (BMP388_FILTER_COEFF_OFF) << 1);
+
+
+      // Set Oversampling rate
+      /* PRESSURE<<3 | TEMP */
+      busWrite(baro->busDev, BMP388_OSR_REG,
+               (BMP388_OVERSAMP_8X) | (BMP388_OVERSAMP_1X << 3)
+              );
+
+
+      // Set mode 0b00110011, normal, pressure and temperature
+      busWrite(busDev, BMP388_PWR_CTRL_REG, 0x03);
+
+      // Set Data Rate
+      busWrite(baro->busDev, BMP388_ODR_REG, BMP388_TIME_STANDBY_20MS);
+
+      // Set mode 0b00110011, normal, pressure and temperature
+      busWrite(busDev, BMP388_PWR_CTRL_REG, 0x33);
+
+      baro->sensorType = SENSOR_BMP388;
+      baro->calculate = bmp388Calculate;
+      return true;
+    }
+
+    delay(100);
   }
 
-  if (!bmp388DeviceDetect(busDev)) {
-    return false;
-  }
-  baro->busDev = busDev;
-
-  busPrint(busDev, PSTR("BMP388 Detected"));
-
-  // read calibration
-
-  busReadBuf(baro->busDev, BMP388_TRIMMING_NVM_PAR_T1_LSB_REG, (unsigned char *)&params, sizeof(params));
-
-  baro->chip.bmp388.cal.param_T1 = (float)params.param_T1 / powf(2.0f, -8.0f); // Calculate the floating point trim parameters
-  baro->chip.bmp388.cal.param_T2 = (float)params.param_T2 / powf(2.0f, 30.0f);
-  baro->chip.bmp388.cal.param_T3 = (float)params.param_T3 / powf(2.0f, 48.0f);
-  baro->chip.bmp388.cal.param_P1 = ((float)params.param_P1 - powf(2.0f, 14.0f)) / powf(2.0f, 20.0f);
-  baro->chip.bmp388.cal.param_P2 = ((float)params.param_P2 - powf(2.0f, 14.0f)) / powf(2.0f, 29.0f);
-  baro->chip.bmp388.cal.param_P3 = (float)params.param_P3 / powf(2.0f, 32.0f);
-  baro->chip.bmp388.cal.param_P4 = (float)params.param_P4 / powf(2.0f, 37.0f);
-  baro->chip.bmp388.cal.param_P5 = (float)params.param_P5 / powf(2.0f, -3.0f);
-  baro->chip.bmp388.cal.param_P6 = (float)params.param_P6 / powf(2.0f, 6.0f);
-  baro->chip.bmp388.cal.param_P7 = (float)params.param_P7 / powf(2.0f, 8.0f);
-  baro->chip.bmp388.cal.param_P8 = (float)params.param_P8 / powf(2.0f, 15.0f);
-  baro->chip.bmp388.cal.param_P9 = (float)params.param_P9 / powf(2.0f, 48.0f);
-  baro->chip.bmp388.cal.param_P10 = (float)params.param_P10 / powf(2.0f, 48.0f);
-  baro->chip.bmp388.cal.param_P11 = (float)params.param_P11 / powf(2.0f, 65.0f);
-
-  //set IIR Filter
-  busWrite(baro->busDev, BMP388_CONFIG_REG, (BMP388_FILTER_COEFF_OFF) << 1);
-
-
-  // Set Oversampling rate
-  /* PRESSURE<<3 | TEMP */
-  busWrite(baro->busDev, BMP388_OSR_REG,
-           (BMP388_OVERSAMP_8X) | (BMP388_OVERSAMP_1X << 3)
-          );
-
-
-  // Set mode 0b00110011, normal, pressure and temperature
-  busWrite(busDev, BMP388_PWR_CTRL_REG, 0x03);
-
-  // Set Data Rate
-  busWrite(baro->busDev, BMP388_ODR_REG, BMP388_TIME_STANDBY_20MS);
-
-  // Set mode 0b00110011, normal, pressure and temperature
-  busWrite(busDev, BMP388_PWR_CTRL_REG, 0x33);
-
-  baro->calculate = bmp388Calculate;
-
-  return true;
+  return false;
 }
 
 
@@ -1396,19 +1425,36 @@ bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
 #define VENTURI2 2
 #define VENTURI3 3
 
-baroDev_t sensors[4]; // See mapping at the top of the file, PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
+void handleSensorFailure()
+{
+  for (uint8_t x = 0; x < 4; x++)
+  {
+    busDeviceFree(sensors[x].busDev);
+    sensors[x].busDev = NULL;
+    sensors[x].calculate = NULL;
+    sensors[x].sensorType = SENSOR_UNKNOWN;
+  }
+  sensorsFound = false;
+  sendCurrentSystemHealth();
+  critical(PSTR("Sensor communication failure"));
+}
+
 
 busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
 {
   busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enablePin);
-  busPrint(device, PSTR("Detecting device on"));
+
+  if (!device)
+    return NULL;
+
+  busPrint(device, PSTR("Discovering sensor type"));
   if (!bmp280Detect(baro, device))
   {
     if (!bmp388Detect(baro, device))
     {
       if (!spl06Detect(baro, device))
       {
-        busPrint(device, PSTR("chip identification failed"));
+        busPrint(device, PSTR("sensor identification failed"));
         busDeviceFree(device);
         device = NULL;
       }
@@ -1452,7 +1498,6 @@ bool detectMuxedSensors(TwoWire *wire)
       return false;
     }
   }
-  debug(PSTR("MUX Based VISP Detected"));
 
   // Assign the device it's correct type
   muxDevice->hwType = HWTYPE_MUX;
@@ -1494,8 +1539,6 @@ bool detectXLateSensors(TwoWire * wire)
     enablePin = ENABLE_PIN_BUS_A;
   }
 
-  debug(PSTR("XLate Based VISP Detected"));
-
   eeprom = detectEEPROM(wire, 0x54, 0, NULL, enablePin);
 
   // Detect U5, U6
@@ -1516,8 +1559,6 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
   int8_t enablePinA = -1;
   int8_t enablePinB = -1;
 
-
-  debug(PSTR("Assuming DUAL I2C VISP"));
 
   eeprom = detectEEPROM(wireA, 0x54);
   if (!eeprom)
@@ -1567,22 +1608,77 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
 }
 
 // FUTURE: read EEPROM and determine what type of VISP it is.
-bool detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
+void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
 {
+  bool formatVisp = false;
   memset(&sensors, 0, sizeof(sensors));
 
-  //debug(PSTR("Detecting MUX VISP"));
-  if (detectMuxedSensors(i2cBusA))
-    return true;
+  debug(PSTR("Detecting sensors"));
 
-  //debug(PSTR("Detecting XLate VISP"));
-  if (detectXLateSensors(i2cBusA))
-    return true;
+  if (!detectMuxedSensors(i2cBusA))
+    if (!detectXLateSensors(i2cBusA))
+      if (!detectDualI2CSensors(i2cBusA, i2cBusB))
+        return;
 
-  //debug(PSTR("Detecting DUAL-I2C VISP"));
-  if (detectDualI2CSensors(i2cBusA, i2cBusB))
-    return true;
-  return false;
+  // Make sure they are all there
+  if (sensors[0].busDev == NULL) {
+    warning(PSTR("Sensor 0 missing"));
+    return;
+  }
+  if (sensors[1].busDev == NULL) {
+    warning(PSTR("Sensor 1 missing"));
+    return;
+  }
+  if (sensors[2].busDev == NULL) {
+    warning(PSTR("Sensor 2 missing"));
+    return;
+  }
+  if (sensors[3].busDev == NULL) {
+    warning(PSTR("Sensor 3 missing"));
+    return;
+  }
+
+  switch (detectedVispType) {
+    case VISP_BUS_TYPE_I2C:   debug(PSTR("DUAL I2C VISP detected"));    break;
+    case VISP_BUS_TYPE_XLATE: debug(PSTR("XLate Based VISP Detected")); break;
+    case VISP_BUS_TYPE_MUX:   debug(PSTR("MUX Based VISP Detected"));   break;
+  }
+    
+  if (eeprom)
+  {
+    //debug(PSTR("Reading VISP EEPROM"));
+    readEEPROM(eeprom, 0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
+
+    if (visp_eeprom.VISP[0] != 'V'
+        ||  visp_eeprom.VISP[1] != 'I'
+        ||  visp_eeprom.VISP[2] != 'S'
+        ||  visp_eeprom.VISP[3] != 'p')
+    {
+      // ok, unformatted VISP
+      formatVisp = true;
+      warning(PSTR("ERROR eeprom not formatted"));
+    }
+  }
+  else
+  {
+    warning(PSTR("ERROR eeprom not available"));
+    // Actually, just provide soem sane numbers for the system
+    formatVisp = true;
+  }
+
+  if (formatVisp)
+    formatVispEEPROM(detectedVispType, VISP_BODYTYPE_VENTURI);
+
+
+  // We store the calibration data in the VISP eeprom variable to conserve ram space
+  // We only have 2KB on an Arduino NANO/UNO
+  clearCalibrationData();
+
+  sensorsFound=true;
+
+  // Just put it out there, what type we are for the status system to figure out
+  info(PSTR("Sensors detected"));
+  sendCurrentSystemHealth();
 }
 
 
@@ -1622,12 +1718,21 @@ void timeToReadVISP()
   timeToReadSensors = true;
 }
 
+void timeToCheckSensors()
+{
+  // If debug is on, and a VISP is NOT connected, we flood the system with sensor scans.
+  // Do it every half second (or longer)
+  if (!sensorsFound)
+    detectSensors(i2cBus1, i2cBus2);
+}
+
 // Timer Driven Tasks and their Schedules.
 // These are checked and executed in order.
-// If somethign takes priority over another task, put it at the top of the list
+// If something takes priority over another task, put it at the top of the list
 t tasks[] = {
   {0, 20, timeToReadVISP},
   {0, 100, timeToPulseWatchdog},
+  {0, 500, timeToCheckSensors},
   {0, 0, NULL} // End of list
 };
 
@@ -1645,8 +1750,8 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
   memset(&visp_eeprom, 0, sizeof(visp_eeprom));
 
   visp_eeprom.VISP[0] = 'V';
-  visp_eeprom.VISP[1] = 'i';
-  visp_eeprom.VISP[2] = 's';
+  visp_eeprom.VISP[1] = 'I';
+  visp_eeprom.VISP[2] = 'S';
   visp_eeprom.VISP[3] = 'p';
   visp_eeprom.busType = busType;
   visp_eeprom.bodyType = bodyType;
@@ -1661,7 +1766,10 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
   // motor_speed;    // For demonstration purposes, run motor at a fixed speed...
   // mode;
 
-  visp_eeprom.debug = false;
+  visp_eeprom.debug = true;
+
+  // Make *sure* that the calibration data is formatted properly
+  clearCalibrationData();
 
   writeEEPROM(eeprom, (unsigned short)0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
 }
@@ -1669,6 +1777,7 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
 
 void clearCalibrationData()
 {
+  runState = RUNSTATE_CALIBRATE;
   calibrationSampleCounter = 0;
   memset(&visp_eeprom.calibrationOffsets, 0, sizeof(visp_eeprom.calibrationOffsets));
 }
@@ -1707,8 +1816,6 @@ void setupTimer1() // WARNING: NOTE: Conflicts with Servo library
 #endif
 
 void setup() {
-  bool sensorsFound = false, formatVisp = false;;
-
   // Address select lines for Dual I2C switching using NPN Transistors
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_A, LOW);
@@ -1721,83 +1828,23 @@ void setup() {
   pinMode(M_DIR_1, OUTPUT);
   pinMode(M_DIR_2, OUTPUT);
 
+  memset(&sensors, 0, sizeof(sensors));
+
   mystepper.setAcceleration(3000);
   mystepper.setMaxSpeed(1000);
   //  setupTimer1();
 
   hwSerial.begin(SERIAL_BAUD);
-  info(PSTR("VISP Sensor Reader Test Application V0.1c"));
+  respond('I', PSTR("VISP Core,%d,%d,%c"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+
   i2cBus1->begin();
   i2cBus1->setClock(400000); // Typical
 
 
-  delay(200);
-
-  visp_eeprom.debug = true;
-
-  do
-  {
-    sensorsFound = detectSensors(i2cBus1, i2cBus2);
-    if (sensorsFound)
-    {
-      debug(PSTR("Sensors detected!"));
-      // Make sure they are all there
-      if (sensors[0].busDev == NULL) {
-        warning(PSTR("Sensor 0 missing"));
-        sensorsFound = false;
-      }
-      if (sensors[1].busDev == NULL) {
-        warning(PSTR("Sensor 1 missing"));
-        sensorsFound = false;
-      }
-      if (sensors[2].busDev == NULL) {
-        warning(PSTR("Sensor 2 missing"));
-        sensorsFound = false;
-      }
-      if (sensors[3].busDev == NULL) {
-        warning(PSTR("Sensor 3 missing"));
-        sensorsFound = false;
-      }
-    }
-    else
-    {
-      debug(PSTR("Error finding sensors, retrying"));
-      delay(500);
-    }
-
-
-  } while (!sensorsFound);
-
-  if (eeprom)
-  {
-    //debug(PSTR("Reading VISP EEPROM"));
-
-    readEEPROM(eeprom, 0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
-
-    if (visp_eeprom.VISP[0] != 'V'
-        ||  visp_eeprom.VISP[1] != 'i'
-        ||  visp_eeprom.VISP[2] != 's'
-        ||  visp_eeprom.VISP[3] != 'p')
-    {
-      // ok, unformatted VISP
-      formatVisp = true;
-      warning(PSTR("ERROR eeprom not formatted"));
-    }
-  }
-  else
-  {
-    critical(PSTR("ERROR eeprom not available"));
-    formatVisp = true;
-  }
-
-  if (formatVisp)
-    formatVispEEPROM(detectedVispType, VISP_BODYTYPE_VENTURI);
-
+  // Some reset conditions do not reset our globals.
+  sensorsFound = false;
+  visp_eeprom.debug = false;
   clearCalibrationData();
-
-
-  // Just put it out there, what type we are for the status system to figure out
-  respond('I', PSTR("%s"), visp_eeprom.VISP);
 }
 
 void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, float tidalVolume, float *P)
@@ -1831,6 +1878,11 @@ void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, fl
 
 void doCalibration(float *P)
 {
+  if (calibrationSampleCounter==0)
+  {
+      respond('C', PSTR("0,Starting Calibration"));
+      clearCalibrationData();
+  }
   visp_eeprom.calibrationOffsets[0] += P[0];
   visp_eeprom.calibrationOffsets[1] += P[1];
   visp_eeprom.calibrationOffsets[2] += P[2];
@@ -2009,18 +2061,21 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
 
 #define RESPOND_LIMITS             1
 #define RESPOND_DEBUG              2
-#define RESPOND_IDENTITY           4
-#define RESPOND_MODE               8
-#define RESPOND_VOLUME            16
-#define RESPOND_RATE              32
-#define RESPOND_BREATH_INTERVAL   64
-#define RESPOND_BREATH_THRESHOLD 128
-#define RESPOND_MOTOR_SPEED      256
-#define RESPOND_BODYTYPE         512
-#define RESPOND_CALIB0          1024
-#define RESPOND_CALIB1          2048
-#define RESPOND_CALIB2          8192
-#define RESPOND_CALIB3         16384
+#define RESPOND_MODE               4
+#define RESPOND_VOLUME             8
+#define RESPOND_RATE              16
+#define RESPOND_BREATH_INTERVAL   32
+#define RESPOND_BREATH_THRESHOLD  64
+#define RESPOND_MOTOR_SPEED      128
+#define RESPOND_BODYTYPE         256
+#define RESPOND_CALIB0           512
+#define RESPOND_CALIB1          1024
+#define RESPOND_CALIB2          2048
+#define RESPOND_CALIB3          4096
+#define RESPOND_SENSOR0         8192
+#define RESPOND_SENSOR1        16384
+#define RESPOND_SENSOR2        32768
+#define RESPOND_SENSOR3        65536
 
 
 struct dictionary_s {
@@ -2043,6 +2098,22 @@ const char strPitot [] PUTINFLASH = "Pitot";
 const char strPitotDesc [] PUTINFLASH = "Pitot body style";
 const char strVenturi [] PUTINFLASH = "Venturi";
 const char strVenturiDesc [] PUTINFLASH = "Venturi body style";
+const char strSensor0 [] PUTINFLASH = "Sensor0";
+const char strSensor1 [] PUTINFLASH = "Sensor1";
+const char strSensor2 [] PUTINFLASH = "Sensor2";
+const char strSensor3 [] PUTINFLASH = "Sensor3";
+const char strBMP388 [] PUTINFLASH = "BMP388";
+const char strBMP280 [] PUTINFLASH = "BMP280";
+const char strSPL06 [] PUTINFLASH = "SPL06";
+
+
+const struct dictionary_s sensorDict[] PUTINFLASH = {
+  {SENSOR_UNKNOWN, strUnknown, strUnknown},
+  {SENSOR_BMP388, strBMP388, strBMP388},
+  {SENSOR_BMP280, strBMP280, strBMP280},
+  {SENSOR_SPL06, strSPL06, strSPL06},
+  { -1, NULL, NULL}
+};
 
 const struct dictionary_s modeDict[] PUTINFLASH = {
   {MODE_UNKNOWN, strUnknown, strUnknown},
@@ -2071,7 +2142,7 @@ typedef bool (*verifyCallback)(struct settingsEntry_s *, const char *);
 typedef void (*respondCallback)(struct settingsEntry_s *);
 
 struct settingsEntry_s {
-  const int PUTINFLASH bitmask;
+  const uint32_t PUTINFLASH bitmask;
   const char * const PUTINFLASH theName;
   const int16_t PUTINFLASH theMin;
   const int16_t PUTINFLASH theMax;
@@ -2127,10 +2198,14 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_BREATH_INTERVAL,  strBreathInterval, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_interval},
   {RESPOND_BREATH_THRESHOLD, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
   {RESPOND_MOTOR_SPEED,      strMotorSpeed, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, motorAction, &visp_eeprom.motor_speed},
-  {RESPOND_CALIB0,           strCalib0, -1000,1000,NULL,noSet,respondFloat, NULL, &visp_eeprom.calibrationOffsets[0]},
-  {RESPOND_CALIB1,           strCalib1, -1000,1000,NULL,noSet,respondFloat, NULL, &visp_eeprom.calibrationOffsets[1]},
-  {RESPOND_CALIB2,           strCalib2, -1000,1000,NULL,noSet,respondFloat, NULL, &visp_eeprom.calibrationOffsets[2]},
-  {RESPOND_CALIB3,           strCalib3, -1000,1000,NULL,noSet,respondFloat, NULL, &visp_eeprom.calibrationOffsets[3]},
+  {RESPOND_CALIB0,           strCalib0, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[0]},
+  {RESPOND_CALIB1,           strCalib1, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[1]},
+  {RESPOND_CALIB2,           strCalib2, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[2]},
+  {RESPOND_CALIB3,           strCalib3, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[3]},
+  {RESPOND_SENSOR0,          strSensor0, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[0].sensorType},
+  {RESPOND_SENSOR1,          strSensor1, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
+  {RESPOND_SENSOR2,          strSensor2, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
+  {RESPOND_SENSOR3,          strSensor3, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
   {0, NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
 
@@ -2199,7 +2274,8 @@ void respondInt16(struct settingsEntry_s *entry)
 void respondFloat(struct settingsEntry_s *entry)
 {
   char buff[32];
-  dtostrf(*(float*)entry->data,7,2,buff);
+  *buff = 0;
+  dtostrf(*(float*)entry->data, 7, 2, buff);
   respond('S', PSTR("" SFLASH ",%s"), entry->theName, buff);
 }
 
@@ -2260,10 +2336,11 @@ void respondSettingLimits(struct settingsEntry_s *entry)
 }
 
 
-void respondAppropriately(uint16_t flags)
+void respondAppropriately(uint32_t flags)
 {
   uint8_t x = 0;
   struct settingsEntry_s entry = {0};
+
   do
   {
     // We must copy the struct from flash to access it
@@ -2287,7 +2364,7 @@ void handleSettingCommand(const char *arg1, const char *arg2)
   if (*arg1 == 0)
   {
     // Same as Q without the Limits
-    respondAppropriately(0xFFFF ^ RESPOND_LIMITS);
+    respondAppropriately(0xFFFFFFFF ^ RESPOND_LIMITS);
     return;
   }
 
@@ -2306,7 +2383,7 @@ void handleSettingCommand(const char *arg1, const char *arg2)
           return;
         }
         else if (entry.verifyIt(&entry, arg2))
-        {          
+        {
           saveParameters();
           entry.respondIt(&entry);
           // Maybe enable a motor or something?
@@ -2350,14 +2427,9 @@ void commandParser(int cmdByte)
 
     switch (command) {
       case 'P': respond('P', PSTR("I am alive!")); break;
-      case 'I': respondAppropriately(RESPOND_IDENTITY); break;
+      case 'I':  respond('I', PSTR("VISP Core,%d,%d,%c"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION); break;
       case 'C':
-        respond('C', (runState == RUNSTATE_CALIBRATE ? PSTR("1,Calibration in progress") : PSTR("0,Starting Calibration")));
-        if (runState != RUNSTATE_CALIBRATE)
-        {
-          runState = RUNSTATE_CALIBRATE;
-          clearCalibrationData();
-        }
+        clearCalibrationData();
         break;
       case 'E':
         if (eepromAddress == 0xFFFF)
@@ -2382,7 +2454,8 @@ void commandParser(int cmdByte)
 
         break;
       case 'Q':
-        respondAppropriately(0xFFFF);
+        sendCurrentSystemHealth();
+        respondAppropriately(0xFFFFFFFF);
         respond('Q', PSTR("Finished"));
         break;
       case 'S': // Set parameter
@@ -2482,27 +2555,35 @@ void loop() {
     timeToReadSensors = false;
 
     // Read them all NOW
-    for (int x = 0; x < 4; x++)
+    if (sensorsFound)
     {
-      P[x] = 0;
-      sensors[x].calculate(&sensors[x], &P[x], &T[x]);
+      for (int x = 0; x < 4; x++)
+      {
+        P[x] = 0;
+        // If any of the sensors fail, stop trying to do others
+        if (!sensors[x].calculate(&sensors[x], &P[x], &T[x]))
+          break;
+      }
     }
 
-    // Check to see if at least one character is available
-    while (hwSerial.available())
-      commandParser(hwSerial.read());
-
-    // Detect the VISP type from the EEPROM and use the appropriate function
-    // Till we get the EEPROMS loaded right
-    switch (visp_eeprom.bodyType)
+    // OK, the cable might have just been unplugged, and the sensors have gone away.
+    // Hence the double checks one above, and this one below
+    if (sensorsFound)
     {
-      case 'P':
-        loopPitotVersion(P, T);
-        break;
-      case 'V':
-      default:
-        loopVenturiVersion(P, T);
-        break;
+      switch (visp_eeprom.bodyType)
+      {
+        case 'P':
+          loopPitotVersion(P, T);
+          break;
+        case 'V':
+        default:
+          loopVenturiVersion(P, T);
+          break;
+      }
     }
   }
+
+  // Handle user input, 1 character at a time
+  while (hwSerial.available())
+    commandParser(hwSerial.read());
 }

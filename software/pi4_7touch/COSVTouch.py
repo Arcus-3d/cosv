@@ -363,7 +363,7 @@ class COSVTouchApp(App):
                         col = row.split(',',10)
                         try:
                             dataType = col[0]
-                           if dataType == 'i':
+                            if dataType == 'i':
                                 print(row)
                             if dataType == 'd':
                                 sampleTime = float(col[1])

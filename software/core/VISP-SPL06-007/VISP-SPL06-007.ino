@@ -2101,10 +2101,10 @@ const char strPitot [] PUTINFLASH = "Pitot";
 const char strPitotDesc [] PUTINFLASH = "Pitot body style";
 const char strVenturi [] PUTINFLASH = "Venturi";
 const char strVenturiDesc [] PUTINFLASH = "Venturi body style";
-const char strSensor0 [] PUTINFLASH = "Sensor0";
-const char strSensor1 [] PUTINFLASH = "Sensor1";
-const char strSensor2 [] PUTINFLASH = "Sensor2";
-const char strSensor3 [] PUTINFLASH = "Sensor3";
+const char strSensor0 [] PUTINFLASH = "sensor0";
+const char strSensor1 [] PUTINFLASH = "sensor1";
+const char strSensor2 [] PUTINFLASH = "sensor2";
+const char strSensor3 [] PUTINFLASH = "sensor3";
 const char strBMP388 [] PUTINFLASH = "BMP388";
 const char strBMP280 [] PUTINFLASH = "BMP280";
 const char strSPL06 [] PUTINFLASH = "SPL06";
@@ -2215,7 +2215,7 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
 
 bool noSet(struct settingsEntry_s *entry, const char *arg)
 {
-  info(PSTR("%s is read-only"),entry->theName);
+  info(PSTR(SFLASH " is read-only"),entry->theName);
   return true;
 }
 

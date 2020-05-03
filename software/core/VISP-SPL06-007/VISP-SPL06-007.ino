@@ -73,6 +73,8 @@ TwoWire *i2cBus2 = NULL;
 #endif
 
 
+#define SWEEP_SPEED 50
+
 // Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
 // This is detected if needed
 #define ENABLE_PIN_BUS_A 4
@@ -85,10 +87,11 @@ TwoWire *i2cBus2 = NULL;
 
 #define STEPPER_DIR  7
 #define STEPPER_STEP 8
+#define HOME_SENSOR   3 // IRQ on low.
 
 #define BLDC_DIR     13 // 
 #define BLDC_PWM     11 // Hardware PWM output for BLDC motor
-#define BLDC_FEEDBACK 3 // Interrupt pin, let's us know the core motor has done 1 Rev
+#define BLDC_FEEDBACK 2 // Interrupt pin, let's us know the core motor has done 1 Rev
 
 // If all of the ADC's are set to zero, then the display controls things
 #define ADC_VOLUME   A0 // How much to push, 0->1023 milliliters, if it reads 0, then display can control this (parameter)
@@ -355,6 +358,7 @@ typedef struct baroDev_s {
 bool sensorsFound = false;
 baroDev_t sensors[4]; // See mappings SENSOR_U[5678] and PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
 
+bool motorFound = false;
 
 void respond(char command, PGM_P fmt, ...)
 {
@@ -1821,6 +1825,105 @@ void setupTimer1() // WARNING: NOTE: Conflicts with Servo library
 }
 #endif
 
+// Let the motor run until we get the correct number of pulses
+void homeTriggered() // IRQ function
+{
+}
+
+void motorReverse()
+{
+  digitalWrite(M_DIR_1, 0);
+  digitalWrite(M_DIR_2, 1);
+  digitalWrite(BLDC_DIR, HIGH);
+  digitalWrite(STEPPER_DIR, HIGH);
+}
+void motorForward()
+{
+  digitalWrite(M_DIR_1, 1);
+  digitalWrite(M_DIR_2, 0);
+  digitalWrite(BLDC_DIR, LOW);
+  digitalWrite(STEPPER_DIR, LOW);
+}
+void motorRun(int rate)
+{
+  analogWrite(M_PWM_1, rate);
+  analogWrite(M_PWM_2, rate);
+  analogWrite(BLDC_PWM, rate);
+  mystepper.setSpeed(rate);
+}
+
+void homeThisPuppy()
+{
+  unsigned long motorSweepStartTime, motorSweepStopTime, timeout;
+
+  // ok, the Hall Effect is a "close"
+  // So, swing till it turns on, and continue till it stops, and check the bldcFgCount.
+  // Then walk halfway back and we should be "homed"
+
+  info(PSTR("Homing"));
+
+  // Within the home zone...
+  // Rewind until out of the zone.
+  if (digitalRead(HOME_SENSOR) == LOW)
+  {
+    info(PSTR("Find Edge2"));
+
+    motorReverse();
+
+    motorRun(SWEEP_SPEED);
+    timeout = millis() + 5000; // 5 seconds...
+    while (millis() < timeout && digitalRead(HOME_SENSOR) == LOW)
+      delay(10);
+    motorRun(0);
+  }
+  info(PSTR("Find Edge1"));
+
+  motorForward();
+  // Sweep looking for hall sensor
+  motorRun(SWEEP_SPEED);
+  analogWrite(BLDC_PWM, SWEEP_SPEED);
+  timeout = millis() + 5000; // 5 seconds...
+  while (millis() < timeout && digitalRead(HOME_SENSOR) == HIGH)
+    delay(1);
+
+  if (digitalRead(HOME_SENSOR) == HIGH)
+  {
+    info(PSTR("Something is wrong, we should have detected a HOME signal by now"));
+    motorFound = false;
+    return;
+  }
+
+  motorSweepStartTime = millis();
+
+  info(PSTR("Find Edge2"));
+
+  // Motor is still running....
+  timeout = millis() + 5000; // 5 seconds...
+  while (millis() < timeout && digitalRead(HOME_SENSOR) == LOW)
+    delay(1);
+
+  motorRun(0);
+
+
+  info(PSTR("Centering"));
+
+  motorSweepStopTime = millis();
+
+  motorReverse();
+
+  timeout = millis() + ((motorSweepStopTime - motorSweepStartTime) / 2);
+
+  motorRun(SWEEP_SPEED);
+  while (millis() < timeout)
+    delay(1);
+  motorRun(0);
+
+  // TADA Motor is *mostly* homed!
+  info(PSTR("Finished"));
+
+  motorFound = true;
+}
+
 void setup() {
   // Address select lines for Dual I2C switching using NPN Transistors
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
@@ -1833,6 +1936,14 @@ void setup() {
   pinMode(M_PWM_2, OUTPUT);
   pinMode(M_DIR_1, OUTPUT);
   pinMode(M_DIR_2, OUTPUT);
+  pinMode(BLDC_DIR, OUTPUT);
+  pinMode(STEPPER_DIR, OUTPUT);
+
+  // Setup the motor output
+  pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
+
+  // Setup the home sensor as an interrupt
+  attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
 
   memset(&sensors, 0, sizeof(sensors));
 
@@ -1851,6 +1962,8 @@ void setup() {
   sensorsFound = false;
   visp_eeprom.debug = DEBUG_DISABLED;
   clearCalibrationData();
+
+  homeThisPuppy();
 }
 
 void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, float tidalVolume, float *P)
@@ -1969,10 +2082,6 @@ void loopVenturiVersion(float * P, float * T)
       break;
 
     case RUNSTATE_RUN:
-      digitalWrite(M_DIR_1, 0);
-      digitalWrite(M_DIR_2, 1);
-      analogWrite(M_PWM_1, 200);
-      analogWrite(M_PWM_2, 200);
       P[0] += visp_eeprom.calibrationOffsets[0];
       P[1] += visp_eeprom.calibrationOffsets[1];
       P[2] += visp_eeprom.calibrationOffsets[2];
@@ -2184,14 +2293,8 @@ void respondInt8ToDict(struct settingsEntry_s *entry);
 void motorAction(struct settingsEntry_s *entry)
 {
   info(PSTR("Setting motor vales to %d"), visp_eeprom.motor_speed);
-  digitalWrite(M_DIR_1, 0);
-  if (visp_eeprom.motor_speed == 0)
-    digitalWrite(M_DIR_2, 0);
-  else
-    digitalWrite(M_DIR_2, 1);
-  analogWrite(M_PWM_1, visp_eeprom.motor_speed);
-  analogWrite(M_PWM_2, visp_eeprom.motor_speed);
-  mystepper.setSpeed(visp_eeprom.motor_speed);
+  motorForward();
+  motorRun(visp_eeprom.motor_speed);
 }
 
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};

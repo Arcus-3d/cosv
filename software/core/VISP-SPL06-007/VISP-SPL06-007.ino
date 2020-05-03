@@ -141,6 +141,9 @@ typedef enum modeState_e {
   MODE_VCCMV = 2
 } modeState_t;
 
+#define DEBUG_DISABLED 0
+#define DEBUG_ENABLED  1
+
 
 // EEPROM is 24c01 128x8
 typedef struct sensor_mapping_s {
@@ -358,7 +361,7 @@ void respond(char command, PGM_P fmt, ...)
   char sbuffer[128];
 
 
-  if (command == 'g' && !visp_eeprom.debug)
+  if (command == 'g' && visp_eeprom.debug==DEBUG_DISABLED)
     return;
 
   //Declare a va_list macro and initialize it with va_start
@@ -1766,7 +1769,7 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
   // motor_speed;    // For demonstration purposes, run motor at a fixed speed...
   // mode;
 
-  visp_eeprom.debug = true;
+  visp_eeprom.debug = DEBUG_DISABLED;
 
   // Make *sure* that the calibration data is formatted properly
   clearCalibrationData();
@@ -1843,7 +1846,7 @@ void setup() {
 
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
-  visp_eeprom.debug = false;
+  visp_eeprom.debug = DEBUG_DISABLED;
   clearCalibrationData();
 }
 
@@ -1858,7 +1861,7 @@ void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, fl
   hwSerial.print(',');
   hwSerial.print(volumeSmoothed, 4);
   hwSerial.print(',');
-  if (!visp_eeprom.debug)
+  if (visp_eeprom.debug==DEBUG_DISABLED)
     hwSerial.println(tidalVolume, 4);
   else
   {
@@ -2123,8 +2126,8 @@ const struct dictionary_s modeDict[] PUTINFLASH = {
 };
 
 const struct dictionary_s enableDict[] PUTINFLASH = {
-  {0, strDisable, strDisabled},
-  {1, strEnable,  strEnabled},
+  {DEBUG_DISABLED, strDisable, strDisabled},
+  {DEBUG_ENABLED, strEnable,  strEnabled},
   { -1, NULL, NULL}
 };
 
@@ -2212,7 +2215,8 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
 
 bool noSet(struct settingsEntry_s *entry, const char *arg)
 {
-  return false;
+  info(PSTR("%s is read-only"),entry->theName);
+  return true;
 }
 
 bool verifyDictWordToInt8(struct settingsEntry_s *entry, const char *arg)

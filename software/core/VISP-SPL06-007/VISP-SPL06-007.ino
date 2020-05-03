@@ -361,7 +361,7 @@ void respond(char command, PGM_P fmt, ...)
   char sbuffer[128];
 
 
-  if (command == 'g' && visp_eeprom.debug==DEBUG_DISABLED)
+  if (command == 'g' && visp_eeprom.debug == DEBUG_DISABLED)
     return;
 
   //Declare a va_list macro and initialize it with va_start
@@ -391,7 +391,7 @@ void respond(char command, PGM_P fmt, ...)
 // Also we have to add motor failure detection to this.
 void sendCurrentSystemHealth()
 {
-  respond('H',(sensorsFound ? PSTR("good") : PSTR("bad")));   
+  respond('H', (sensorsFound ? PSTR("good") : PSTR("bad")));
 }
 
 
@@ -1646,7 +1646,7 @@ void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
     case VISP_BUS_TYPE_XLATE: debug(PSTR("XLate Based VISP Detected")); break;
     case VISP_BUS_TYPE_MUX:   debug(PSTR("MUX Based VISP Detected"));   break;
   }
-    
+
   if (eeprom)
   {
     //debug(PSTR("Reading VISP EEPROM"));
@@ -1677,7 +1677,7 @@ void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
   // We only have 2KB on an Arduino NANO/UNO
   clearCalibrationData();
 
-  sensorsFound=true;
+  sensorsFound = true;
 
   // Just put it out there, what type we are for the status system to figure out
   info(PSTR("Sensors detected"));
@@ -1711,9 +1711,12 @@ void tCheck (struct t * t ) {
 // Periodically pulse a pin
 void timeToPulseWatchdog()
 {
-  digitalWrite(MISSING_PULSE_PIN, HIGH);
-  delayMicroseconds(1);
-  digitalWrite(MISSING_PULSE_PIN, LOW);
+  if (sensorsFound)
+  {
+    digitalWrite(MISSING_PULSE_PIN, HIGH);
+    delayMicroseconds(1);
+    digitalWrite(MISSING_PULSE_PIN, LOW);
+  }
 }
 
 void timeToReadVISP()
@@ -1861,7 +1864,7 @@ void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, fl
   hwSerial.print(',');
   hwSerial.print(volumeSmoothed, 4);
   hwSerial.print(',');
-  if (visp_eeprom.debug==DEBUG_DISABLED)
+  if (visp_eeprom.debug == DEBUG_DISABLED)
     hwSerial.println(tidalVolume, 4);
   else
   {
@@ -1881,10 +1884,10 @@ void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, fl
 
 void doCalibration(float *P)
 {
-  if (calibrationSampleCounter==0)
+  if (calibrationSampleCounter == 0)
   {
-      respond('C', PSTR("0,Starting Calibration"));
-      clearCalibrationData();
+    respond('C', PSTR("0,Starting Calibration"));
+    clearCalibrationData();
   }
   visp_eeprom.calibrationOffsets[0] += P[0];
   visp_eeprom.calibrationOffsets[1] += P[1];
@@ -2215,7 +2218,7 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
 
 bool noSet(struct settingsEntry_s *entry, const char *arg)
 {
-  info(PSTR(SFLASH " is read-only"),entry->theName);
+  info(PSTR(SFLASH " is read-only"), entry->theName);
   return true;
 }
 

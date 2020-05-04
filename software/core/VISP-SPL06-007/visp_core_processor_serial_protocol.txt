@@ -1,0 +1,153 @@
+VISP Core Processor Serial Data Format
+
+Note: <t> is time on the core,based on milliseconds since power up.
+
+Sensor Readings
+d,<t>,<pressure cmH20>,<smoothed volume (mL)>,<tidal volume (mL)>[,<s1>,<s2>,<s3>,<s4>] (UNSOLICITED)
+
+Logging Output (UNSOLICITED)
+i,<t>,<informational string>
+g,<t>,<debug string>
+w,<t>,<warning string>
+c,<t>,<critical string>
+
+Health Status Reports have the text "good" or "bad" based on the active status of the core. (UNSOLICITED)
+H,<t>,[good|bad]
+
+
+Ping the core.
+P
+
+Core responds with timestamp and status string.
+P,<t>,<I am alive!>
+
+
+Calibrate now
+C
+Core responds with timestamp, status code, and status string.
+C,<t>,<status>,<string>
+
+Example responses:
+C,<t>,0,Starting
+C,<t>,1,In Progress
+C,<t>,2,Complete
+
+
+Reboot command.   Reboots the core
+R
+Core does not respond to a Reboot command
+
+
+Identification Command (UNSOLICITED RESPONSE HAPPENS AT STARTUP)
+I
+Core responds with
+I,<t>,<string>,<major>,<minor>,<revision>
+
+
+EEPROM read/write
+An empty parameter string makes the core echo back all 128 bytes of EEPROM data.
+Providing the address will reply with a full page (16-bytes) starting at that address,
+Providing the address and data will write the data to the EEPROM.
+E
+E,<address>
+E,<address>,<b_0>,<b_1>,<b_2>...
+
+Response will always consist of a time, address, and data bytes
+E,<t>,<address>,<b0>,<b1>,<b2>...
+
+
+Settings.  There are many settings available, use 'Q' to query them all
+S
+Core replies with all settings (no limits or dictionaries)
+S,5003,mode,Unknown
+S,5004,debug,Disable
+S,5006,bodytype,Unknown
+S,5008,volume,0
+S,5009,rate,0
+S,5010,breath_interval,0
+S,5013,breath_threshold,0
+S,5015,motor_speed,0
+S,5017,calib0,   0.00
+S,5019,calib1,   0.00
+S,5020,calib2,   0.00
+S,5022,calib3,   0.00
+S,5024,sensor0,Unknown
+S,5026,sensor1,Unknown
+S,5028,sensor2,Unknown
+S,5030,sensor3,Unknown
+
+Settings Query 1 setting command
+S,mode
+Core replies with the current "mode" setting
+S,mode,Unknown
+
+Settings set command
+S,mode,PC-CMV
+Core replies with the current setting
+S,mode,PC-CMV
+
+
+mode sets the operational mode using "PC-CMV" or "VC-CMV)
+volume controls the volume in mL of breaths (tidal volume)
+rate controls the rate in which the breath is delivered
+breath_interval controls the time period between breaths in milliseconds. (Continuous Mandatory Ventilation)
+debug enable or disable the internal debugging output
+motor_speed Internal testing, turns motor on at a specific speed
+bodytype Switches the algorithm used for the core
+calib0-3 Current calibration settings for each sensor
+sensor0-3 Current sensor detected.  Sensor0=U5, Sensor1=U6, Sensor2=U7, Sensor3=U8
+
+
+
+Query all settings.  This a display will want to do on startup, to determine the capabilities of the core.
+Q
+The Core will respond with 'H', and 'S' responses for all settings and limits/dictionaries.
+
+Example Q output
+H,129157,bad
+S,129157,mode_dict,Unknown,Unknown,PC-CMV,Pressure Controlled,VC-CMV,Volume Controlled
+S,129160,mode,Unknown
+S,129162,debug_dict,Disable,Disabled,Enable,Enabled
+S,129166,debug,Disable
+S,129168,bodytype_dict,Unknown,Unknown,Pitot,Pitot body style,Venturi,Venturi body style
+S,129176,bodytype,Unknown
+S,129178,volume_min,0
+S,129180,volume_max,1000
+S,129182,volume,0
+S,129184,rate_min,0
+S,129185,rate_max,1000
+S,129187,rate,0
+S,129189,breath_interval_min,0
+S,129191,breath_interval_max,1000
+S,129195,breath_interval,0
+S,129198,breath_threshold_min,0
+S,129200,breath_threshold_max,1000
+S,129203,breath_threshold,0
+S,129206,motor_speed_min,0
+S,129208,motor_speed_max,1000
+S,129211,motor_speed,0
+S,129213,calib0_min,-1000
+S,129215,calib0_max,1000
+S,129217,calib0,   0.00
+S,129219,calib1_min,-1000
+S,129221,calib1_max,1000
+S,129224,calib1,   0.00
+S,129226,calib2_min,-1000
+S,129228,calib2_max,1000
+S,129230,calib2,   0.00
+S,129232,calib3_min,-1000
+S,129234,calib3_max,1000
+S,129238,calib3,   0.00
+S,129240,sensor0_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,129246,sensor0,Unknown
+S,129248,sensor1_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,129255,sensor1,Unknown
+S,129257,sensor2_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,129264,sensor2,Unknown
+S,129266,sensor3_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,129272,sensor3,Unknown
+Q,129274,Finished
+
+
+
+

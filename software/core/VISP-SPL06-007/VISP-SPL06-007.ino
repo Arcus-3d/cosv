@@ -82,14 +82,14 @@ TwoWire *i2cBus2 = NULL;
 
 #define M_PWM_1 6 // Hardware PWM on a Nano
 #define M_PWM_2 9 // Hardware PWM on a Nano
-#define M_DIR_1 10
-#define M_DIR_2 11 // Daren, can you switch this to D12 so I can have the PWM from 11 for BLDC_PWM
+#define M_DIR_1 12
+#define M_DIR_2 13
 
 #define STEPPER_DIR  7
 #define STEPPER_STEP 8
 #define HOME_SENSOR   3 // IRQ on low.
 
-#define BLDC_DIR     13 // 
+#define BLDC_DIR     10 // 
 #define BLDC_PWM     11 // Hardware PWM output for BLDC motor
 #define BLDC_FEEDBACK 2 // Interrupt pin, let's us know the core motor has done 1 Rev
 
@@ -1879,10 +1879,11 @@ void homeThisPuppy()
   info(PSTR("Find Edge1"));
 
   motorForward();
+
   // Sweep looking for hall sensor
   motorRun(SWEEP_SPEED);
-  analogWrite(BLDC_PWM, SWEEP_SPEED);
   timeout = millis() + 5000; // 5 seconds...
+
   while (millis() < timeout && digitalRead(HOME_SENSOR) == HIGH)
     delay(1);
 

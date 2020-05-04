@@ -1871,7 +1871,7 @@ void homeThisPuppy()
     motorReverse();
 
     motorRun(SWEEP_SPEED);
-    timeout = millis() + 5000; // 5 seconds...
+    timeout = millis() + 5000000; // 5 seconds...
     while (millis() < timeout && digitalRead(HOME_SENSOR) == LOW)
       /* nothing */;
     motorRun(0);
@@ -1894,7 +1894,7 @@ void homeThisPuppy()
     return;
   }
 
-  motorSweepStartTime = millis();
+  motorSweepStartTime = micros();
 
   info(PSTR("Find Right Edge"));
 
@@ -1905,18 +1905,18 @@ void homeThisPuppy()
 
   motorRun(0);
 
-  motorSweepStopTime = millis();
+  motorSweepStopTime = micros();
 
   timeout = motorSweepStopTime - motorSweepStartTime;
 
-  info(PSTR("Centering: Motor Home Sweep is %d millis wide"),timeout);
+  info(PSTR("Centering: Motor Home Sweep is %d micros wide"),timeout);
   
   timeout /=2;
-  timeout += millis();
+  timeout += micros();
   
   motorReverse();
   motorRun(SWEEP_SPEED);
-  while (millis() < timeout)
+  while (micros() < timeout)
     /* Nothing */;
   motorRun(0);
 

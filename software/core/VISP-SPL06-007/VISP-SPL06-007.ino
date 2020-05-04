@@ -1866,17 +1866,17 @@ void homeThisPuppy()
   // Rewind until out of the zone.
   if (digitalRead(HOME_SENSOR) == LOW)
   {
-    info(PSTR("Find Edge2"));
+    info(PSTR("Get out of home position"));
 
     motorReverse();
 
     motorRun(SWEEP_SPEED);
     timeout = millis() + 5000; // 5 seconds...
     while (millis() < timeout && digitalRead(HOME_SENSOR) == LOW)
-      delay(10);
+      /* nothing */;
     motorRun(0);
   }
-  info(PSTR("Find Edge1"));
+  info(PSTR("Find Left Edge"));
 
   motorForward();
 
@@ -1885,7 +1885,7 @@ void homeThisPuppy()
   timeout = millis() + 5000; // 5 seconds...
 
   while (millis() < timeout && digitalRead(HOME_SENSOR) == HIGH)
-    delay(1);
+    /* nothing */;
 
   if (digitalRead(HOME_SENSOR) == HIGH)
   {
@@ -1896,27 +1896,28 @@ void homeThisPuppy()
 
   motorSweepStartTime = millis();
 
-  info(PSTR("Find Edge2"));
+  info(PSTR("Find Right Edge"));
 
   // Motor is still running....
   timeout = millis() + 5000; // 5 seconds...
   while (millis() < timeout && digitalRead(HOME_SENSOR) == LOW)
-    delay(1);
+    /* nothing */;
 
   motorRun(0);
 
-
-  info(PSTR("Centering"));
-
   motorSweepStopTime = millis();
 
+  timeout = motorSweepStopTime - motorSweepStartTime;
+
+  info(PSTR("Centering: Motor Home Sweep is %d millis wide"),timeout);
+  
+  timeout /=2;
+  timeout += millis();
+  
   motorReverse();
-
-  timeout = millis() + ((motorSweepStopTime - motorSweepStartTime) / 2);
-
   motorRun(SWEEP_SPEED);
   while (millis() < timeout)
-    delay(1);
+    /* Nothing */;
   motorRun(0);
 
   // TADA Motor is *mostly* homed!

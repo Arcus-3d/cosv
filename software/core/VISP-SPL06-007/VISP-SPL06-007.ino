@@ -73,7 +73,7 @@ TwoWire *i2cBus2 = NULL;
 #endif
 
 
-#define SWEEP_SPEED 150
+#define SWEEP_SPEED 180
 
 // Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
 // This is detected if needed

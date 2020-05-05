@@ -32,17 +32,25 @@ def listSerialPorts():
     return portList
 
 class DisplayButton(BoxLayout,Button):
-    def updateValue(self,*args):
+    def updateValue(self,value):
+        self.value=value
         self.text=str(self.value).title();
+        if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
+        self.dispatch('on_change',self.value)
     def pressEvent(self,*args):
         return True
+    def on_change(self,value):
+        pass
     def __init__(self,**kwargs):
         self.name=kwargs.pop('name',None)
         self.text_top=kwargs.pop('text_top',' ')
         self.value=kwargs.pop('value',0)
         self.text_bottom=kwargs.pop('text_bottom',' ')
+        self.value_colors=kwargs.pop('value_colors',{'default':(1,1,1,1)})
+        self.text=str(self.value).title();
+        self.register_event_type('on_change')
+        if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
         super(DisplayButton,self).__init__(**kwargs)
-        self.text=str(self.value)
         self.spacing=0
         self.bold=True
         self.font_size='20sp'
@@ -65,9 +73,9 @@ class PopupButton(DisplayButton):
         size_hint=(0.2,0.7)
         if (self.popup_orientation == 'horizontal'): size_hint=(0.7,0.2)
         self.popup=Popup(title=self.text_top,auto_dismiss=False,content=self.popupBox,title_size='20sp',title_align='center',size_hint=size_hint)
-    def updateValue(self,*args):
+    def updateValue(self,value):
         self.popup.dismiss()
-        super(PopupButton,self).updateValue(self,*args)
+        super(PopupButton,self).updateValue(value)
     def pressEvent(self,*args):
         self.popup.pos_hint={'center_x':(self.pos[0]+self.width/2)/Window.width,'bottom_y':(self.pos[1]+self.height)/Window.height}
         self.popup.open()
@@ -76,7 +84,6 @@ class PopupButton(DisplayButton):
 class SliderButton(PopupButton):
     def __init__(self,**kwargs):
         self.min=kwargs.pop('min',0)
-        self.register_event_type('on_change')
         self.max=kwargs.pop('max',100)
         self.step=kwargs.pop('step',1)
         #self.on_update=kwargs.pop('on_update',None)
@@ -85,18 +92,14 @@ class SliderButton(PopupButton):
         self.slider=Slider(min=self.min,value=self.value,max=self.max,step=self.step,cursor_width='32sp',orientation=self.popup_orientation,size_hint=(1,1),size=('25sp','100sp'))
         self.popupBox.add_widget(self.slider)
         #self.popupBox.title=str(self.value)
-    def on_change(self,value):
-        pass
     def bindTouchUp(self,*args):
         self.slider.bind(on_touch_up=self.updateValue)
-    def updateValue(self,*args):
-        #self.popup.title=str(self.text_top) + str(':  ') + str(self.slider.value)
+    def updateValue(self,instance,event):
         self.value=int(self.slider.value)
         self.slider.unbind(on_touch_up=self.updateValue)
         self.slider.unbind(on_touch_move=self.updatePopup)
-        super(SliderButton,self).updateValue(self,*args)
-        self.dispatch('on_change',self.value)
-        #self.on_update(self.value)
+        #self.popup.title=str(self.text_top) + str(':  ') + str(self.slider.value)
+        super(SliderButton,self).updateValue(self.value)
     def updatePopup(self,*args):
         self.popup.title=str(self.text_top) + str(' : ') + str(self.slider.value)
         Clock.schedule_once(self.bindTouchUp,0.5)
@@ -110,12 +113,13 @@ class SelectButton(PopupButton):
     def __init__(self,**kwargs):
         self.values=kwargs.pop('values',('------'))
         super(SelectButton,self).__init__(**kwargs)
-        for v in self.values:
-            button = Button(text=v,size=('100sp','50sp'), on_press=lambda button:self.updateValue(button.text))
+        for value in self.values:
+            button = Button(text=str(value.title()),size=('100sp','50sp'),on_press=lambda button:self.updateValue(value))
+            if value in self.value_colors: 
+                button.background_color=self.value_colors.get(value) 
             self.popupBox.add_widget(button)
     def updateValue(self,value):
-        self.value=value
-        super(SelectButton,self).updateValue(self,value)
+        super(SelectButton,self).updateValue(value)
     def stopUpdate(self,value):
         return False
     def pressEvent(self,value):
@@ -134,14 +138,13 @@ class RotaryButton(DisplayButton):
         self.updateValue(self.value)
         #super(RotaryButton,self).pressEvent(self,args)
     def updateValue(self,value):
-        super(RotaryButton,self).updateValue(self,value)
         counter = 0
-        if (self.value in self.values):
+        if (value in self.values):
             for v in self.value_list:
                 counter = counter + 1
                 if (v == self.value): break
                 if counter >> len(self.values): break
-        if (self.value in self.value_colors): self.background_color=self.value_colors.get(self.value) 
+        super(RotaryButton,self).updateValue(value)
 class ScrollGraph(Graph):
     def __init__(self,**kwargs):
         self.color=kwargs.pop('color',[1,1,1,1])
@@ -278,22 +281,22 @@ class COSVTouchApp(App):
         
         # Bottom Controls
         layoutControlBottom = BoxLayout(orientation='horizontal', spacing=10, padding=(5,10),size_hint=(1,0.2))
-        buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV'),text_bottom=" ")
+        buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV'),text_bottom=" ",on_change=self.sendSerial)
         layoutControlBottom.add_widget(buttonMode);
         
-        buttonTidalVolume = SliderButton(name='tidalv',text_top="TidalV",min=200,max=700,value=500,text_bottom="ml");
+        buttonTidalVolume = SliderButton(name='volume',text_top="TidalV",min=200,max=700,value=500,text_bottom="ml",on_change=self.sendSerial);
         layoutControlBottom.add_widget(buttonTidalVolume);
         
-        buttonRespRate = SliderButton(name='rate',text_top="Rate",min=8,max=40,value=18,text_bottom="/min",on_change=self.updateRate);
+        buttonRespRate = SliderButton(name='rate',text_top="Rate",min=8,max=40,value=18,text_bottom="/min",on_change=self.sendSerial);
         layoutControlBottom.add_widget(buttonRespRate);
         
-        buttonInhaleExhale = SelectButton(name='ie',text_top="I:E",value="1:2",values=('1:1','1:2','1:3','1:4'),text_bottom=" ");
+        buttonInhaleExhale = SelectButton(name='ie',text_top="I:E",value="1:2",values=('1:1','1:2','1:3','1:4'),text_bottom=" ",on_change=self.sendSerial);
         layoutControlBottom.add_widget(buttonInhaleExhale);
         
         #buttonPEEP = SliderButton(name='peep',text_top="PEEP",min=0,value="5",max=25,text_bottom="cmH2O");
         #layoutControlBottom.add_widget(buttonPEEP);
         
-        buttonPressureMax = SliderButton(name='pmax',text_top="Pmax",min=10,value="20",max=60,text_bottom="cmH2O");
+        buttonPressureMax = SliderButton(name='pmax',text_top="Pmax",min=10,value="20",max=60,text_bottom="cmH2O",on_change=self.sendSerial);
         layoutControlBottom.add_widget(buttonPressureMax);
         
         layoutLeft.add_widget(layoutControlBottom)
@@ -301,25 +304,34 @@ class COSVTouchApp(App):
         
         # Right Controls
         layoutControlRight = BoxLayout(orientation='vertical', spacing=10, padding=(10,5),size_hint=(0.2,1))
-        buttonAlarmPause = RotaryButton(name='alarm',text_top='Alarm Status',value="silenced",values={'normal','alarm','silenced'},value_colors={'normal':(0.3,1,0.3,1),'silenced':(1,1,0.3,1),'alarm':(1,0.3,0.3,1)});
+        buttonAlarmPause = SelectButton(name='alarm',text_top='Alarm Status',value="silenced",values={'normal','alarm','silenced'},value_colors={'normal':(0.3,1,0.3,1),'silenced':(1,1,0.3,1),'alarm':(1,0.3,0.3,1)});
         layoutControlRight.add_widget(buttonAlarmPause);
         buttonAlarmSetup = DisplayButton(value="Alarm\nSetup");
         layoutControlRight.add_widget(buttonAlarmSetup);
         buttonSystemSetup = DisplayButton(value="System\nSetup");
         layoutControlRight.add_widget(buttonSystemSetup);
-        self.buttonRun = RotaryButton(name='state',text_top="State",on_press=self.runButton,value="stop",values=('stop','run'),value_colors={'stop':(1,0.3,0.3,1),'calibrate':(1,1,0.3,1),'run':(0.3,1,0.3,1)})
+        self.buttonRun = SelectButton(name='state',text_top="State",on_change=self.runButton,value="stop",values=('stop','run'),value_colors={'stop':(1,0.3,0.3,1),'calibrate':(1,1,0.3,1),'run':(0.3,1,0.3,1)})
         layoutControlRight.add_widget(self.buttonRun)
 
         layoutMain.add_widget(layoutControlRight)
         return layoutMain
-    def updateRate(self,event,value):
-        self.run_rate = value
-        self.serial.write(b'S,motor_speed,')
-        self.serial.write(bytes(self.run_rate*6))
-        self.serial.write(b'\n')
-    def runButton(self,event):
-        #pass
-        if self.buttonRun.value == 'stop':
+    def sendSerial(self,instance,value):
+        print(instance.name,value)
+        name = instance.name
+        if name == 'rate':
+            name = 'motor_speed'
+            value = int(value * 6.3)
+        try:
+            if self.serial.is_open:
+                self.serial.write(bytes(str('S,'+str(name)+ ',' + str(value) + '\n').encode('ascii')))
+            else:
+                print('Serial not open')
+        except Exception as e:
+            print('sendSerial exception')
+            print(e)
+    def runButton(self,instance,value):
+        print(instance.name,value)
+        if value == 'run':
             self.run_state = 'run'
         else:
             self.run_state = 'stop'
@@ -367,7 +379,6 @@ class COSVTouchApp(App):
                                 print(row)
                             if dataType == 'd':
                                 sampleTime = float(col[1])
-                                print(col)
                                 self.graphs.add_points(float(col[2]),float(col[3])*2,float(col[4])*2) #,float(col[2])/float(col[3])*10)
                             else:
                                 if dataType == 's':

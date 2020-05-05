@@ -82,12 +82,6 @@ PARTLS = \
 	laser_arm \
 	laser_bag_mount
 
-PARTLCAMS = \
-	laser_base_b \
-	laser_cam \
-	laser_cam_center \
-
-
 
 MODELS=$(patsubst %,generated/FFF/$(PREFIX)-%.stl,$(PARTS))
 
@@ -105,23 +99,23 @@ directories:
 models: directories $(MODELS) cams bases
 
 cams: directories $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\" -Dparam_partl=\"\"  -Dparam_motor=\"bldc\"       -Dparam_d_shaft=\"zero\  -o generated/FFF/cam_6mm.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\" -Dparam_partl=\"\"  -Dparam_motor=\"bldc\"       -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_6mm_d.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\" -Dparam_partl=\"\"  -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\  -o generated/FFF/cam_6.35mm_d.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\" -Dparam_partl=\"\"  -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_6.35mm.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\" -Dparam_partl=\"\"  -Dparam_motor=\"nema23\"     -Dparam_d_shaft=\"zero\" -o generated/FFF/cam_8mm.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\" -Dparam_partl=\"\"  -Dparam_motor=\"nema23\"     -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_8mm_d.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\" -Dparam_partl=\"\"  -Dparam_motor=\"wiper\"      -Dparam_d_shaft=\"two\"  -o generated/FFF/cam_12mm_double_d.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"bldc\"       -Dparam_d_shaft=\"zero\  -o generated/FFF/cam_6mm.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"bldc\"       -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_6mm_d.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\  -o generated/FFF/cam_6.35mm_d.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_6.35mm.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23\"     -Dparam_d_shaft=\"zero\" -o generated/FFF/cam_8mm.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23\"     -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_8mm_d.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"wiper\"      -Dparam_d_shaft=\"two\"  -o generated/FFF/cam_12mm_double_d.stl $(PREFIX).scad
 
 bases: directories $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\"  -Dparam_motor=\"nema23-635\" -o generated/FFF/base_b_nema23.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\"  -Dparam_motor=\"nema23\"     -o generated/FFF/base_b_nema23.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\"  -Dparam_motor=\"bldc\"       -o generated/FFF/base_b_bldc.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\"  -Dparam_motor=\"worm\"       -o generated/FFF/base_b_worm.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\"  -Dparam_motor=\"wiper\"      -o generated/FFF/base_b_wiper.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\"  -Dparam_motor=\"nema23-635\" -o generated/FFF/base_b_nema23.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\"  -Dparam_motor=\"nema23\"     -o generated/FFF/base_b_nema23.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\"  -Dparam_motor=\"bldc\"       -o generated/FFF/base_b_bldc.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\"  -Dparam_motor=\"worm\"       -o generated/FFF/base_b_worm.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\"  -Dparam_motor=\"wiper\"      -o generated/FFF/base_b_wiper.stl $(PREFIX).scad
 
 $(MODELS) : generated/FFF/$(PREFIX)-%.stl : $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"$(subst $(PREFIX)-,,$(subst .stl,,$(@F)))\" -Dparam_partl=\"\"  $<
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"$(subst $(PREFIX)-,,$(subst .stl,,$(@F)))\"  $<
 	
 
 # For laser cutters
@@ -142,70 +136,101 @@ clean:
 # Dependencies for Laser SVG images
 
 $(IMAGES1) : generated/Laser/kerf-0.2/$(PREFIX)-%.svg : $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"\" -Dparam_partl=\"$(subst $(PREFIX)-,,$(subst .svg,,$(@F)))\" -Dparam_kerf=0.2 $(IMAGE_OPTIONS) $<
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"$(subst $(PREFIX)-,,$(subst .svg,,$(@F)))\" -Dparam_kerf=0.2 $(IMAGE_OPTIONS) $<
 
 $(IMAGES2) : generated/Laser/kerf-0.025/$(PREFIX)-%.svg : $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"\" -Dparam_partl=\"$(subst $(PREFIX)-,,$(subst .svg,,$(@F)))\" -Dparam_kerf=0.025 $(IMAGE_OPTIONS) $<
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"$(subst $(PREFIX)-,,$(subst .svg,,$(@F)))\" -Dparam_kerf=0.025 $(IMAGE_OPTIONS) $<
 
 # Dependencies for Laser DXF images
 $(IMAGES3) : generated/Laser/kerf-0.2/$(PREFIX)-%.dxf : $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"\" -Dparam_partl=\"$(subst $(PREFIX)-,,$(subst .dxf,,$(@F)))\" -Dparam_kerf=0.2 $(IMAGE_OPTIONS) $<
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"$(subst $(PREFIX)-,,$(subst .dxf,,$(@F)))\" -Dparam_kerf=0.2 $(IMAGE_OPTIONS) $<
 
 $(IMAGES4) : generated/Laser/kerf-0.025/$(PREFIX)-%.dxf : $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"\" -Dparam_partl=\"$(subst $(PREFIX)-,,$(subst .dxf,,$(@F)))\" -Dparam_kerf=0.025 $(IMAGE_OPTIONS) $<
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -o $@ -Dparam_part=\"$(subst $(PREFIX)-,,$(subst .dxf,,$(@F)))\" -Dparam_kerf=0.025 $(IMAGE_OPTIONS) $<
 
 
 lcams: directories $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"      -o generated/Laser/kerf-0.025/cam_6mm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"       -o generated/Laser/kerf-0.025/cam_6mm_d.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" generated/Laser/kerf-0.025/cam_6.35mm_d.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\" -o generated/Laser/kerf-0.025/cam_6.35mm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"  -o generated/Laser/kerf-0.025/cam_8mm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"     -o generated/Laser/kerf-0.025/cam_8mm_d.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"      -o generated/Laser/kerf-0.025/cam_12mm_double_d.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"    -o generated/Laser/kerf-0.2/cam_6mm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"       -o generated/Laser/kerf-0.2/cam_6mm_d.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" generated/Laser/kerf-0.2/cam_6.35mm_d.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\" -o generated/Laser/kerf-0.2/cam_6.35mm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"  -o generated/Laser/kerf-0.2/cam_8mm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"     -o generated/Laser/kerf-0.2/cam_8mm_d.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"      -o generated/Laser/kerf-0.2/cam_12mm_double_d.svg $(PREFIX).scad
+	echo "I'm too lazy today to automate this in a loop"
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"      -o generated/Laser/kerf-0.025/cam_6mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"       -o generated/Laser/kerf-0.025/cam_6mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" -o generated/Laser/kerf-0.025/cam_6.35mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\" -o generated/Laser/kerf-0.025/cam_6.35mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"  -o generated/Laser/kerf-0.025/cam_8mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"     -o generated/Laser/kerf-0.025/cam_8mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"      -o generated/Laser/kerf-0.025/cam_12mm_double_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"    -o generated/Laser/kerf-0.2/cam_6mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"       -o generated/Laser/kerf-0.2/cam_6mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" generated/Laser/kerf-0.2/cam_6.35mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\" -o generated/Laser/kerf-0.2/cam_6.35mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"  -o generated/Laser/kerf-0.2/cam_8mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"     -o generated/Laser/kerf-0.2/cam_8mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"      -o generated/Laser/kerf-0.2/cam_12mm_double_d.svg $(PREFIX).scad
 	echo "Now do the DXF's"
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"       -o generated/Laser/kerf-0.025/cam_6mm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"        -o generated/Laser/kerf-0.025/cam_6mm_d.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" -o generated/Laser/kerf-0.025/cam_6.35mm_d.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"  -o generated/Laser/kerf-0.025/cam_6.35mm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"     -o generated/Laser/kerf-0.025/cam_8mm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"      -o generated/Laser/kerf-0.025/cam_8mm_d.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"       -o generated/Laser/kerf-0.025/cam_12mm_double_d.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"         -o generated/Laser/kerf-0.2/cam_6mm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"          -o generated/Laser/kerf-0.2/cam_6mm_d.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\"   -o generated/Laser/kerf-0.2/cam_6.35mm_d.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"    -o generated/Laser/kerf-0.2/cam_6.35mm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"       -o generated/Laser/kerf-0.2/cam_8mm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"        -o generated/Laser/kerf-0.2/cam_8mm_d.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"\" -Dparam_partl=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"         -o generated/Laser/kerf-0.2/cam_12mm_double_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"       -o generated/Laser/kerf-0.025/cam_6mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"        -o generated/Laser/kerf-0.025/cam_6mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" -o generated/Laser/kerf-0.025/cam_6.35mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"  -o generated/Laser/kerf-0.025/cam_6.35mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"     -o generated/Laser/kerf-0.025/cam_8mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"      -o generated/Laser/kerf-0.025/cam_8mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"       -o generated/Laser/kerf-0.025/cam_12mm_double_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"         -o generated/Laser/kerf-0.2/cam_6mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"          -o generated/Laser/kerf-0.2/cam_6mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\"   -o generated/Laser/kerf-0.2/cam_6.35mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"    -o generated/Laser/kerf-0.2/cam_6.35mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"       -o generated/Laser/kerf-0.2/cam_8mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"        -o generated/Laser/kerf-0.2/cam_8mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"         -o generated/Laser/kerf-0.2/cam_12mm_double_d.dxf $(PREFIX).scad
+	echo "Laser cam centers"
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"      -o generated/Laser/kerf-0.025/cam_center_6mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"       -o generated/Laser/kerf-0.025/cam_center_6mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" -o generated/Laser/kerf-0.025/cam_center_6.35mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\" -o generated/Laser/kerf-0.025/cam_center_6.35mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"  -o generated/Laser/kerf-0.025/cam_center_8mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"     -o generated/Laser/kerf-0.025/cam_center_8mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"      -o generated/Laser/kerf-0.025/cam_center_12mm_double_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"    -o generated/Laser/kerf-0.2/cam_center_6mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"       -o generated/Laser/kerf-0.2/cam_center_6mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" generated/Laser/kerf-0.2/cam_center_6.35mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\" -o generated/Laser/kerf-0.2/cam_center_6.35mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"  -o generated/Laser/kerf-0.2/cam_center_8mm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"     -o generated/Laser/kerf-0.2/cam_center_8mm_d.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"      -o generated/Laser/kerf-0.2/cam_center_12mm_double_d.svg $(PREFIX).scad
+	echo "Now do the DXF's"
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"       -o generated/Laser/kerf-0.025/cam_center_6mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"        -o generated/Laser/kerf-0.025/cam_center_6mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\" -o generated/Laser/kerf-0.025/cam_center_6.35mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"  -o generated/Laser/kerf-0.025/cam_center_6.35mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"     -o generated/Laser/kerf-0.025/cam_center_8mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"      -o generated/Laser/kerf-0.025/cam_center_8mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"       -o generated/Laser/kerf-0.025/cam_center_12mm_double_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"zero\"         -o generated/Laser/kerf-0.2/cam_center_6mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\" -Dparam_d_shaft=\"one\"          -o generated/Laser/kerf-0.2/cam_center_6mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\"   -o generated/Laser/kerf-0.2/cam_center_6.35mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"    -o generated/Laser/kerf-0.2/cam_center_6.35mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"zero\"       -o generated/Laser/kerf-0.2/cam_center_8mm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\" -Dparam_d_shaft=\"one\"        -o generated/Laser/kerf-0.2/cam_center_8mm_d.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_cam_center\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\" -Dparam_d_shaft=\"two\"         -o generated/Laser/kerf-0.2/cam_center_12mm_double_d.dxf $(PREFIX).scad
 
 
 lbases: directories $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"auto\" -o generated/Laser/kerf-0.025/base_b_nema23.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.025/base_b_nema23.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.025/base_b_bldc.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.025/base_b_worm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.025/base_b_wiper.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -o generated/Laser/kerf-0.2/base_b_nema23.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.2/base_b_nema23.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.2/base_b_bldc.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.2/base_b_worm.svg $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.2/base_b_wiper.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"auto\" -o generated/Laser/kerf-0.025/laser_base_b_nema23.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.025/laser_base_b_nema23.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.025/laser_base_b_bldc.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.025/laser_base_b_worm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.025/laser_base_b_wiper.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -o generated/Laser/kerf-0.2/laser_base_b_nema23.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.2/laser_base_b_nema23.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.2/laser_base_b_bldc.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.2/laser_base_b_worm.svg $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.2/laser_base_b_wiper.svg $(PREFIX).scad
 	echo "now do the dxf's"
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -o generated/Laser/kerf-0.025/base_b_nema23.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.025/base_b_nema23.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.025/base_b_bldc.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.025/base_b_worm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.025/base_b_wiper.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -o generated/Laser/kerf-0.2/base_b_nema23.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.2/base_b_nema23.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.2/base_b_bldc.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.2/base_b_worm.dxf $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"base_b\" -Dparam_partl=\"\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.2/base_b_wiper.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23-635\" -o generated/Laser/kerf-0.025/laser_base_b_nema23.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.025/laser_base_b_nema23.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.025/laser_base_b_bldc.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.025/laser_base_b_worm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.025 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.025/laser_base_b_wiper.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23-635\" -o generated/Laser/kerf-0.2/laser_base_b_nema23.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"nema23\"     -o generated/Laser/kerf-0.2/laser_base_b_nema23.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"bldc\"       -o generated/Laser/kerf-0.2/laser_base_b_bldc.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"worm\"       -o generated/Laser/kerf-0.2/laser_base_b_worm.dxf $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"laser_base_b\" -Dparam_kerf=0.2 -Dparam_motor=\"wiper\"      -o generated/Laser/kerf-0.2/laser_base_b_wiper.dxf $(PREFIX).scad

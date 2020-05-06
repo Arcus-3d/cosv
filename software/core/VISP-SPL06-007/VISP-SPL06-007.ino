@@ -400,13 +400,6 @@ bool sensorsFound = false;
 baroDev_t sensors[4]; // See mappings SENSOR_U[5678] and PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
 
 
-#ifdef ARDUINO_TEENSY40
-// emulate AVR flash read
-char pgm_read_byte(const char *data)
-{
-  return *data;
-}
-#endif
 void printp(const char *data)
 {
   while (pgm_read_byte(data) != 0x00)
@@ -1747,6 +1740,7 @@ static inline void sanitizeVispData()
     visp_eeprom.breath_pressure = MIN_BREATH_PRESSURE;
 }
 
+const char strBasedType[] PUTINFLASH = " Based VISP Detected"; // Save some bytes in flash
 // FUTURE: read EEPROM and determine what type of VISP it is.
 void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
 {
@@ -1773,9 +1767,11 @@ void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
   }
 
   switch (detectedVispType) {
-    case VISP_BUS_TYPE_I2C:   debug(PSTR("DUAL I2C VISP detected"));    break;
-    case VISP_BUS_TYPE_XLATE: debug(PSTR("XLate Based VISP Detected")); break;
-    case VISP_BUS_TYPE_MUX:   debug(PSTR("MUX Based VISP Detected"));   break;
+    case VISP_BUS_TYPE_I2C:   debug(PSTR("DUAL I2C%S"),strBasedType); break;
+    case VISP_BUS_TYPE_XLATE: debug(PSTR("XLate%S"),strBasedType);    break;
+    case VISP_BUS_TYPE_MUX:   debug(PSTR("MUX%S"),strBasedType);      break;
+    case VISP_BUS_TYPE_SPI:   debug(PSTR("SPI%S"),strBasedType);      break;
+    case VISP_BUS_TYPE_NONE:  break;
   }
 
   if (eeprom)
@@ -1859,8 +1855,9 @@ void timeToReadVISP()
 
 int16_t modeBreathRateToMotorSpeed()
 {
-  if (visp_eeprom.mode == MODE_PCCMV)
-    return 150;
+//  if (visp_eeprom.mode == MODE_PCCMV)
+
+  return motorMinSpeedDetected;
 }
 
 void homeThisPuppy(bool forced);
@@ -2059,7 +2056,7 @@ void homeThisPuppy(bool forced)
 
 unsigned long timeTillNextMagnet(uint8_t motorSpeed)
 {
-  unsigned long startTime, stopTime, timeDiff;
+  unsigned long startTime, stopTime;
 
   if (motorFound)
   {
@@ -2071,6 +2068,8 @@ unsigned long timeTillNextMagnet(uint8_t motorSpeed)
 
     return (stopTime - startTime);
   }
+
+  return 0L;
 }
 
 void calibrateMotorSpeeds()
@@ -2258,7 +2257,7 @@ void loopVenturiVersion(float * P, float * T)
   static float volumeSmoothed = 0.0; // It only needs to be in this function, but needs to be persistant, so make it static
   static float tidalVolume = 0.0;
   static unsigned long lastSampleTime = 0;
-  float volume, inletPressure, outletPressure, throatPressure, ambientPressure, patientPressure, pressure;
+  float volume, inletPressure, outletPressure, throatPressure, ambientPressure, pressure;
   unsigned long sampleTime = millis();
 
   switch (runState)
@@ -2283,7 +2282,7 @@ void loopVenturiVersion(float * P, float * T)
       ambientPressure = P[VENTURI_AMBIANT];
       inletPressure = P[VENTURI_INPUT];
       outletPressure = P[VENTURI_OUTPUT];
-      patientPressure = P[VENTURI_SENSOR];   // This is not used?
+      // patientPressure = P[VENTURI_SENSOR];   // This is not used?
       throatPressure = P[VENTURI_SENSOR];
 
       //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m

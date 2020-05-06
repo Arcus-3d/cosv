@@ -18,9 +18,7 @@
 */
 
 
-
-#include <math.h>
-#include <stdbool.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <Wire.h>
 #include <SPI.h>
@@ -29,10 +27,9 @@
 
 #define VERSION_MAJOR     0
 #define VERSION_MINOR     1
-#define VERSION_REVISION 'd'
+#define VERSION_REVISION  4
 
 #ifdef ARDUINO_TEENSY40
-
 #include <IntervalTimer.h>
 #define hwSerial Serial1
 TwoWire *i2cBus1 = &Wire1;
@@ -40,7 +37,10 @@ TwoWire *i2cBus2 = &Wire2;
 #define SERIAL_BAUD 115200
 
 #define PUTINFLASH
-#define SFLASH "%s"
+
+#define WANT_BMP388 1
+#define WANT_BMP280 1
+#define WANT_SPL06  1
 
 #elif ARDUINO_AVR_NANO
 
@@ -52,7 +52,11 @@ TwoWire *i2cBus2 = NULL;
 #define SERIAL_BAUD 115200
 
 #define PUTINFLASH PROGMEM
-#define SFLASH "%S"
+
+#define WANT_BMP388 1 // 1822 bytes
+#define WANT_BMP280 1
+#define WANT_SPL06  1
+
 
 #elif ARDUINO_AVR_UNO
 
@@ -64,7 +68,10 @@ TwoWire *i2cBus2 = NULL;
 #define SERIAL_BAUD 115200
 
 #define PUTINFLASH PROGMEM
-#define SFLASH "%S"
+
+#define WANT_BMP388 1
+#define WANT_BMP280 1
+#define WANT_SPL06  1
 
 #else
 
@@ -72,8 +79,36 @@ TwoWire *i2cBus2 = NULL;
 
 #endif
 
+#define STEPPER_STEPS_PER_REV 200
+#define SWEEP_SPEED 150 // Ford F150 motor wiper
+#define HOMING_SPEED 255
 
-#define SWEEP_SPEED 180
+volatile bool motorFound = false;
+volatile bool motorHoming = false;
+uint8_t motorMinSpeedDetected = 0; // Max speed is 255 on the PWM
+uint8_t motorMaxSpeedDetected = 0; // Max speed is 255 on the PWM
+
+
+#define MIN_BREATH_RATIO 2
+#define MAX_BREATH_RATIO 5
+#define MIN_BREATH_RATE  10 // TODO: saner limits 10 breaths/minute
+#define MAX_BREATH_RATE  30 // TODO: saner limits 30 breaths/minute
+#define MIN_BREATH_PRESSURE 0 // TODO: saner limits
+#define MAX_BREATH_PRESSURE 100// TODO: saner limits
+
+#define MOTOR_WIPER 0
+#define MOTOR_STEPPER 1
+#define MOTOR_BLDC
+
+
+
+//The Arduino has 3 timers and 6 PWM output pins. The relation between timers and PWM outputs is:
+//
+//    Pins 5 and 6: controlled by Timer0
+//    Pins 9 and 10: controlled by Timer1
+//    Pins 11 and 3: controlled by Timer2
+//
+// We should rebalance the PWM's to give Timer1 or Timer2 to AccelStepper.
 
 // Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
 // This is detected if needed
@@ -95,8 +130,8 @@ TwoWire *i2cBus2 = NULL;
 
 // If all of the ADC's are set to zero, then the display controls things
 #define ADC_VOLUME   A0 // How much to push, 0->1023 milliliters, if it reads 0, then display can control this (parameter)
-#define ADC_RATE     A1 // How much time to push, 0->1023.   Scaled to 1/2 the interval???
-#define ADC_INTERVAL A2 // When to timeout and trigger a new breath.   0..1023 is scaled from 0 to 3 seconds.  0=display controls the parameter
+#define ADC_RATIO    A1 // How much time to push, 0->1023.   Scaled to 1/2 the interval???
+#define ADC_RATE     A2 // When to timeout and trigger a new breath.   0..1023 is scaled from 0 to 3 seconds.  0=display controls the parameter
 #define ADC_HALL     A3 // Used for sensing home with Hall Effect Sensors
 #define ADC_SDA      A4
 #define ADC_SCL      A5
@@ -108,7 +143,8 @@ TwoWire *i2cBus2 = NULL;
 
 // We only have ADC inputs A6 and A7 left...
 
-AccelStepper mystepper(1, STEPPER_DIR, STEPPER_STEP);
+AccelStepper mystepper(AccelStepper::DRIVER, STEPPER_STEP, STEPPER_DIR); // Direction: High means forward.
+// mystepper adds 3674 bytes of code and 94 bytes of ram
 
 // DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
 //
@@ -139,7 +175,7 @@ AccelStepper mystepper(1, STEPPER_DIR, STEPPER_STEP);
 
 
 typedef enum modeState_e {
-  MODE_UNKNOWN = 0,
+  MODE_OFF = 0,
   MODE_PCCMV = 1,
   MODE_VCCMV = 2
 } modeState_t;
@@ -180,9 +216,10 @@ typedef struct visp_eeprom_s {
   uint8_t extra[2];
   sensor_mapping_t sensorMapping[4]; // 16 bytes for sensor mapping.
   float calibrationOffsets[4]; // 4*4=16 bytes
-  uint16_t volume;
-  uint16_t rate;
-  uint16_t breath_interval;
+  uint16_t breath_pressure; // For pressure controlled automatic ventilation
+  uint16_t breath_volume;
+  uint8_t breath_rate;
+  uint8_t breath_ratio;
   uint16_t breath_threshold;
   uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
   uint8_t extra2[8];
@@ -267,7 +304,6 @@ typedef struct busDevice_s {
 
 // Simple bus device for initially reading the VISP eeprom
 busDevice_t *eeprom = NULL;
-
 typedef struct  bmp388_calib_param_s {
   float param_T1;
   float param_T2;
@@ -284,7 +320,6 @@ typedef struct  bmp388_calib_param_s {
   float param_P10;
   float param_P11;
 } bmp388_calib_param_t;
-
 
 typedef struct bmp280_calib_param_s {
   uint16_t dig_T1; /* calibration T1 data */
@@ -327,6 +362,7 @@ typedef struct baroDev_s {
   baroCalculateFuncPtr calculate;
   uint8_t sensorType; // Used by the interface to get the types of sensors we have
   union {
+#ifdef WANT_BMP280
     struct {
       bmp280_calib_param_t cal;
       // uncompensated pressure and temperature
@@ -336,6 +372,8 @@ typedef struct baroDev_s {
       int32_t up_valid;
       int32_t ut_valid;
     } bmp280;
+#endif
+#ifdef WANT_BMP388
     struct {
       bmp388_calib_param_t cal;
       // uncompensated pressure and temperature
@@ -345,12 +383,15 @@ typedef struct baroDev_s {
       int32_t up_valid;
       int32_t ut_valid;
     } bmp388;
+#endif
+#ifdef WANT_SPL06
     struct {
       spl06_coeffs_t cal;
       // uncompensated pressure and temperature
       int32_t pressure_raw;
       int32_t temperature_raw;
     } spl06;
+#endif
   } chip;
 } baroDev_t;
 
@@ -358,27 +399,69 @@ typedef struct baroDev_s {
 bool sensorsFound = false;
 baroDev_t sensors[4]; // See mappings SENSOR_U[5678] and PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
 
-bool motorFound = false;
 
+#ifdef ARDUINO_TEENSY40
+// emulate AVR flash read
+char pgm_read_byte(const char *data)
+{
+  return *data;
+}
+#endif
+void printp(const char *data)
+{
+  while (pgm_read_byte(data) != 0x00)
+    hwSerial.print((const char)pgm_read_byte(data++));
+}
+
+// Implement a lighter version of sprintf to save a couple KB of flash space.  sprintf is 2.5KB in size
 void respond(char command, PGM_P fmt, ...)
 {
-  char sbuffer[128];
-
-
+  char c;
   if (command == 'g' && visp_eeprom.debug == DEBUG_DISABLED)
     return;
-
-  //Declare a va_list macro and initialize it with va_start
-  va_list l_Arg;
-  va_start(l_Arg, fmt);
-  vsnprintf_P(sbuffer, sizeof(sbuffer), fmt, l_Arg);
-  va_end(l_Arg);
 
   hwSerial.print(command);
   hwSerial.print(',');
   hwSerial.print(millis());
   hwSerial.print(',');
-  hwSerial.println(sbuffer);
+
+  //Declare a va_list macro and initialize it with va_start
+  va_list va;
+  va_start(va, fmt);
+
+  for (PGM_P data = fmt; (c = pgm_read_byte(data)); data++)
+  {
+    if (c != '%')
+      hwSerial.print(c);
+    else
+    {
+      data++;
+      c = pgm_read_byte(data);
+      // I don't know why, but the switch statement was not working for me
+      if (c == 'd') {
+        const int d = va_arg(va, int);
+        hwSerial.print(d);
+      } else if (c == 'l') {
+        const long l = va_arg(va, long);
+        hwSerial.print(l);
+      } else if (c == 'x') {
+        const int x = va_arg(va, int);
+        hwSerial.print(x, HEX);
+      } else if (c == 'S') {
+        const char *S = va_arg(va, const char *);
+        printp(S);
+      } else if (c == 's') {
+        const char *s = va_arg(va, const char *);
+        hwSerial.print(s);
+      } else if (c == 0) {
+        va_end(va);
+        return;
+      }
+    }
+  }
+
+  va_end(va);
+  hwSerial.println();
 }
 
 
@@ -425,48 +508,68 @@ void busPrint(busDevice_t *bus, const char *function)
 {
   if (bus == NULL)
   {
-    debug(PSTR("" SFLASH "(busDev is NULL)"), function);
+    debug(PSTR("%S(busDev is NULL)"), function);
     return;
   }
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("" SFLASH "(I2C: address=0x%x channel=%d enablePin=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin);
+    debug(PSTR("%S(I2C: address=0x%x channel=%d enablePin=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin);
     return;
   }
+
   if (bus->busType == BUSTYPE_SPI)
   {
-    debug(PSTR("" SFLASH "(SPI CSPIN=%d)"), function, bus->busdev.spi.csnPin);
+    debug(PSTR("%S(SPI CSPIN=%d)"), function, bus->busdev.spi.csnPin);
     return;
   }
 }
 
+// Get rid of malloc() and free() issues
+#define MAX_DEVICES 8
+busDevice_t devices[MAX_DEVICES];
+
 busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, int8_t enablePin = -1, hwType_e hwType = HWTYPE_NONE)
 {
-  busDevice_t *dev = (busDevice_t *)malloc(sizeof(busDevice_t));
-  memset(dev, 0, sizeof(busDevice_t));
-  dev->busType = BUSTYPE_I2C;
-  dev->hwType = hwType;
-  dev->busdev.i2c.i2cBus = wire;
-  dev->busdev.i2c.address = address;
-  dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
-  dev->busdev.i2c.channelDev = channelDev;
-  dev->busdev.i2c.enablePin = enablePin;
-  dev->refCount = 1;
-  if (channelDev)
-    channelDev->refCount++;
-  return dev;
+  busDevice_t *dev = NULL;
+
+  for (uint8_t x = 0; x < MAX_DEVICES; x++)
+    if (devices[x].refCount == 0)
+    {
+      dev = &devices[x];
+      memset(dev, 0, sizeof(busDevice_t));
+      dev->busType = BUSTYPE_I2C;
+      dev->hwType = hwType;
+      dev->busdev.i2c.i2cBus = wire;
+      dev->busdev.i2c.address = address;
+      dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
+      dev->busdev.i2c.channelDev = channelDev;
+      dev->busdev.i2c.enablePin = enablePin;
+      dev->refCount = 1;
+      if (channelDev)
+        channelDev->refCount++;
+      return dev;
+    }
+  return NULL;
 }
 
 busDevice_t *busDeviceInitSPI(SPIClass *spiBus, uint8_t csnPin, hwType_e hwType = HWTYPE_NONE)
 {
-  busDevice_t *dev = (busDevice_t *)malloc(sizeof(busDevice_t));
-  memset(dev, 0, sizeof(busDevice_t));
-  dev->busType = BUSTYPE_SPI;
-  dev->hwType = hwType;
-  dev->busdev.spi.spiBus = spiBus;
-  dev->busdev.spi.csnPin = csnPin;
-  dev->refCount = 1;
-  return dev;
+  busDevice_t *dev = NULL;
+
+  for (uint8_t x = 0; x < MAX_DEVICES; x++)
+    if (devices[x].refCount == 0)
+    {
+      dev = &devices[x];
+      memset(dev, 0, sizeof(busDevice_t));
+      dev->busType = BUSTYPE_SPI;
+      dev->hwType = hwType;
+      dev->busdev.spi.spiBus = spiBus;
+      dev->busdev.spi.csnPin = csnPin;
+      dev->refCount = 1;
+      return dev;
+    }
+  return NULL;
+
 }
 
 // TODO: check to see if this is a mux...
@@ -482,7 +585,7 @@ void busDeviceFree(busDevice_t *dev)
       // Consider a Core with a Mux to 2 VISP sensors with MUX's of their own
       if (dev->busType == BUSTYPE_I2C && dev->busdev.i2c.channelDev)
         busDeviceFree(dev->busdev.i2c.channelDev);
-      free(dev);
+      memset(dev, 0, sizeof(busDevice_t));
     }
   }
 }
@@ -653,6 +756,8 @@ bool writeEEPROM(busDevice_t *busDev, unsigned short reg, unsigned char *values,
   return true;
 }
 
+
+#ifdef WANT_SPL06
 
 #define SPL06_I2C_ADDR                         0x76
 #define SPL06_DEFAULT_CHIP_ID                  0x10
@@ -914,10 +1019,15 @@ bool spl06Detect(baroDev_t *baro, busDevice_t *busDev)
   }
   return false;
 }
+#else
+bool spl06Detect(baroDev_t *baro, busDevice_t *busDev)
+{
+  return false;
+}
+#endif
 
 
-
-
+#ifdef WANT_BMP280
 /************************************************/
 #define BMP280_I2C_ADDR                      (0x76)
 #define BMP280_DEFAULT_CHIP_ID               (0x58)
@@ -1091,7 +1201,14 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
 
   return false;
 }
+#else
+bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
+{
+  return false;
+}
+#endif
 
+#ifdef WANT_BMP388
 #define BMP388_DEFAULT_CHIP_ID                          (0x50) // from https://github.com/BoschSensortec/BMP3-Sensor-API/blob/master/bmp3_defs.h#L130
 
 #define BMP388_CMD_REG                                  (0x7E)
@@ -1385,7 +1502,12 @@ bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
   return false;
 }
 
-
+#else
+bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
+{
+  return false;
+}
+#endif
 
 
 
@@ -1446,41 +1568,36 @@ void handleSensorFailure()
   critical(PSTR("Sensor communication failure"));
 }
 
-
-busDevice_t *detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
+void detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
 {
   busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enablePin);
 
   if (!device)
-    return NULL;
+    return;
 
   busPrint(device, PSTR("Discovering sensor type"));
   if (!bmp280Detect(baro, device))
-  {
     if (!bmp388Detect(baro, device))
-    {
       if (!spl06Detect(baro, device))
       {
         busPrint(device, PSTR("sensor identification failed"));
         busDeviceFree(device);
         device = NULL;
       }
-    }
-  }
   device->hwType = HWTYPE_SENSOR;
-  return device;
+  return;
 }
 
-busDevice_t *detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
+void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
 {
   busDevice_t *thisDevice = busDeviceInitI2C(wire, address, muxChannel, muxDevice, enablePin);
-  if (!busDeviceDetect(thisDevice))
+  if (busDeviceDetect(thisDevice))
   {
-    free(thisDevice);
-    return NULL;
+    thisDevice->hwType = HWTYPE_EEPROM;
+    eeprom = thisDevice;
   }
-  thisDevice->hwType = HWTYPE_EEPROM;
-  return thisDevice;
+  else
+    busDeviceFree(thisDevice);
 }
 
 
@@ -1509,7 +1626,7 @@ bool detectMuxedSensors(TwoWire *wire)
   // Assign the device it's correct type
   muxDevice->hwType = HWTYPE_MUX;
 
-  eeprom = detectEEPROM(wire, 0x54, 1, muxDevice, enablePin);
+  detectEEPROM(wire, 0x54, 1, muxDevice, enablePin);
 
 
   // Detect U5, U6
@@ -1546,7 +1663,7 @@ bool detectXLateSensors(TwoWire * wire)
     enablePin = ENABLE_PIN_BUS_A;
   }
 
-  eeprom = detectEEPROM(wire, 0x54, 0, NULL, enablePin);
+  detectEEPROM(wire, 0x54, 0, NULL, enablePin);
 
   // Detect U5, U6
   detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 0, NULL, enablePin);
@@ -1567,15 +1684,15 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
   int8_t enablePinB = -1;
 
 
-  eeprom = detectEEPROM(wireA, 0x54);
+  detectEEPROM(wireA, 0x54);
   if (!eeprom)
   {
     enablePinA = 4;
     enablePinB = 5;
-    eeprom = detectEEPROM(wireA, 0x54, 0, NULL, enablePinA);
+    detectEEPROM(wireA, 0x54, 0, NULL, enablePinA);
     if (!eeprom)
     {
-      eeprom = detectEEPROM(wireA, 0x54, 0, NULL, enablePinB);
+      detectEEPROM(wireA, 0x54, 0, NULL, enablePinB);
       if (eeprom)
       {
         TwoWire *swap = wireA;
@@ -1587,7 +1704,7 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
       //  debug(PSTR("Failed to detect DUAL I2C VISP"));
       return false;
     }
-    debug(PSTR("Enable pins detected!"));
+    //debug(PSTR("Enable pins detected!"));
   }
 
   // Detect U5, U6
@@ -1614,10 +1731,27 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB)
   return true;
 }
 
+static inline void sanitizeVispData()
+{
+  if (visp_eeprom.breath_ratio > MAX_BREATH_RATIO)
+    visp_eeprom.breath_ratio = MAX_BREATH_RATIO;
+  if (visp_eeprom.breath_ratio < MIN_BREATH_RATIO)
+    visp_eeprom.breath_ratio = MIN_BREATH_RATIO;
+  if (visp_eeprom.breath_rate > MAX_BREATH_RATE)
+    visp_eeprom.breath_rate = MAX_BREATH_RATE;
+  if (visp_eeprom.breath_rate < MIN_BREATH_RATE)
+    visp_eeprom.breath_rate = MIN_BREATH_RATE;
+  if (visp_eeprom.breath_pressure > MAX_BREATH_PRESSURE)
+    visp_eeprom.breath_pressure = MAX_BREATH_PRESSURE;
+  if (visp_eeprom.breath_pressure < MIN_BREATH_PRESSURE)
+    visp_eeprom.breath_pressure = MIN_BREATH_PRESSURE;
+}
+
 // FUTURE: read EEPROM and determine what type of VISP it is.
 void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
 {
   bool formatVisp = false;
+  uint8_t missing;
   memset(&sensors, 0, sizeof(sensors));
 
   debug(PSTR("Detecting sensors"));
@@ -1628,20 +1762,13 @@ void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
         return;
 
   // Make sure they are all there
-  if (sensors[0].busDev == NULL) {
-    warning(PSTR("Sensor 0 missing"));
-    return;
-  }
-  if (sensors[1].busDev == NULL) {
-    warning(PSTR("Sensor 1 missing"));
-    return;
-  }
-  if (sensors[2].busDev == NULL) {
-    warning(PSTR("Sensor 2 missing"));
-    return;
-  }
-  if (sensors[3].busDev == NULL) {
-    warning(PSTR("Sensor 3 missing"));
+  missing = (!sensors[0].busDev ? 1 : 0)
+            | (!sensors[1].busDev ? 2 : 0)
+            | (!sensors[2].busDev ? 4 : 0)
+            | (!sensors[3].busDev ? 8 : 0);
+  if (missing)
+  {
+    warning(PSTR("Sensors missing 0x%x"), missing);
     return;
   }
 
@@ -1680,6 +1807,8 @@ void detectSensors(TwoWire * i2cBusA, TwoWire * i2cBusB)
   // We store the calibration data in the VISP eeprom variable to conserve ram space
   // We only have 2KB on an Arduino NANO/UNO
   clearCalibrationData();
+
+  sanitizeVispData();
 
   sensorsFound = true;
 
@@ -1728,6 +1857,59 @@ void timeToReadVISP()
   timeToReadSensors = true;
 }
 
+int16_t modeBreathRateToMotorSpeed()
+{
+  if (visp_eeprom.mode == MODE_PCCMV)
+    return 150;
+}
+
+void homeThisPuppy(bool forced);
+
+
+unsigned long timeToInhale = 0;
+unsigned long timeToStopInhale = 0;
+bool lastBreathMotorDirection = false;
+void timeToCheckPatient()
+{
+  unsigned long theMillis = millis();
+  // breathRate is in breaths per minute. timeout= 60*1000/bpm
+  // breatRation is a 1:X where 1=inhale, and X=exhale.  So a 1:2 is 50% inhaling and 50% exhaling
+
+  if (visp_eeprom.mode == MODE_OFF)
+    return;
+
+  if (theMillis > timeToInhale)
+  {
+    unsigned long nextBreathCycle = ((60.0 / (float)visp_eeprom.breath_rate) * 1000.0);
+    timeToInhale = nextBreathCycle;
+    timeToStopInhale = (nextBreathCycle / visp_eeprom.breath_ratio);
+
+    info(PSTR("brate=%d  bratio=%d nextBreathCycle=%l timeToStopInhale=%l millis"), visp_eeprom.breath_rate, visp_eeprom.breath_ratio, nextBreathCycle, timeToStopInhale);
+
+    timeToInhale += theMillis;
+    timeToStopInhale += theMillis;
+
+    // Switch direction each time.
+    if (lastBreathMotorDirection)
+    {
+      motorForward(modeBreathRateToMotorSpeed());
+      lastBreathMotorDirection = false;
+    }
+    else
+    {
+      motorReverse(modeBreathRateToMotorSpeed());
+      lastBreathMotorDirection = true;
+    }
+  }
+
+  if (timeToStopInhale >= 0 && theMillis > timeToStopInhale)
+  {
+    motorStop();
+    homeThisPuppy(false);
+    timeToStopInhale = -1;
+  }
+}
+
 void timeToCheckSensors()
 {
   // If debug is on, and a VISP is NOT connected, we flood the system with sensor scans.
@@ -1741,6 +1923,7 @@ void timeToCheckSensors()
 // If something takes priority over another task, put it at the top of the list
 t tasks[] = {
   {0, 20, timeToReadVISP},
+  {0, 5,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
   {0, 500, timeToCheckSensors},
   {0, 0, NULL} // End of list
@@ -1767,19 +1950,12 @@ void formatVispEEPROM(uint8_t busType, uint8_t bodyType)
   visp_eeprom.bodyType = bodyType;
   visp_eeprom.bodyVersion = '0';
 
-  // TODO: scan sensor mappings and populate the eeprom with what we have detected
-  // TODO: checksum;
-  // volume;
-  // rate;
-  // breath_interval;
-  // breath_threshold;
-  // motor_speed;    // For demonstration purposes, run motor at a fixed speed...
-  // mode;
-
   visp_eeprom.debug = DEBUG_DISABLED;
 
   // Make *sure* that the calibration data is formatted properly
   clearCalibrationData();
+
+  sanitizeVispData();
 
   writeEEPROM(eeprom, (unsigned short)0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
 }
@@ -1792,138 +1968,141 @@ void clearCalibrationData()
   memset(&visp_eeprom.calibrationOffsets, 0, sizeof(visp_eeprom.calibrationOffsets));
 }
 
-#ifdef ARDUINO_TEENSY40
-IntervalTimer myIntervalTimer;
-
-void doStepperStuff()
-{
-  mystepper.runSpeed();
-}
-void setupTimer1()
-{
-  myIntervalTimer.begin(doStepperStuff, 1000); // microseconds
-}
-#else
-ISR(Timer1_COMPA_vect) // timer compare interrupt service routine
-{
-  mystepper.runSpeed();
-}
-
-void setupTimer1() // WARNING: NOTE: Conflicts with Servo library
-{
-  noInterrupts(); //Disable global interrupts
-  TCCR1A = 0; //Register set to 0
-  TCCR1B = 0; //Register set to 0
-  TCNT1 = 0;
-
-  OCR1A = 15999; //Counter for 1KHz interrupt 16*10^6/1000-1 no prescaler
-  TCCR1B |= (1 << WGM12); //CTC mode
-  TCCR1B |= (1 << CS10); //No prescaler
-  TIMSK1 |= (1 << OCIE1A); //Compare interrupt mode
-
-  interrupts(); //Enable global interrupts
-}
-#endif
 
 // Let the motor run until we get the correct number of pulses
 void homeTriggered() // IRQ function
 {
+  // This is tested a lot, we need to fail on not homing.
+  if (motorHoming)
+  {
+    motorFound = true;
+    motorHoming = false;
+  }
+
+  motorStop();
 }
 
-void motorReverse()
+bool motorWasGoingForward = false;
+void motorReverse(int rate)
 {
+  motorWasGoingForward = false;
   digitalWrite(M_DIR_1, 0);
   digitalWrite(M_DIR_2, 1);
-  digitalWrite(BLDC_DIR, HIGH);
-  digitalWrite(STEPPER_DIR, HIGH);
-}
-void motorForward()
-{
-  digitalWrite(M_DIR_1, 1);
-  digitalWrite(M_DIR_2, 0);
-  digitalWrite(BLDC_DIR, LOW);
-  digitalWrite(STEPPER_DIR, LOW);
-}
-void motorRun(int rate)
-{
+  //digitalWrite(BLDC_DIR, HIGH);
+
   analogWrite(M_PWM_1, rate);
   analogWrite(M_PWM_2, rate);
-  analogWrite(BLDC_PWM, rate);
+
+  //  analogWrite(BLDC_PWM, rate);
+  rate = -rate;
   mystepper.setSpeed(rate);
 }
 
-void homeThisPuppy()
+void motorForward(int rate)
 {
-  unsigned long motorSweepStartTime, motorSweepStopTime, timeout;
+  motorWasGoingForward = true;
+  digitalWrite(M_DIR_1, 1);
+  digitalWrite(M_DIR_2, 0);
+  //  digitalWrite(BLDC_DIR, LOW);
 
-  // ok, the Hall Effect is a "close"
-  // So, swing till it turns on, and continue till it stops, and check the bldcFgCount.
-  // Then walk halfway back and we should be "homed"
+  analogWrite(M_PWM_1, rate);
+  analogWrite(M_PWM_2, rate);
 
-  info(PSTR("Homing"));
+  //  analogWrite(BLDC_PWM, rate);
+  mystepper.setSpeed(rate);
+}
 
-  // Within the home zone...
-  // Rewind until out of the zone.
-  if (digitalRead(HOME_SENSOR) == LOW)
+void motorStop()
+{
+  // Short the motor, so it stops faster
+  digitalWrite(M_DIR_1, 0);
+  digitalWrite(M_DIR_2, 0);
+
+  analogWrite(M_PWM_1, 0);
+  analogWrite(M_PWM_2, 0);
+
+  //  analogWrite(BLDC_PWM, 0);
+  mystepper.stop(); // Stop as fast as possible: sets new target
+  mystepper.setSpeed(0);
+}
+
+void motorRunStepper()
+{
+  mystepper.runSpeed();
+}
+
+bool runWhileHomeSensorReads(int value)
+{
+  unsigned long timeout = millis() + 6000; // 6 seconds...
+  do
   {
-    info(PSTR("Get out of home position"));
-
-    motorReverse();
-
-    motorRun(SWEEP_SPEED);
-    timeout = millis() + 5000000; // 5 seconds...
-    while (millis() < timeout && digitalRead(HOME_SENSOR) == LOW)
-      /* nothing */;
-    motorRun(0);
+    if (digitalRead(HOME_SENSOR) != value)
+      return true;
+    motorRunStepper();
   }
-  info(PSTR("Find Left Edge"));
+  while (millis() < timeout);
+  return false;
+}
 
-  motorForward();
-
-  // Sweep looking for hall sensor
-  motorRun(SWEEP_SPEED);
-  timeout = millis() + 5000; // 5 seconds...
-
-  while (millis() < timeout && digitalRead(HOME_SENSOR) == HIGH)
-    /* nothing */;
-
-  if (digitalRead(HOME_SENSOR) == HIGH)
+// If forced, this is for the initial setup
+void homeThisPuppy(bool forced)
+{
+  if (forced || digitalRead(HOME_SENSOR) == HIGH)
   {
-    info(PSTR("Something is wrong, we should have detected a HOME signal by now"));
-    motorFound = false;
-    return;
+    motorHoming = true;
+    if (motorWasGoingForward)
+      motorReverse(HOMING_SPEED);
+    else
+      motorForward(HOMING_SPEED);
   }
+}
 
-  motorSweepStartTime = micros();
+unsigned long timeTillNextMagnet(uint8_t motorSpeed)
+{
+  unsigned long startTime, stopTime, timeDiff;
 
-  info(PSTR("Find Right Edge"));
+  if (motorFound)
+  {
+    startTime = millis();
+    motorForward(motorSpeed);
+    runWhileHomeSensorReads(LOW);
+    runWhileHomeSensorReads(HIGH);
+    stopTime = millis();
 
-  // Motor is still running....
-  timeout = millis() + 5000; // 5 seconds...
-  while (millis() < timeout && digitalRead(HOME_SENSOR) == LOW)
-    /* nothing */;
+    return (stopTime - startTime);
+  }
+}
 
-  motorRun(0);
+void calibrateMotorSpeeds()
+{
+  if (motorFound)
+  {
+    unsigned long minTimeToGetToOtherMagnet = ((60000.0 / (float)MIN_BREATH_RATE) / MIN_BREATH_RATIO); // 10 and 1:2
+    unsigned long maxTimeToGetToOtherMagnet = ((60000.0 / (float)MAX_BREATH_RATE) / MAX_BREATH_RATIO); // 40 and 1:5
+    unsigned long runTime = 0;
+    for (uint8_t x = 250; x > 10; x -= 10)
+    {
 
-  motorSweepStopTime = micros();
+      runTime = timeTillNextMagnet(x);
+      if (runTime < maxTimeToGetToOtherMagnet || motorMaxSpeedDetected == 0)
+      {
+        if (motorMaxSpeedDetected == 0 && runTime > maxTimeToGetToOtherMagnet)
+          info(PSTR("Motor not fast enough for fastest %l compress time"), maxTimeToGetToOtherMagnet);
+        motorMaxSpeedDetected = x;
+      }
 
-  timeout = motorSweepStopTime - motorSweepStartTime;
+      info(PSTR("Calibrated speed %d=%l millis"), x, runTime);
 
-  info(PSTR("Centering: Motor Home Sweep is %d micros wide"),timeout);
-  
-  timeout /=2;
-  timeout += micros();
-  
-  motorReverse();
-  motorRun(SWEEP_SPEED);
-  while (micros() < timeout)
-    /* Nothing */;
-  motorRun(0);
+      if (runTime > minTimeToGetToOtherMagnet)
+      {
+        info(PSTR("Motor range is %d to %d for %l to %l compress times"), motorMinSpeedDetected, motorMaxSpeedDetected, minTimeToGetToOtherMagnet, maxTimeToGetToOtherMagnet);
+        return;
+      }
+      motorMinSpeedDetected = x;
+    }
 
-  // TADA Motor is *mostly* homed!
-  info(PSTR("Finished"));
-
-  motorFound = true;
+    info(PSTR("Motor not slow enough for lowest %l compress time"), minTimeToGetToOtherMagnet);
+  }
 }
 
 void setup() {
@@ -1938,8 +2117,7 @@ void setup() {
   pinMode(M_PWM_2, OUTPUT);
   pinMode(M_DIR_1, OUTPUT);
   pinMode(M_DIR_2, OUTPUT);
-  pinMode(BLDC_DIR, OUTPUT);
-  pinMode(STEPPER_DIR, OUTPUT);
+  //  pinMode(BLDC_DIR, OUTPUT);
 
   // Setup the motor output
   pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
@@ -1947,28 +2125,35 @@ void setup() {
   // Setup the home sensor as an interrupt
   attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
 
+  hwSerial.begin(SERIAL_BAUD);
+  respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+
+  memset(&devices, 0, sizeof(devices));
   memset(&sensors, 0, sizeof(sensors));
 
-  mystepper.setAcceleration(3000);
-  mystepper.setMaxSpeed(1000);
-  //  setupTimer1();
-
-  hwSerial.begin(SERIAL_BAUD);
-  respond('I', PSTR("VISP Core,%d,%d,%c"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+  mystepper.setAcceleration(2000);
+  mystepper.setMaxSpeed(STEPPER_STEPS_PER_REV * 3);
 
   i2cBus1->begin();
   i2cBus1->setClock(400000); // Typical
-
 
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
   visp_eeprom.debug = DEBUG_DISABLED;
   clearCalibrationData();
+  sanitizeVispData(); // Apply defaults
 
-  homeThisPuppy();
+  homeThisPuppy(true);
+
+  for (unsigned long timeout = millis() + 6000; millis() < timeout && !motorFound; )
+    motorRunStepper();
+
+  motorStop(); /* sensor detached, motor unplugged, etc */
+  info(PSTR("motor state = %S"), motorFound ? PSTR("Found") : PSTR("Missing"));
+  calibrateMotorSpeeds();
 }
 
-void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, float tidalVolume, float *P)
+void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, float tidalVolume, float * P)
 {
   // Take some time to write to the serial port
   hwSerial.print('d');
@@ -1979,11 +2164,9 @@ void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, fl
   hwSerial.print(',');
   hwSerial.print(volumeSmoothed, 4);
   hwSerial.print(',');
+  hwSerial.print(tidalVolume, 4);
   if (visp_eeprom.debug == DEBUG_DISABLED)
-    hwSerial.println(tidalVolume, 4);
-  else
   {
-    hwSerial.print(tidalVolume, 4);
     hwSerial.print(',');
     hwSerial.print(P[SENSOR_U5], 1);
     hwSerial.print(',');
@@ -1991,13 +2174,14 @@ void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, fl
     hwSerial.print(',');
     hwSerial.print(P[SENSOR_U7], 1);
     hwSerial.print(',');
-    hwSerial.println(P[SENSOR_U8], 1);
+    hwSerial.print(P[SENSOR_U8], 1);
   }
+  hwSerial.println();
 }
 
 
 
-void doCalibration(float *P)
+void doCalibration(float * P)
 {
   if (calibrationSampleCounter == 0)
   {
@@ -2028,7 +2212,7 @@ void doCalibration(float *P)
 #define PITOT1           SENSOR_U7
 #define PITOT2           SENSOR_U8
 
-void loopPitotVersion(float *P, float *T)
+void loopPitotVersion(float * P, float * T)
 {
   float  airflow, volume, pitot_diff, ambientPressure, pitot1, pitot2, patientPressure, pressure;
 
@@ -2144,27 +2328,29 @@ void loopVenturiVersion(float * P, float * T)
   }
 }
 
+
 typedef enum parser_state_e {
   PARSE_COMMAND,
   PARSE_IGNORE_TILL_LF,
-  PARSE_SINGLE_ARG,
   PARSE_FIRST_ARG,
-  PARSE_SECOND_ARG,
-  PARSE_EEPROM_ARGS
+  PARSE_SECOND_ARG
 } parser_state_t;
 
 
+// Defined once in flash instead of twice, hey, it saves 6 bytes!
+const char strEEPROMcomma [] PUTINFLASH = ", 0x";
 
 void sendEEPROMdata(uint16_t address, uint16_t len)
 {
   uint8_t *cbuf = (uint8_t *)&visp_eeprom;
-  hwSerial.print(PSTR("E,"));
+  hwSerial.print('E');
+  hwSerial.print(',');
   hwSerial.print(millis());
-  hwSerial.print(PSTR(", 0x"));
+  hwSerial.print(strEEPROMcomma);
   hwSerial.print(address, HEX);
   for (int x = 0; x < len; x++)
   {
-    hwSerial.print(PSTR(",0x"));
+    hwSerial.print(strEEPROMcomma);
     hwSerial.print(cbuf[address + x], HEX);
   }
   hwSerial.println();
@@ -2176,23 +2362,25 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
   cbuf[address] = data;
 }
 
-#define RESPOND_LIMITS             1
-#define RESPOND_DEBUG              2
-#define RESPOND_MODE               4
-#define RESPOND_VOLUME             8
-#define RESPOND_RATE              16
-#define RESPOND_BREATH_INTERVAL   32
-#define RESPOND_BREATH_THRESHOLD  64
-#define RESPOND_MOTOR_SPEED      128
-#define RESPOND_BODYTYPE         256
-#define RESPOND_CALIB0           512
-#define RESPOND_CALIB1          1024
-#define RESPOND_CALIB2          2048
-#define RESPOND_CALIB3          4096
-#define RESPOND_SENSOR0         8192
-#define RESPOND_SENSOR1        16384
-#define RESPOND_SENSOR2        32768
-#define RESPOND_SENSOR3        65536
+#define RESPOND_ALL           0xFFFFFFFFL
+#define RESPOND_LIMITS             1UL<<0
+#define RESPOND_DEBUG              1UL<<1
+#define RESPOND_MODE               1UL<<2
+#define RESPOND_BREATH_VOLUME      1UL<<3
+#define RESPOND_BREATH_PRESSURE    1UL<<4
+#define RESPOND_BREATH_RATE        1UL<<5
+#define RESPOND_BREATH_RATIO       1UL<<6
+#define RESPOND_BREATH_THRESHOLD   1UL<<7
+#define RESPOND_MOTOR_SPEED        1UL<<8
+#define RESPOND_BODYTYPE           1UL<<9
+#define RESPOND_CALIB0             1UL<<10
+#define RESPOND_CALIB1             1UL<<11
+#define RESPOND_CALIB2             1UL<<12
+#define RESPOND_CALIB3             1UL<<13
+#define RESPOND_SENSOR0            1UL<<14
+#define RESPOND_SENSOR1            1UL<<15
+#define RESPOND_SENSOR2            1UL<<16
+#define RESPOND_SENSOR3            1UL<<17
 
 
 struct dictionary_s {
@@ -2222,6 +2410,8 @@ const char strSensor3 [] PUTINFLASH = "sensor3";
 const char strBMP388 [] PUTINFLASH = "BMP388";
 const char strBMP280 [] PUTINFLASH = "BMP280";
 const char strSPL06 [] PUTINFLASH = "SPL06";
+const char strOff [] PUTINFLASH = "OFF";
+const char strModeOffDesc [] PUTINFLASH = "Offline";
 
 
 const struct dictionary_s sensorDict[] PUTINFLASH = {
@@ -2233,7 +2423,7 @@ const struct dictionary_s sensorDict[] PUTINFLASH = {
 };
 
 const struct dictionary_s modeDict[] PUTINFLASH = {
-  {MODE_UNKNOWN, strUnknown, strUnknown},
+  {MODE_OFF,     strOff, strModeOffDesc},
   {MODE_PCCMV,   strPCCMV,   strPCCMVdesc},
   {MODE_VCCMV,   strVCCMV,   strVCCMVdesc},
   { -1, NULL, NULL}
@@ -2252,30 +2442,47 @@ const struct dictionary_s bodyDict[] PUTINFLASH = {
   { -1, NULL, NULL}
 };
 
+const char strBreathRatio2 [] PUTINFLASH = "1:2";
+const char strBreathRatio3 [] PUTINFLASH = "1:3";
+const char strBreathRatio4 [] PUTINFLASH = "1:4";
+const char strBreathRatio5 [] PUTINFLASH = "1:5";
 
+const char strBreathRatioDesc2 [] PUTINFLASH = "50% duty cyce";
+const char strBreathRatioDesc3 [] PUTINFLASH = "33% duty cyce";
+const char strBreathRatioDesc4 [] PUTINFLASH = "25% duty cyce";
+const char strBreathRatioDesc5 [] PUTINFLASH = "20% duty cyce";
+
+const struct dictionary_s breathRatioDict[] PUTINFLASH = {
+  {2,  strBreathRatio2, strBreathRatioDesc2},
+  {3,  strBreathRatio3, strBreathRatioDesc3},
+  {4,  strBreathRatio4, strBreathRatioDesc4},
+  {5,  strBreathRatio5, strBreathRatioDesc5},
+  { -1, NULL, NULL}
+};
 
 
 typedef bool (*verifyCallback)(struct settingsEntry_s *, const char *);
 typedef void (*respondCallback)(struct settingsEntry_s *);
 
 struct settingsEntry_s {
-  const uint32_t PUTINFLASH bitmask;
-  const char * const PUTINFLASH theName;
-  const int16_t PUTINFLASH theMin;
-  const int16_t PUTINFLASH theMax;
-  const PUTINFLASH struct dictionary_s  *personalDictionary;
-  const verifyCallback PUTINFLASH verifyIt;
-  const respondCallback PUTINFLASH respondIt;
-  const respondCallback PUTINFLASH actionIt;
-  void * const PUTINFLASH data;
+  const uint32_t bitmask;
+  const char * const theName;
+  const int16_t theMin;
+  const int16_t theMax;
+  const struct dictionary_s  *personalDictionary;
+  const verifyCallback  verifyIt;
+  const respondCallback respondIt;
+  const respondCallback actionIt;
+  void * const data;
 };
 
 const char strMode [] PUTINFLASH = "mode";
 const char strDebug [] PUTINFLASH = "debug";
 const char strBodyType [] PUTINFLASH = "bodytype";
-const char strVolume [] PUTINFLASH = "volume";
-const char strRate [] PUTINFLASH = "rate";
-const char strBreathInterval [] PUTINFLASH = "breath_interval";
+const char strBreathVolume [] PUTINFLASH = "volume";
+const char strBreathPressure [] PUTINFLASH = "pressure";
+const char strBreathRate [] PUTINFLASH = "rate";
+const char strBreathRatio [] PUTINFLASH = "ie"; // Inhale/exhale ratio
 const char strBreathThreshold [] PUTINFLASH = "breath_threshold";
 const char strMotorSpeed [] PUTINFLASH = "motor_speed";
 const char strCalib0 [] PUTINFLASH = "calib0";
@@ -2283,30 +2490,37 @@ const char strCalib1 [] PUTINFLASH = "calib1";
 const char strCalib2 [] PUTINFLASH = "calib2";
 const char strCalib3 [] PUTINFLASH = "calib3";
 
-bool noSet(struct settingsEntry_s *entry, const char *arg);
-bool verifyDictWordToInt8(struct settingsEntry_s *entry, const char *arg);
-bool verifyDictWordToInt16(struct settingsEntry_s *entry, const char *arg);
-bool verifyLimitsToInt16(struct settingsEntry_s *entry);
-void respondFloat(struct settingsEntry_s *entry);
-void respondInt8(struct settingsEntry_s *entry);
-void respondInt16(struct settingsEntry_s *entry);
-void respondInt8ToDict(struct settingsEntry_s *entry);
+bool noSet(struct settingsEntry_s * entry, const char *arg);
+bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg);
+bool verifyDictWordToInt16(struct settingsEntry_s * entry, const char *arg);
+bool verifyLimitsToInt8(struct settingsEntry_s * entry);
+bool verifyLimitsToInt16(struct settingsEntry_s * entry);
+void respondFloat(struct settingsEntry_s * entry);
+void respondInt8(struct settingsEntry_s * entry);
+void respondInt16(struct settingsEntry_s * entry);
+void respondInt8ToDict(struct settingsEntry_s * entry);
 
-void motorAction(struct settingsEntry_s *entry)
+void motorAction(struct settingsEntry_s * entry)
 {
-  info(PSTR("Setting motor vales to %d"), visp_eeprom.motor_speed);
-  motorForward();
-  motorRun(visp_eeprom.motor_speed);
+  info(PSTR("Setting motor to %d"), visp_eeprom.motor_speed);
+  motorForward(visp_eeprom.motor_speed);
 }
+
+void handleNewVolume(struct settingsEntry_s * entry)
+{
+  //volumeTimeout=((motorCycleTime/2)*(visp_eeprom.vreath_volume/MAX_VOLUME); // Half way through a cycle is full compression
+}
+
 
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_MODE,             strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.mode},
   {RESPOND_DEBUG,            strDebug, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.debug},
   {RESPOND_BODYTYPE,         strBodyType, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.bodyType},
-  {RESPOND_VOLUME,           strVolume, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.volume},
-  {RESPOND_RATE,             strRate, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.rate},
-  {RESPOND_BREATH_INTERVAL,  strBreathInterval, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_interval},
+  {RESPOND_BREATH_VOLUME,    strBreathVolume, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
+  {RESPOND_BREATH_RATE,      strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
+  {RESPOND_BREATH_PRESSURE,  strBreathPressure, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
+  {RESPOND_BREATH_RATIO,     strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
   {RESPOND_BREATH_THRESHOLD, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
   {RESPOND_MOTOR_SPEED,      strMotorSpeed, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, motorAction, &visp_eeprom.motor_speed},
   {RESPOND_CALIB0,           strCalib0, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[0]},
@@ -2321,13 +2535,13 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
 };
 
 
-bool noSet(struct settingsEntry_s *entry, const char *arg)
+bool noSet(struct settingsEntry_s * entry, const char *arg)
 {
-  info(PSTR(SFLASH " is read-only"), entry->theName);
+  warning(PSTR("%S is read-only"), entry->theName);
   return true;
 }
 
-bool verifyDictWordToInt8(struct settingsEntry_s *entry, const char *arg)
+bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -2345,7 +2559,7 @@ bool verifyDictWordToInt8(struct settingsEntry_s *entry, const char *arg)
   return false;
 }
 
-bool verifyDictWordToInt16(struct settingsEntry_s *entry, const char *arg)
+bool verifyDictWordToInt16(struct settingsEntry_s * entry, const char *arg)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -2363,7 +2577,19 @@ bool verifyDictWordToInt16(struct settingsEntry_s *entry, const char *arg)
   return false;
 }
 
-bool verifyLimitsToInt16(struct settingsEntry_s *entry, const char *arg)
+bool verifyLimitsToFloat(struct settingsEntry_s * entry, const char *arg)
+{
+  float value = atof(arg);
+  // TODO: other checks on the argument...
+  if (value >= (float)entry->theMin && value <= (float)entry->theMax)
+  {
+    *(float *)entry->data = value;
+    return true;
+  }
+  return false;
+}
+
+bool verifyLimitsToInt16(struct settingsEntry_s * entry, const char *arg)
 {
   int value = strtol(arg, NULL, 0);
   // TODO: other checks on the argument...
@@ -2375,23 +2601,35 @@ bool verifyLimitsToInt16(struct settingsEntry_s *entry, const char *arg)
   return false;
 }
 
-void respondInt8(struct settingsEntry_s *entry)
+bool verifyLimitsToInt8(struct settingsEntry_s * entry, const char *arg)
 {
-  respond('S', PSTR("" SFLASH ",%d"), entry->theName, *(int8_t *)entry->data);
+  int value = strtol(arg, NULL, 0);
+  // TODO: other checks on the argument...
+  if (value >= entry->theMin && value <= entry->theMax)
+  {
+    *(uint16_t *)entry->data = value;
+    return true;
+  }
+  return false;
 }
-void respondInt16(struct settingsEntry_s *entry)
+
+void respondInt8(struct settingsEntry_s * entry)
 {
-  respond('S', PSTR("" SFLASH ",%d"), entry->theName, *(int16_t *)entry->data);
+  respond('S', PSTR("%S,%d"), entry->theName, *(int8_t *)entry->data);
 }
-void respondFloat(struct settingsEntry_s *entry)
+void respondInt16(struct settingsEntry_s * entry)
+{
+  respond('S', PSTR("%S,%d"), entry->theName, *(int16_t *)entry->data);
+}
+void respondFloat(struct settingsEntry_s * entry)
 {
   char buff[32];
   *buff = 0;
   dtostrf(*(float*)entry->data, 7, 2, buff);
-  respond('S', PSTR("" SFLASH ",%s"), entry->theName, buff);
+  respond('S', PSTR("%S,%s"), entry->theName, buff);
 }
 
-void respondInt8ToDict(struct settingsEntry_s *entry)
+void respondInt8ToDict(struct settingsEntry_s * entry)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -2405,27 +2643,24 @@ void respondInt8ToDict(struct settingsEntry_s *entry)
     {
       if (dict.theAssociatedValue == *(int8_t*)entry->data)
       {
-        respond('S', PSTR("" SFLASH "," SFLASH ""), entry->theName, dict.theWord);
+        respond('S', PSTR("%S,%S"), entry->theName, dict.theWord);
         return;
       }
     }
   } while (dict.theWord);
 }
 
-void respondSettingLimits(struct settingsEntry_s *entry)
+void respondSettingLimits(struct settingsEntry_s * entry)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
   if (entry->personalDictionary)
   {
-    char buffer[80];
-
     hwSerial.print('S');
     hwSerial.print(',');
     hwSerial.print(millis());
     hwSerial.print(',');
-    snprintf_P(buffer, sizeof(buffer), PSTR("" SFLASH ""), entry->theName);
-    hwSerial.print(buffer);
+    printp(entry->theName);
     hwSerial.print(F("_dict"));
     do
     {
@@ -2433,17 +2668,18 @@ void respondSettingLimits(struct settingsEntry_s *entry)
       d++;
       if (dict.theWord)
       {
-        // Must copy the string from flash memory
-        snprintf_P(buffer, sizeof(buffer), PSTR("," SFLASH "," SFLASH ""), dict.theWord, dict.theDescription);
-        hwSerial.print(buffer);
+        hwSerial.print(',');
+        printp(dict.theWord);
+        hwSerial.print(',');
+        printp(dict.theDescription);
       }
     } while (dict.theWord);
     hwSerial.println();
   }
   else
   {
-    respond('S', PSTR("" SFLASH "_min,%d"), entry->theName, entry->theMin);
-    respond('S', PSTR("" SFLASH "_max,%d"), entry->theName, entry->theMax);
+    respond('S', PSTR("%S_min,%d"), entry->theName, entry->theMin);
+    respond('S', PSTR("%S_max,%d"), entry->theName, entry->theMax);
   }
 }
 
@@ -2473,10 +2709,11 @@ void handleSettingCommand(const char *arg1, const char *arg2)
 {
   struct settingsEntry_s entry = {0};
   uint8_t x = 0;
+
   if (*arg1 == 0)
   {
     // Same as Q without the Limits
-    respondAppropriately(0xFFFFFFFF ^ RESPOND_LIMITS);
+    respondAppropriately(RESPOND_ALL ^ RESPOND_LIMITS);
     return;
   }
 
@@ -2504,7 +2741,7 @@ void handleSettingCommand(const char *arg1, const char *arg2)
           return;
         }
         else
-          warning(PSTR("Invalid " SFLASH " value %s"), entry.theName, arg2);
+          warning(PSTR("Invalid %S value %s"), entry.theName, arg2);
       }
     }
   } while (entry.bitmask);
@@ -2512,6 +2749,67 @@ void handleSettingCommand(const char *arg1, const char *arg2)
   warning(PSTR("Unknown setting '%s'"), arg1);
 }
 
+void handleQueryCommand(const char *arg1, const char *arg2)
+{
+  sendCurrentSystemHealth();
+  respondAppropriately(RESPOND_ALL);
+  respond('Q', PSTR("Finished"));
+}
+
+void handlePingCommand(const char *arg1, const char *arg2)
+{
+  respond('P', PSTR("I am alive!"));
+}
+
+void handleIdentifyCommand(const char *arg1, const char *arg2)
+{
+  respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+}
+
+void handleCalibrateCommand(const char *arg1, const char *arg2)
+{
+  clearCalibrationData();
+}
+
+void handleEepromCommand(const char *arg1, const char *arg2)
+{
+  uint16_t eepromAddress;
+
+  if (*arg1)
+  {
+    eepromAddress = strtol(arg1, NULL, 0);
+
+    if (*arg2)
+    {
+      updateEEPROMdata(eepromAddress, strtol(arg2, NULL, 0));
+      sendEEPROMdata(eepromAddress, 1);
+      if (eepromAddress == 127)
+        saveParameters();
+    }
+    else
+      sendEEPROMdata(eepromAddress, 16);
+  }
+  else
+    sendEEPROMdata(0, 128);
+}
+
+typedef void (*commandCallback)(const char *arg1, const char *arg2);
+
+struct commandEntry_s {
+  const char cmdByte;
+  const commandCallback doIt;
+};
+
+const struct commandEntry_s commands[] PUTINFLASH = {
+  { 'P', handlePingCommand},
+  { 'C', handleCalibrateCommand},
+  { 'I', handleIdentifyCommand},
+  { 'Q', handleQueryCommand},
+  { 'S', handleSettingCommand },
+  { 'E', handleEepromCommand },
+  { 'R', NULL}, // declare reset function at address 0
+  { 0, NULL}
+};
 
 void commandParser(int cmdByte)
 {
@@ -2519,9 +2817,7 @@ void commandParser(int cmdByte)
   static uint8_t command = 0;
   static char arg1[16] = "", arg2[16] = "";
   static uint8_t arg1Pos = 0, arg2Pos = 0;
-  static uint16_t eepromAddress = 0xFFFF; // Invalid Address
-  static uint16_t eepromCount = 0;
-  const void(* resetFunc) (void) = 0;//declare reset function at address 0
+  struct commandEntry_s entry = {0};
 
   // Any kind of garbage input resets the state machine
   if (!isprint(cmdByte))
@@ -2534,64 +2830,25 @@ void commandParser(int cmdByte)
   // Need to be able to gracefully handle empty lines
   if (cmdByte == '\n')
   {
+    int x = 0;
     // Process the command here
     currentState = PARSE_COMMAND;
 
-    switch (command) {
-      case 'P': respond('P', PSTR("I am alive!")); break;
-      case 'I':  respond('I', PSTR("VISP Core,%d,%d,%c"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION); break;
-      case 'C':
-        clearCalibrationData();
-        break;
-      case 'E':
-        if (eepromAddress == 0xFFFF)
-        {
-          // arg1 has an address
-          if (*arg1)
-            sendEEPROMdata(strtol(arg1, NULL, 0), 16); // If user supplied an address, only 16 bytes
-          else
-            sendEEPROMdata(0, 128);
-        }
-        else
-        {
-          if (*arg1)
-          {
-            updateEEPROMdata(eepromAddress + eepromCount, strtol(arg1, NULL, 0));
-            eepromCount++;
-            // Write the whole thing.   Kinda wasteful as we should really do it on a Commit...
-            writeEEPROM(eeprom, (unsigned short)0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
-          }
-          sendEEPROMdata(eepromAddress, eepromCount);
-        }
-
-        break;
-      case 'Q':
-        sendCurrentSystemHealth();
-        respondAppropriately(0xFFFFFFFF);
-        respond('Q', PSTR("Finished"));
-        break;
-      case 'S': // Set parameter
-        handleSettingCommand(arg1, arg2); break;
-        break;
-      case 'R': // Reboot chip
-        resetFunc(); //call reset
-        break;
-    }
+    do
+    {
+      // We must copy the struct from flash to access it
+      memcpy_P(&entry, & commands[x], sizeof(entry));
+      if (command == entry.cmdByte)
+        entry.doIt(arg1, arg2);
+        x++;
+    } while (entry.cmdByte);
     return;
   }
 
   switch (currentState) {
     case PARSE_COMMAND:
       if (cmdByte == ',')
-      {
-        // Command with arguments
-        switch (command) {
-          case 'S':  currentState = PARSE_FIRST_ARG;    break;
-          case 'M':  currentState = PARSE_SINGLE_ARG;   break;
-          case 'E':  currentState = PARSE_EEPROM_ARGS;  break;
-          default: currentState = PARSE_IGNORE_TILL_LF; break;
-        }
-      }
+        currentState = PARSE_FIRST_ARG;
       else
       {
         // And reset!
@@ -2600,16 +2857,11 @@ void commandParser(int cmdByte)
         memset(arg1, 0, sizeof(arg1));
         arg2Pos = 0;
         memset(arg2, 0, sizeof(arg2));
-        eepromAddress = 0xFFFF;
-        eepromCount = 0;
       }
       break;
     case PARSE_FIRST_ARG:
-    case PARSE_SINGLE_ARG:
       if (cmdByte == ',')
-      {
-        currentState = (currentState == PARSE_SINGLE_ARG ? PARSE_IGNORE_TILL_LF : PARSE_SECOND_ARG); // Default
-      }
+        currentState = PARSE_SECOND_ARG;
       else
       {
         if (arg1Pos < (sizeof(arg1) - 1))
@@ -2620,9 +2872,7 @@ void commandParser(int cmdByte)
       break;
     case PARSE_SECOND_ARG:
       if (cmdByte == ',')
-      {
         currentState = PARSE_IGNORE_TILL_LF; // Default
-      }
       else
       {
         if (arg2Pos < (sizeof(arg2) - 1))
@@ -2631,36 +2881,17 @@ void commandParser(int cmdByte)
         }
       }
       break;
-    case PARSE_EEPROM_ARGS:
-      if (cmdByte == ',')
-      {
-        if (eepromAddress == 0xFFFF)
-          eepromAddress = strtol(arg1, NULL, 0);
-        else
-        {
-          updateEEPROMdata(eepromAddress + eepromCount, strtol(arg1, NULL, 0));
-          eepromCount++;
-        }
-        arg1Pos = 0;
-        memset(arg1, 0, sizeof(arg1));
-      }
-      else
-      {
-        if (arg1Pos < (sizeof(arg1) - 1))
-          arg1[arg1Pos++] = cmdByte;
-      }
-      break;
     case PARSE_IGNORE_TILL_LF:
       break;
   }
 }
 
-
 void loop() {
   static float P[4], T[4];
+  motorRunStepper();
 
-  for (int x = 0; tasks[x].cbk; x++)
-    tCheck(&tasks[x]);
+  for (t_t *entry = tasks; entry->cbk; entry++)
+    tCheck(entry);
 
   if (timeToReadSensors)
   {
@@ -2682,19 +2913,14 @@ void loop() {
     // Hence the double checks one above, and this one below
     if (sensorsFound)
     {
-      switch (visp_eeprom.bodyType)
-      {
-        case 'P':
-          loopPitotVersion(P, T);
-          break;
-        case 'V':
-        default:
-          loopVenturiVersion(P, T);
-          break;
-      }
+      if (visp_eeprom.bodyType == 'P')
+        loopPitotVersion(P, T);
+      else
+        loopVenturiVersion(P, T);
     }
   }
 
+  // Command parser uses 6530 bytes of flash... This is a LOT
   // Handle user input, 1 character at a time
   while (hwSerial.available())
     commandParser(hwSerial.read());

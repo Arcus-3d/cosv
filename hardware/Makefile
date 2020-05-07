@@ -99,9 +99,9 @@ directories:
 models: directories $(MODELS) cams bases
 
 cams: directories $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"bldc\"       -Dparam_d_shaft=\"zero\  -o generated/FFF/cam_6mm.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"bldc\"       -Dparam_d_shaft=\"zero\"  -o generated/FFF/cam_6mm.stl $(PREFIX).scad
 	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"bldc\"       -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_6mm_d.stl $(PREFIX).scad
-	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\  -o generated/FFF/cam_6.35mm_d.stl $(PREFIX).scad
+	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"zero\"  -o generated/FFF/cam_6.35mm_d.stl $(PREFIX).scad
 	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23-635\" -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_6.35mm.stl $(PREFIX).scad
 	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23\"     -Dparam_d_shaft=\"zero\" -o generated/FFF/cam_8mm.stl $(PREFIX).scad
 	$(OPENSCAD) $(OPENSCAD_OPTIONS) -Dparam_part=\"cam\"  -Dparam_motor=\"nema23\"     -Dparam_d_shaft=\"one\"  -o generated/FFF/cam_8mm_d.stl $(PREFIX).scad

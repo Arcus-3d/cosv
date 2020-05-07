@@ -90,8 +90,6 @@ typedef struct visp_eeprom_s {
   uint8_t bodyType; // "V"=Venturi "P"=Pitot "H"=Hybrid
   uint8_t bodyVersion; // printable character
   uint8_t zero;  // NULL Terminator, so we can Serial.print(*eeprom);
-  uint8_t mode;
-  uint8_t debug;
   uint8_t extra[2];
   sensor_mapping_t sensorMapping[4]; // 16 bytes for sensor mapping.
   float calibrationOffsets[4]; // 4*4=16 bytes
@@ -101,7 +99,7 @@ typedef struct visp_eeprom_s {
   uint8_t breath_ratio;
   uint16_t breath_threshold;
   uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
-  uint8_t extra2[8];
+  uint8_t extra2[10];
   uint16_t checksum; // TODO: future, paranoia about integrity
 
 
@@ -112,6 +110,11 @@ typedef struct visp_eeprom_s {
 
 
 extern visp_eeprom_t visp_eeprom;
+
+extern float ambientPressure, throatPressure;
+extern float pressure; // Used for PC-CMV
+extern float volume; // Used for VC-CMV
+extern float tidalVolume; // Maybe used for VC-CMV definitely safety limits
 
 extern baroDev_t sensors[4]; // See mappings SENSOR_U[5678] and PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
 extern bool sensorsFound ;
@@ -126,5 +129,14 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, int enablePinA=-1, i
 void sanitizeVispData();
 void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA=-1, int enablePinB=-1);
 void saveParametersToVISP();
+
+void calibrateClear();
+bool calibrateInProgress();
+void calibrateSensors(float * P);
+void calibrateApply(float * P);
+
+void calculatePitotValues(float * P);
+void calculateVenturiValues(float * P);
+void calculateTidalVolume();
 
 #endif

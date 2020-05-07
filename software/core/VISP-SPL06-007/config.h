@@ -68,28 +68,26 @@
 
 #endif
 
-// System modes
-typedef enum modeState_e {
-  MODE_OFF = 0,
-  MODE_PCCMV = 1,
-  MODE_VCCMV = 2
-} modeState_t;
+// System modes (This needs to be a bitmask friendly for settings validity checking (setting Volume when in Pressure mode is an error)
+#define MODE_NONE  0x00
+#define MODE_OFF   0x01
+#define MODE_PCCMV 0x02
+#define MODE_VCCMV 0x04
+#define MODE_ALL   0xFF
 
-typedef enum {
-  RUNSTATE_CALIBRATE = 0,
-  RUNSTATE_RUN
-} runState_e;
+extern uint8_t currentMode;
 
 typedef enum {
   DEBUG_DISABLED = 0,
   DEBUG_ENABLED
 } debugState_e;
 
+extern debugState_e debug;
 
 #define MIN_BREATH_RATIO 2
 #define MAX_BREATH_RATIO 5
-#define MIN_BREATH_RATE  10 // TODO: saner limits 10 breaths/minute
-#define MAX_BREATH_RATE  30 // TODO: saner limits 30 breaths/minute
+#define MIN_BREATH_RATE  5 // TODO: saner limits 5 breaths/minute
+#define MAX_BREATH_RATE  20 // TODO: saner limits 30 breaths/minute
 #define MIN_BREATH_PRESSURE 0 // TODO: saner limits
 #define MAX_BREATH_PRESSURE 100// TODO: saner limits
 

@@ -30,7 +30,7 @@ void printp(const char *data)
 void respond(char command, PGM_P fmt, ...)
 {
   char c;
-  if (command == 'g' && visp_eeprom.debug == DEBUG_DISABLED)
+  if (command == 'g' && debug == DEBUG_DISABLED)
     return;
 
   hwSerial.print(command);

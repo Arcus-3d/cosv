@@ -30,6 +30,14 @@
 busDevice_t *eeprom = NULL;
 visp_eeprom_t visp_eeprom;
 
+float ambientPressure = 0.0, throatPressure = 0.0;
+float pressure = 0.0; // Used for PC-CMV
+float volume = 0.0; // Used for VC-CMV
+float tidalVolume = 0.0; // Maybe used for VC-CMV definitely safety limits
+
+uint8_t calibrationSampleCounter = 0;
+#define CALIBRATION_FINISHED 99
+
 vispBusType_e detectedVispType = VISP_BUS_TYPE_NONE;
 
 baroDev_t sensors[4]; // See mappings SENSOR_U[5678] and PATIENT_PRESSURE, AMBIENT_PRESSURE, PITOT1, PITOT2
@@ -38,6 +46,10 @@ bool sensorsFound = false;
 void vispInit()
 {
   memset(&sensors, 0, sizeof(sensors));
+  ambientPressure = 0.0, throatPressure = 0.0;
+  pressure = 0.0; // Used for PC-CMV
+  volume = 0.0; // Used for VC-CMV
+  tidalVolume = 0.0; // Maybe used for VC-CMV definitely safety limits
 }
 
 void formatVisp(busDevice_t *busDev, struct visp_eeprom_s *data, uint8_t busType, uint8_t bodyType)
@@ -52,12 +64,10 @@ void formatVisp(busDevice_t *busDev, struct visp_eeprom_s *data, uint8_t busType
   data->bodyType = bodyType;
   data->bodyVersion = '0';
 
-  data->debug = DEBUG_DISABLED;
-
-//  // Make *sure* that the calibration data is formatted properly
-//  clearCalibrationData();
-//
-//  sanitizeVispData();
+  //  // Make *sure* that the calibration data is formatted properly
+  //  calibrateClear();
+  //
+  //  sanitizeVispData();
 
   writeEEPROM(busDev, (unsigned short)0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
 }
@@ -229,11 +239,11 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
   debug(PSTR("Detecting sensors"));
 
   if (!detectMuxedSensors(i2cBusA, enablePinA))
-  if (!detectMuxedSensors(i2cBusA, enablePinB))
-    if (!detectXLateSensors(i2cBusA, enablePinA))
-    if (!detectXLateSensors(i2cBusA, enablePinB))
-      if (!detectDualI2CSensors(i2cBusA, i2cBusB, enablePinA, enablePinB))
-        return;
+    if (!detectMuxedSensors(i2cBusA, enablePinB))
+      if (!detectXLateSensors(i2cBusA, enablePinA))
+        if (!detectXLateSensors(i2cBusA, enablePinB))
+          if (!detectDualI2CSensors(i2cBusA, i2cBusB, enablePinA, enablePinB))
+            return;
 
   // Make sure they are all there
   missing = (!sensors[0].busDev ? 1 : 0)
@@ -282,7 +292,7 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
 
   // We store the calibration data in the VISP eeprom variable to conserve ram space
   // We only have 2KB on an Arduino NANO/UNO
-  clearCalibrationData();
+  calibrateClear();
 
   sanitizeVispData();
 
@@ -291,4 +301,143 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
   // Just put it out there, what type we are for the status system to figure out
   info(PSTR("Sensors detected"));
   sendCurrentSystemHealth();
+}
+
+void calibrateClear()
+{
+  calibrationSampleCounter = 0;
+  memset(&visp_eeprom.calibrationOffsets, 0, sizeof(visp_eeprom.calibrationOffsets));
+}
+
+
+void calibrateApply(float * P)
+{
+  P[0] += visp_eeprom.calibrationOffsets[0];
+  P[1] += visp_eeprom.calibrationOffsets[1];
+  P[2] += visp_eeprom.calibrationOffsets[2];
+  P[3] += visp_eeprom.calibrationOffsets[3];
+}
+
+void calibrateSensors(float * P)
+{
+  if (calibrationSampleCounter == 1)
+    respond('C', PSTR("0,Starting Calibration"));
+  visp_eeprom.calibrationOffsets[0] += P[0];
+  visp_eeprom.calibrationOffsets[1] += P[1];
+  visp_eeprom.calibrationOffsets[2] += P[2];
+  visp_eeprom.calibrationOffsets[3] += P[3];
+  calibrationSampleCounter++;
+  if (calibrationSampleCounter == CALIBRATION_FINISHED) {
+    float average = (visp_eeprom.calibrationOffsets[0] + visp_eeprom.calibrationOffsets[1] + visp_eeprom.calibrationOffsets[2] + visp_eeprom.calibrationOffsets[3]) / 400.0;
+    for (int x = 0; x < 4; x++)
+    {
+      visp_eeprom.calibrationOffsets[x] = average - visp_eeprom.calibrationOffsets[x] / 100.0;
+    }
+    respond('C', PSTR("2,Calibration Finished"));
+  }
+}
+
+bool calibrateInProgress()
+{
+  return (calibrationSampleCounter<CALIBRATION_FINISHED);
+}
+
+
+
+// Use these definitions to map sensors output P[SENSOR_Ux] to their usage
+#define THROAT_PRESSURE  SENSOR_U5
+#define AMBIANT_PRESSURE SENSOR_U6
+#define PITOT1           SENSOR_U7
+#define PITOT2           SENSOR_U8
+
+void calculatePitotValues(float * P)
+{
+  const float paTocmH2O = 0.0101972;
+  float  airflow, roughVolume, pitot_diff, pitot1, pitot2;
+
+  pitot1 = P[PITOT1] - visp_eeprom.calibrationOffsets[PITOT1];
+  pitot2 = P[PITOT2] - visp_eeprom.calibrationOffsets[PITOT2];
+  ambientPressure = P[AMBIANT_PRESSURE] - visp_eeprom.calibrationOffsets[AMBIANT_PRESSURE];
+  throatPressure = P[THROAT_PRESSURE] - visp_eeprom.calibrationOffsets[THROAT_PRESSURE];
+  pressure = (throatPressure - ambientPressure) * paTocmH2O;
+
+  pitot_diff = (pitot1 - pitot2) / 100.0; // pascals to hPa
+
+  airflow = ((0.05 * pitot_diff * pitot_diff) - (0.0008 * pitot_diff)); // m/s
+  //airflow=sqrt(2.0*pitot_diff/2.875);
+  if (pitot_diff < 0) {
+    airflow = -airflow;
+  }
+  //airflow = -(-0.0008+sqrt(0.0008*0.0008-4*0.05*0.0084+4*0.05*pitot_diff))/2*0.05;
+
+  // TODO: smoothing for Pitot version
+  volume = roughVolume = airflow * 0.25 * 60.0; // volume for our 18mm orfice, and 60s/min
+}
+
+
+// Use these definitions to map sensors output P[SENSOR_Ux] to their usage
+//U7 is input tube, U8 is output tube, U5 is venturi, U6 is ambient
+#define VENTURI_SENSOR  SENSOR_U5
+#define VENTURI_AMBIANT SENSOR_U6
+#define VENTURI_INPUT   SENSOR_U7
+#define VENTURI_OUTPUT  SENSOR_U8
+void calculateVenturiValues(float * P)
+{
+  const float paTocmH2O = 0.0101972;
+  // venturi calculations
+  const float aPipe = 232.35219306;
+  const float aRestriction = 56.745017403;
+  const float a_diff = (aPipe * aRestriction) / sqrt((aPipe * aRestriction) - (aPipe * aRestriction)); // area difference
+  float roughVolume, inletPressure, outletPressure;
+
+  //    static float paTocmH2O = 0.00501972;
+  ambientPressure = P[VENTURI_AMBIANT];
+  inletPressure = P[VENTURI_INPUT];
+  outletPressure = P[VENTURI_OUTPUT];
+  // patientPressure = P[VENTURI_SENSOR];   // This is not used?
+  throatPressure = P[VENTURI_SENSOR];
+  pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;
+
+  //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m
+  //airflow = a_diff * sqrt(2.0 * (inletPressure - throatPressure)) / 998.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
+  // Why multiply by 2 then devide by a number, why not just divide by half the number?
+  //airflow = a_diff * sqrt((inletPressure - throatPressure) / (449.0*1.2)) * 600000.0; // airflow in cubic m/s *60000 to get L/m
+
+
+  if (inletPressure > outletPressure && inletPressure > throatPressure)
+  {
+    roughVolume = a_diff * sqrt((inletPressure - throatPressure) / (449.0 * 1.2)) * 0.6; // instantaneous volume
+  }
+  else if (outletPressure > inletPressure && outletPressure > throatPressure)
+  {
+    roughVolume = -a_diff * sqrt((outletPressure - throatPressure) / (449.0 * 1.2)) * 0.6;
+  }
+  else
+  {
+    roughVolume = 0.0;
+  }
+  if (isnan(roughVolume) || abs(roughVolume) < 1.0 )
+  {
+    roughVolume = 0.0;
+  }
+
+  const float alpha = 0.15; // smoothing factor for exponential filter
+  volume = roughVolume * alpha + volume * (1.0 - alpha);
+}
+
+
+void calculateTidalVolume()
+{
+  static unsigned long lastSampleTime = 0;
+  unsigned long sampleTime = millis();
+
+  if (lastSampleTime)
+  {
+    tidalVolume = tidalVolume + volume * (sampleTime - lastSampleTime) / 60 - 0.05; // tidal volume is the volume delivered to the patient at this time.  So it is cumulative.
+  }
+  if (tidalVolume < 0.0)
+  {
+    tidalVolume = 0.0;
+  }
+  lastSampleTime = sampleTime;
 }

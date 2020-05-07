@@ -43,16 +43,27 @@ volatile bool motorHoming = false;
 uint8_t motorMinSpeedDetected = 0; // Max speed is 255 on the PWM
 uint8_t motorMaxSpeedDetected = 0; // Max speed is 255 on the PWM
 
-
+uint8_t currentMode = MODE_OFF;
+debugState_e debug = DEBUG_DISABLED;
 
 
 //The Arduino has 3 timers and 6 PWM output pins. The relation between timers and PWM outputs is:
 //
-//    Pins 5 and 6: controlled by Timer0
-//    Pins 9 and 10: controlled by Timer1
-//    Pins 11 and 3: controlled by Timer2
+//    Pins 5 and 6: controlled by Timer0   (On the Uno and similar boards, pins 5 and 6 have a frequency of approximately 980 Hz.)
+//    Pins 9 and 10: controlled by Timer1  (490 Hz)
+//    Pins 11 and 3: controlled by Timer2  (490 Hz)
 //
 // We should rebalance the PWM's to give Timer1 or Timer2 to AccelStepper.
+//
+// The Arduino does not have a built-in digital-to-analog converter (DAC),
+// but it can pulse-width modulate (PWM) a digital signal to achieve some
+// of the functions of an analog output. The function used to output a
+// PWM signal is analogWrite(pin, value). pin is the pin number used for
+// the PWM output. value is a number proportional to the duty cycle of
+// the signal.
+// When value = 0, the signal is always off.
+// When value = 255, the signal is always on.
+// On most Arduino boards, the PWM function is available on pins 3, 5, 6, 9, 10, and 11. The frequency of the PWM signal on most pins is approximately 490 Hz.
 
 // Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
 // This is detected if needed
@@ -119,30 +130,6 @@ AccelStepper mystepper(AccelStepper::DRIVER, STEPPER_STEP, STEPPER_DIR); // Dire
 
 
 
-
-
-void handleSensorFailure();
-
-
-uint8_t calibrationSampleCounter = 0;
-
-
-
-
-
-runState_e runState = RUNSTATE_CALIBRATE;
-
-
-
-
-
-
-
-
-
-
-
-
 bool timeToReadSensors = false;
 
 
@@ -167,7 +154,7 @@ void tCheck (struct t * t ) {
 // Periodically pulse a pin
 void timeToPulseWatchdog()
 {
-  if (sensorsFound)
+  if (sensorsFound && motorFound)
   {
     digitalWrite(MISSING_PULSE_PIN, HIGH);
     delayMicroseconds(1);
@@ -182,7 +169,7 @@ void timeToReadVISP()
 
 int16_t modeBreathRateToMotorSpeed()
 {
-//  if (visp_eeprom.mode == MODE_PCCMV)
+  //  if (currentMode == MODE_PCCMV)
 
   return motorMinSpeedDetected;
 }
@@ -199,7 +186,7 @@ void timeToCheckPatient()
   // breathRate is in breaths per minute. timeout= 60*1000/bpm
   // breatRation is a 1:X where 1=inhale, and X=exhale.  So a 1:2 is 50% inhaling and 50% exhaling
 
-  if (visp_eeprom.mode == MODE_OFF)
+  if (currentMode == MODE_OFF)
     return;
 
   if (theMillis > timeToInhale)
@@ -255,13 +242,6 @@ t tasks[] = {
 
 /*** End of timer callback subsystem ***/
 
-
-void clearCalibrationData()
-{
-  runState = RUNSTATE_CALIBRATE;
-  calibrationSampleCounter = 0;
-  memset(&visp_eeprom.calibrationOffsets, 0, sizeof(visp_eeprom.calibrationOffsets));
-}
 
 
 // Let the motor run until we get the correct number of pulses
@@ -428,7 +408,7 @@ void setup() {
 
   busDeviceInit();
   vispInit();
-  
+
   mystepper.setAcceleration(2000);
   mystepper.setMaxSpeed(STEPPER_STEPS_PER_REV * 3);
 
@@ -437,8 +417,7 @@ void setup() {
 
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
-  visp_eeprom.debug = DEBUG_DISABLED;
-  clearCalibrationData();
+  debug = DEBUG_DISABLED;
   sanitizeVispData(); // Apply defaults
 
   homeThisPuppy(true);
@@ -449,186 +428,19 @@ void setup() {
   motorStop(); /* sensor detached, motor unplugged, etc */
   info(PSTR("motor state = %S"), motorFound ? PSTR("Found") : PSTR("Missing"));
   calibrateMotorSpeeds();
-}
 
-void dataSend(unsigned long sampleTime, float pressure, float volumeSmoothed, float tidalVolume, float * P)
-{
-  // Take some time to write to the serial port
-  hwSerial.print('d');
-  hwSerial.print(',');
-  hwSerial.print(sampleTime);
-  hwSerial.print(',');
-  hwSerial.print(pressure, 4);
-  hwSerial.print(',');
-  hwSerial.print(volumeSmoothed, 4);
-  hwSerial.print(',');
-  hwSerial.print(tidalVolume, 4);
-  if (visp_eeprom.debug == DEBUG_DISABLED)
-  {
-    hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U5], 1);
-    hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U6], 1);
-    hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U7], 1);
-    hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U8], 1);
-  }
-  hwSerial.println();
+  // Start the VISP calibration process  
+  calibrateClear();
 }
 
 
 
-void doCalibration(float * P)
-{
-  if (calibrationSampleCounter == 0)
-  {
-    respond('C', PSTR("0,Starting Calibration"));
-    clearCalibrationData();
-  }
-  visp_eeprom.calibrationOffsets[0] += P[0];
-  visp_eeprom.calibrationOffsets[1] += P[1];
-  visp_eeprom.calibrationOffsets[2] += P[2];
-  visp_eeprom.calibrationOffsets[3] += P[3];
-  calibrationSampleCounter++;
-  if (calibrationSampleCounter == 99) {
-    float average = (visp_eeprom.calibrationOffsets[0] + visp_eeprom.calibrationOffsets[1] + visp_eeprom.calibrationOffsets[2] + visp_eeprom.calibrationOffsets[3]) / 400.0;
-    for (int x = 0; x < 4; x++)
-    {
-      visp_eeprom.calibrationOffsets[x] = average - visp_eeprom.calibrationOffsets[x] / 100.0;
-    }
-    calibrationSampleCounter = 0;
-    runState = RUNSTATE_RUN;
-    respond('C', PSTR("2,Calibration Finished"));
-  }
-}
 
-
-// Use these definitions to map sensors to their usage
-#define PATIENT_PRESSURE SENSOR_U5
-#define AMBIANT_PRESSURE SENSOR_U6
-#define PITOT1           SENSOR_U7
-#define PITOT2           SENSOR_U8
-
-void loopPitotVersion(float * P, float * T)
-{
-  float  airflow, volume, pitot_diff, ambientPressure, pitot1, pitot2, patientPressure, pressure;
-
-  switch (runState)
-  {
-    case RUNSTATE_CALIBRATE:
-      doCalibration(P);
-      break;
-
-    case RUNSTATE_RUN:
-      const float paTocmH2O = 0.0101972;
-      //    static float paTocmH2O = 0.00501972;
-      ambientPressure = P[AMBIANT_PRESSURE] - visp_eeprom.calibrationOffsets[AMBIANT_PRESSURE];
-      pitot1 = P[PITOT1] - visp_eeprom.calibrationOffsets[PITOT1];
-      pitot2 = P[PITOT2] - visp_eeprom.calibrationOffsets[PITOT2];
-      patientPressure = P[PATIENT_PRESSURE] - visp_eeprom.calibrationOffsets[PATIENT_PRESSURE];
-
-      pitot_diff = (pitot1 - pitot2) / 100.0; // pascals to hPa
-
-      airflow = ((0.05 * pitot_diff * pitot_diff) - (0.0008 * pitot_diff)); // m/s
-      //airflow=sqrt(2.0*pitot_diff/2.875);
-      if (pitot_diff < 0) {
-        airflow = -airflow;
-      }
-      //airflow = -(-0.0008+sqrt(0.0008*0.0008-4*0.05*0.0084+4*0.05*pitot_diff))/2*0.05;
-
-      volume = airflow * 0.25 * 60.0; // volume for our 18mm orfice, and 60s/min
-      pressure = (patientPressure - ambientPressure) * paTocmH2O; // average of all sensors in the tube for pressure reading
-
-      // Take some time to write to the serial port
-      dataSend(millis(), pressure, volume, 0.0, P);
-      break;
-  }
-}
-
-//U7 is input tube, U8 is output tube, U5 is venturi, U6 is ambient
-#define VENTURI_SENSOR  SENSOR_U5
-#define VENTURI_AMBIANT SENSOR_U6
-#define VENTURI_INPUT   SENSOR_U7
-#define VENTURI_OUTPUT  SENSOR_U8
-void loopVenturiVersion(float * P, float * T)
-{
-  static float volumeSmoothed = 0.0; // It only needs to be in this function, but needs to be persistant, so make it static
-  static float tidalVolume = 0.0;
-  static unsigned long lastSampleTime = 0;
-  float volume, inletPressure, outletPressure, throatPressure, ambientPressure, pressure;
-  unsigned long sampleTime = millis();
-
-  switch (runState)
-  {
-    case RUNSTATE_CALIBRATE:
-      doCalibration(P);
-      break;
-
-    case RUNSTATE_RUN:
-      P[0] += visp_eeprom.calibrationOffsets[0];
-      P[1] += visp_eeprom.calibrationOffsets[1];
-      P[2] += visp_eeprom.calibrationOffsets[2];
-      P[3] += visp_eeprom.calibrationOffsets[3];
-      const float paTocmH2O = 0.0101972;
-      // venturi calculations
-      const float a1 = 232.35219306; // area of pipe
-      const float a2 = 56.745017403; // area of restriction
-
-      const float a_diff = (a1 * a2) / sqrt((a1 * a1) - (a2 * a2)); // area difference
-
-      //    static float paTocmH2O = 0.00501972;
-      ambientPressure = P[VENTURI_AMBIANT];
-      inletPressure = P[VENTURI_INPUT];
-      outletPressure = P[VENTURI_OUTPUT];
-      // patientPressure = P[VENTURI_SENSOR];   // This is not used?
-      throatPressure = P[VENTURI_SENSOR];
-
-      //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m
-      //airflow = a_diff * sqrt(2.0 * (inletPressure - throatPressure)) / 998.0) * 600000.0; // airflow in cubic m/s *60000 to get L/m
-      // Why multiply by 2 then devide by a number, why not just divide by half the number?
-      //airflow = a_diff * sqrt((inletPressure - throatPressure) / (449.0*1.2)) * 600000.0; // airflow in cubic m/s *60000 to get L/m
-
-
-      if (inletPressure > outletPressure && inletPressure > throatPressure)
-      {
-        volume = a_diff * sqrt((inletPressure - throatPressure) / (449.0 * 1.2)) * 0.6; // instantaneous volume
-      }
-      else if (outletPressure > inletPressure && outletPressure > throatPressure)
-      {
-        volume = -a_diff * sqrt((outletPressure - throatPressure) / (449.0 * 1.2)) * 0.6;
-      }
-      else
-      {
-        volume = 0.0;
-      }
-      if (isnan(volume) || abs(volume) < 1.0 )
-      {
-        volume = 0.0;
-      }
-
-      const float alpha = 0.15; // smoothing factor for exponential filter
-      volumeSmoothed = volume * alpha + volumeSmoothed * (1.0 - alpha);
-
-      if (lastSampleTime)
-      {
-        tidalVolume = tidalVolume + volumeSmoothed * (sampleTime - lastSampleTime) / 60 - 0.05; // tidal volume is the volume delivered to the patient at this time.  So it is cumulative.
-      }
-      if (tidalVolume < 0.0)
-      {
-        tidalVolume = 0.0;
-      }
-      lastSampleTime = sampleTime;
-      pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;
-
-      dataSend(sampleTime, pressure, volumeSmoothed, tidalVolume, P);
-      break;
-  }
-}
 
 
 void loop() {
   static float P[4], T[4];
+
   motorRunStepper();
 
   for (t_t *entry = tasks; entry->cbk; entry++)
@@ -654,13 +466,45 @@ void loop() {
     // Hence the double checks one above, and this one below
     if (sensorsFound)
     {
-      if (visp_eeprom.bodyType == 'P')
-        loopPitotVersion(P, T);
+      if (calibrateInProgress())
+          calibrateSensors(P);
       else
-        loopVenturiVersion(P, T);
+      {
+          calibrateApply(P);
+
+          if (visp_eeprom.bodyType == 'P')
+            calculatePitotValues(P);
+          else
+            calculateVenturiValues(P);
+      }
+
+      // TidalVolume is the same for both versions
+      calculateTidalVolume();      
+
+      // Take some time to write to the serial port
+      dataSend(P);
     }
   }
-
+#ifdef NEWISH
+  if (timeToCheckMotors && sensorsFound)
+  {
+    switch (currentMode == MODE_PCCMV)
+    {
+      case PC_CMV:
+        if (pressure < visp_eeprom.pressure)
+          motorSpeedUp();
+        if (pressure < visp_eeprom.pressure)
+          motorSpeedDown();
+        break;
+      case VC_CMV:
+        if (volume < visp_eeprom.volume)
+          motorSpeedUp();
+        if (volume < visp_eeprom.volume)
+          motorSpeedDown();
+        break;
+    }
+  }
+#endif
   // Command parser uses 6530 bytes of flash... This is a LOT
   // Handle user input, 1 character at a time
   while (hwSerial.available())

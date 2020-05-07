@@ -156,6 +156,7 @@ typedef void (*respondCallback)(struct settingsEntry_s *);
 
 struct settingsEntry_s {
   const uint32_t bitmask;
+  const int8_t validModes;
   const char * const theName;
   const int16_t theMin;
   const int16_t theMax;
@@ -188,6 +189,7 @@ void respondFloat(struct settingsEntry_s * entry);
 void respondInt8(struct settingsEntry_s * entry);
 void respondInt16(struct settingsEntry_s * entry);
 void respondInt8ToDict(struct settingsEntry_s * entry);
+void actionUpdateDisplayIcons(struct settingsEntry_s *);
 
 
 void handleNewVolume(struct settingsEntry_s * entry)
@@ -195,26 +197,25 @@ void handleNewVolume(struct settingsEntry_s * entry)
   //volumeTimeout=((motorCycleTime/2)*(visp_eeprom.vreath_volume/MAX_VOLUME); // Half way through a cycle is full compression
 }
 
-
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
-  {RESPOND_MODE,             strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.mode},
-  {RESPOND_DEBUG,            strDebug, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.debug},
-  {RESPOND_BODYTYPE,         strBodyType, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.bodyType},
-  {RESPOND_BREATH_VOLUME,    strBreathVolume, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
-  {RESPOND_BREATH_RATE,      strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
-  {RESPOND_BREATH_PRESSURE,  strBreathPressure, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
-  {RESPOND_BREATH_RATIO,     strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
-  {RESPOND_BREATH_THRESHOLD, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
-  {RESPOND_CALIB0,           strCalib0, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[0]},
-  {RESPOND_CALIB1,           strCalib1, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[1]},
-  {RESPOND_CALIB2,           strCalib2, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[2]},
-  {RESPOND_CALIB3,           strCalib3, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[3]},
-  {RESPOND_SENSOR0,          strSensor0, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[0].sensorType},
-  {RESPOND_SENSOR1,          strSensor1, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
-  {RESPOND_SENSOR2,          strSensor2, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
-  {RESPOND_SENSOR3,          strSensor3, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
-  {0, NULL, 0, 0, NULL, NULL, NULL, NULL}
+  {RESPOND_MODE,             MODE_ALL, strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
+  {RESPOND_BREATH_RATE,      MODE_ALL, strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
+  {RESPOND_BREATH_RATIO,     MODE_ALL, strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
+  {RESPOND_BREATH_VOLUME,    MODE_VCCMV | MODE_OFF, strBreathVolume, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
+  {RESPOND_BREATH_PRESSURE,  MODE_PCCMV | MODE_OFF, strBreathPressure, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
+  {RESPOND_BREATH_THRESHOLD, MODE_NONE, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
+  {RESPOND_BODYTYPE,         MODE_NONE, strBodyType, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.bodyType},
+  {RESPOND_CALIB0,           MODE_NONE, strCalib0, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[0]},
+  {RESPOND_CALIB1,           MODE_NONE, strCalib1, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[1]},
+  {RESPOND_CALIB2,           MODE_NONE, strCalib2, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[2]},
+  {RESPOND_CALIB3,           MODE_NONE, strCalib3, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[3]},
+  {RESPOND_SENSOR0,          MODE_NONE, strSensor0, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[0].sensorType},
+  {RESPOND_SENSOR1,          MODE_NONE, strSensor1, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
+  {RESPOND_SENSOR2,          MODE_NONE, strSensor2, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
+  {RESPOND_SENSOR3,          MODE_NONE, strSensor3, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
+  {RESPOND_DEBUG,            MODE_NONE, strDebug, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &debug},
+  {0, MODE_NONE,  NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
 
 
@@ -366,6 +367,27 @@ void respondSettingLimits(struct settingsEntry_s * entry)
   }
 }
 
+void respondEnabled(struct settingsEntry_s * entry)
+{
+  respond('S', PSTR("%S_display,%S"), entry->theName,
+          ((entry->validModes & currentMode)==0 ? strDisabled : strEnabled));
+}
+
+void actionUpdateDisplayIcons(struct settingsEntry_s *)
+{
+  uint8_t x = 0;
+  struct settingsEntry_s entry = {0};
+
+  do
+  {
+    // We must copy the struct from flash to access it
+    memcpy_P(&entry, & settings[x], sizeof(entry));
+    x++;
+    if (entry.bitmask)
+        respondEnabled(&entry);
+  }
+  while (entry.bitmask != 0);
+}
 
 void respondAppropriately(uint32_t flags)
 {
@@ -381,7 +403,10 @@ void respondAppropriately(uint32_t flags)
     if (entry.bitmask & flags)
     {
       if (flags & RESPOND_LIMITS)
+      {
         respondSettingLimits(&entry);
+        respondEnabled(&entry);
+      }
       entry.respondIt(&entry);
     }
   }
@@ -439,11 +464,6 @@ void handleQueryCommand(const char *arg1, const char *arg2)
   respond('Q', PSTR("Finished"));
 }
 
-void handlePingCommand(const char *arg1, const char *arg2)
-{
-  respond('P', PSTR("I am alive!"));
-}
-
 void handleIdentifyCommand(const char *arg1, const char *arg2)
 {
   respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
@@ -451,7 +471,7 @@ void handleIdentifyCommand(const char *arg1, const char *arg2)
 
 void handleCalibrateCommand(const char *arg1, const char *arg2)
 {
-  clearCalibrationData();
+  calibrateClear();
 }
 
 // Core system health (we need a way to clear errors, like once the sensors are attached)
@@ -496,7 +516,6 @@ struct commandEntry_s {
 };
 
 const struct commandEntry_s commands[] PUTINFLASH = {
-  { 'P', handlePingCommand},
   { 'C', handleCalibrateCommand},
   { 'I', handleIdentifyCommand},
   { 'Q', handleQueryCommand},
@@ -536,7 +555,7 @@ void commandParser(int cmdByte)
       memcpy_P(&entry, & commands[x], sizeof(entry));
       if (command == entry.cmdByte)
         entry.doIt(arg1, arg2);
-        x++;
+      x++;
     } while (entry.cmdByte);
     return;
   }
@@ -580,4 +599,30 @@ void commandParser(int cmdByte)
     case PARSE_IGNORE_TILL_LF:
       break;
   }
+}
+
+void dataSend(float *P)
+{
+  // Take some time to write to the serial port
+  hwSerial.print('d');
+  hwSerial.print(',');
+  hwSerial.print(millis());
+  hwSerial.print(',');
+  hwSerial.print(pressure, 4);
+  hwSerial.print(',');
+  hwSerial.print(volume, 4);
+  hwSerial.print(',');
+  hwSerial.print(tidalVolume, 4);
+  if (debug == DEBUG_DISABLED)
+  {
+    hwSerial.print(',');
+    hwSerial.print(P[SENSOR_U5], 1);
+    hwSerial.print(',');
+    hwSerial.print(P[SENSOR_U6], 1);
+    hwSerial.print(',');
+    hwSerial.print(P[SENSOR_U7], 1);
+    hwSerial.print(',');
+    hwSerial.print(P[SENSOR_U8], 1);
+  }
+  hwSerial.println();
 }

@@ -102,7 +102,8 @@ const char strBMP280 [] PUTINFLASH = "BMP280";
 const char strSPL06 [] PUTINFLASH = "SPL06";
 const char strOff [] PUTINFLASH = "OFF";
 const char strModeOffDesc [] PUTINFLASH = "Offline";
-
+const char strManual [] PUTINFLASH = "Manual";
+const char strManualdesc [] PUTINFLASH = "Manual mode, analog dials on unit";
 
 const struct dictionary_s sensorDict[] PUTINFLASH = {
   {SENSOR_UNKNOWN, strUnknown, strUnknown},
@@ -113,9 +114,10 @@ const struct dictionary_s sensorDict[] PUTINFLASH = {
 };
 
 const struct dictionary_s modeDict[] PUTINFLASH = {
-  {MODE_OFF,     strOff, strModeOffDesc},
+  {MODE_OFF,     strOff,     strModeOffDesc},
   {MODE_PCCMV,   strPCCMV,   strPCCMVdesc},
   {MODE_VCCMV,   strVCCMV,   strVCCMVdesc},
+  {MODE_MANUAL,  strManual,  strManualdesc},
   { -1, NULL, NULL}
 };
 
@@ -199,9 +201,9 @@ void handleNewVolume(struct settingsEntry_s * entry)
 
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
-  {RESPOND_MODE,             MODE_ALL, strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
-  {RESPOND_BREATH_RATE,      MODE_ALL, strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
-  {RESPOND_BREATH_RATIO,     MODE_ALL, strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
+  {RESPOND_MODE,             (MODE_ALL^MODE_MANUAL), strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
+  {RESPOND_BREATH_RATE,      (MODE_ALL^MODE_MANUAL), strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
+  {RESPOND_BREATH_RATIO,     (MODE_ALL^MODE_MANUAL), strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
   {RESPOND_BREATH_VOLUME,    MODE_VCCMV | MODE_OFF, strBreathVolume, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
   {RESPOND_BREATH_PRESSURE,  MODE_PCCMV | MODE_OFF, strBreathPressure, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
   {RESPOND_BREATH_THRESHOLD, MODE_NONE, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},

@@ -73,7 +73,10 @@
 #define MODE_OFF   0x01
 #define MODE_PCCMV 0x02
 #define MODE_VCCMV 0x04
+#define MODE_MANUAL 0x08 // No display, just some analog dial inputs that adjust breath_rate, I:E ratio, and pressure/volume limit
 #define MODE_ALL   0xFF
+
+// rate, i:e, pressure, volume, mode as analog inputs  5 of them...  e have 6 available on the nano!
 
 extern uint8_t currentMode;
 

@@ -175,11 +175,17 @@ int16_t modeBreathRateToMotorSpeed()
 }
 
 void homeThisPuppy(bool forced);
+void motorSpeedUp();
+void motorSpeedDown();
 
 
 unsigned long timeToInhale = 0;
-unsigned long timeToStopInhale = 0;
+unsigned long timeToStopInhale = -1;
 bool lastBreathMotorDirection = false;
+bool isInInhaleCycle = false;
+
+#define isInInhaleCycle() (timeToStopInhale < 0)
+
 void timeToCheckPatient()
 {
   unsigned long theMillis = millis();
@@ -189,6 +195,7 @@ void timeToCheckPatient()
   if (currentMode == MODE_OFF)
     return;
 
+  // The patenti hasn't tried to breath on their own...
   if (theMillis > timeToInhale)
   {
     unsigned long nextBreathCycle = ((60.0 / (float)visp_eeprom.breath_rate) * 1000.0);
@@ -219,6 +226,30 @@ void timeToCheckPatient()
     homeThisPuppy(false);
     timeToStopInhale = -1;
   }
+
+  // TODO: if in the middle of the inhalation time, and we don't have any pressure from the VISP,
+  // TODO: either we have a motor fault or we have a disconnected tube
+
+  if (isInInhaleCycle() && sensorsFound)
+  {
+    switch (currentMode)
+    {
+      case MODE_MANUAL:
+        break;
+      case MODE_PCCMV:
+        if (pressure < visp_eeprom.breath_pressure)
+          motorSpeedUp();
+        if (pressure > visp_eeprom.breath_pressure)
+          motorSpeedDown();
+        break;
+      case MODE_VCCMV:
+        if (volume < visp_eeprom.breath_volume)
+          motorSpeedUp();
+        if (volume > visp_eeprom.breath_volume)
+          motorSpeedDown();
+        break;
+    }
+  }
 }
 
 void timeToCheckSensors()
@@ -229,12 +260,13 @@ void timeToCheckSensors()
     detectVISP(i2cBus1, i2cBus2, ENABLE_PIN_BUS_A, ENABLE_PIN_BUS_B);
 }
 
+
 // Timer Driven Tasks and their Schedules.
 // These are checked and executed in order.
 // If something takes priority over another task, put it at the top of the list
 t tasks[] = {
   {0, 20, timeToReadVISP},
-  {0, 5,  timeToCheckPatient},
+  {0, 50,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
   {0, 500, timeToCheckSensors},
   {0, 0, NULL} // End of list
@@ -258,6 +290,49 @@ void homeTriggered() // IRQ function
 }
 
 bool motorWasGoingForward = false;
+uint8_t motorSpeed = 0;
+
+// For PC-CMV and VC-CMV
+void motorSpeedUp()
+{
+  if (motorSpeed < 0)
+  {
+    if (motorSpeed > -255)
+    {
+      motorSpeed--;
+      motorReverse(-motorSpeed);
+    }
+  }
+  else
+  {
+    if (motorSpeed < 255)
+    {
+      motorSpeed++;
+      motorForward(motorSpeed);
+    }
+  }
+  debug(PSTR("Speeding up motor to %d"), motorSpeed);
+}
+
+// For PC-CMV and VC-CMV
+void motorSpeedDown()
+{
+  if (motorSpeed < 0)
+  {
+    motorSpeed++;
+    motorReverse(-motorSpeed);
+  }
+  else
+  {
+    if (motorSpeed > 0)
+    {
+      motorSpeed--;
+      motorForward(motorSpeed);
+    }
+  }
+  debug(PSTR("Slowing down motor to %d"), motorSpeed);
+}
+
 void motorReverse(int rate)
 {
   motorWasGoingForward = false;
@@ -269,8 +344,8 @@ void motorReverse(int rate)
   analogWrite(M_PWM_2, rate);
 
   //  analogWrite(BLDC_PWM, rate);
-  rate = -rate;
-  mystepper.setSpeed(rate);
+  motorSpeed = -rate;
+  mystepper.setSpeed(motorSpeed);
 }
 
 void motorForward(int rate)
@@ -284,6 +359,7 @@ void motorForward(int rate)
   analogWrite(M_PWM_2, rate);
 
   //  analogWrite(BLDC_PWM, rate);
+  motorSpeed = rate;
   mystepper.setSpeed(rate);
 }
 
@@ -435,10 +511,13 @@ void setup() {
 
 
 
-
+// Every second, compute how much time we spent working, and report the percentage
+unsigned long currentUtilization = 0;
+unsigned long utilizationTimeout = 0;
 
 void loop() {
   static float P[4], T[4];
+  unsigned long startMicros = micros();
 
   motorRunStepper();
 
@@ -482,28 +561,18 @@ void loop() {
       dataSend(P);
     }
   }
-#ifdef NEWISH
-  if (timeToCheckMotors && sensorsFound)
-  {
-    switch (currentMode == MODE_PCCMV)
-    {
-      case PC_CMV:
-        if (pressure < visp_eeprom.pressure)
-          motorSpeedUp();
-        if (pressure < visp_eeprom.pressure)
-          motorSpeedDown();
-        break;
-      case VC_CMV:
-        if (volume < visp_eeprom.volume)
-          motorSpeedUp();
-        if (volume < visp_eeprom.volume)
-          motorSpeedDown();
-        break;
-    }
-  }
-#endif
+
+
   // Command parser uses 6530 bytes of flash... This is a LOT
   // Handle user input, 1 character at a time
   while (hwSerial.available())
     commandParser(hwSerial.read());
+
+  if (millis() > utilizationTimeout)
+  {
+    info(PSTR("Utilization %l%%"), currentUtilization / 10000);
+    currentUtilization = 0;
+    utilizationTimeout = millis() + 1000;
+  }
+  currentUtilization += micros() - startMicros;
 }

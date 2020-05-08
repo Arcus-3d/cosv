@@ -604,12 +604,12 @@ bool bmp280Detect(baroDev_t *baro, busDevice_t *busDev)
 bool bmp388GetUP(baroDev_t *baro)
 {
   uint8_t data[BMP388_DATA_FRAME_SIZE]; //, status;
-
-  //if (busReadBuf(baro->busDev, BMP388_INT_STATUS_REG, &status, 1))
-  //{
-  //  if (0 == (status &  (1 << 3)))
-  //    busPrint(baro->busDev, PSTR("Data is NOT ready"));
-  //}
+  uint8_t status;
+  if (busReadBuf(baro->busDev, BMP388_INT_STATUS_REG, &status, 1))
+  {
+    if (0 == (status &  (1 << 3)))
+      busPrint(baro->busDev, PSTR("Data is NOT ready"));
+  }
 
   bool ack = busReadBuf(baro->busDev, BMP388_DATA_0_REG, data, BMP388_DATA_FRAME_SIZE);
   if (ack)

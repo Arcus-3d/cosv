@@ -30,6 +30,8 @@
 busDevice_t *eeprom = NULL;
 visp_eeprom_t visp_eeprom;
 
+float calibrationOffsets[4];
+
 float ambientPressure = 0.0, throatPressure = 0.0;
 float pressure = 0.0; // Used for PC-CMV
 float volume = 0.0; // Used for VC-CMV
@@ -246,23 +248,20 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
             return;
 
   // Make sure they are all there
-  missing = (!sensors[0].busDev ? 1 : 0)
-            | (!sensors[1].busDev ? 2 : 0)
-            | (!sensors[2].busDev ? 4 : 0)
-            | (!sensors[3].busDev ? 8 : 0);
+  missing = 0;
+  for (int x = 0; x < 4; x++)
+    missing |= (sensors[x].busDev ? 0 : 1<<x);
+    
   if (missing)
   {
     warning(PSTR("Sensors missing 0x%x"), missing);
     return;
   }
 
-  switch (detectedVispType) {
-    case VISP_BUS_TYPE_I2C:   debug(PSTR("DUAL I2C%S"), strBasedType); break;
-    case VISP_BUS_TYPE_XLATE: debug(PSTR("XLate%S"), strBasedType);    break;
-    case VISP_BUS_TYPE_MUX:   debug(PSTR("MUX%S"), strBasedType);      break;
-    case VISP_BUS_TYPE_SPI:   debug(PSTR("SPI%S"), strBasedType);      break;
-    case VISP_BUS_TYPE_NONE:  break;
-  }
+  if (detectedVispType == VISP_BUS_TYPE_I2C) debug(PSTR("DUAL I2C%S"), strBasedType);
+  else if (detectedVispType == VISP_BUS_TYPE_XLATE) debug(PSTR("XLate%S"), strBasedType);
+  else if (detectedVispType == VISP_BUS_TYPE_MUX)  debug(PSTR("MUX%S"), strBasedType);
+  else if (detectedVispType == VISP_BUS_TYPE_SPI) debug(PSTR("SPI%S"), strBasedType);
 
   if (eeprom)
   {
@@ -289,11 +288,6 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
   if (format)
     formatVisp(eeprom, &visp_eeprom, detectedVispType, VISP_BODYTYPE_VENTURI);
 
-
-  // We store the calibration data in the VISP eeprom variable to conserve ram space
-  // We only have 2KB on an Arduino NANO/UNO
-  calibrateClear();
-
   sanitizeVispData();
 
   sensorsFound = true;
@@ -306,40 +300,39 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
 void calibrateClear()
 {
   calibrationSampleCounter = 0;
-  memset(&visp_eeprom.calibrationOffsets, 0, sizeof(visp_eeprom.calibrationOffsets));
+  memset(&calibrationOffsets, 0, sizeof(calibrationOffsets));
 }
 
 
 void calibrateApply(float * P)
 {
-  P[0] += visp_eeprom.calibrationOffsets[0];
-  P[1] += visp_eeprom.calibrationOffsets[1];
-  P[2] += visp_eeprom.calibrationOffsets[2];
-  P[3] += visp_eeprom.calibrationOffsets[3];
+  for (int x = 0; x < 4; x++)
+    P[x] += calibrationOffsets[x];
 }
 
 void calibrateSensors(float * P)
 {
+  int x;
   if (calibrationSampleCounter == 1)
     respond('C', PSTR("0,Starting Calibration"));
-  visp_eeprom.calibrationOffsets[0] += P[0];
-  visp_eeprom.calibrationOffsets[1] += P[1];
-  visp_eeprom.calibrationOffsets[2] += P[2];
-  visp_eeprom.calibrationOffsets[3] += P[3];
+  for (x = 0; x < 4; x++)
+    calibrationOffsets[x] += P[x];
   calibrationSampleCounter++;
   if (calibrationSampleCounter == CALIBRATION_FINISHED) {
-    float average = (visp_eeprom.calibrationOffsets[0] + visp_eeprom.calibrationOffsets[1] + visp_eeprom.calibrationOffsets[2] + visp_eeprom.calibrationOffsets[3]) / 400.0;
-    for (int x = 0; x < 4; x++)
-    {
-      visp_eeprom.calibrationOffsets[x] = average - visp_eeprom.calibrationOffsets[x] / 100.0;
-    }
+    float average = 0.0;
+    for (x = 0; x < 4; x++)
+      average += calibrationOffsets[x];
+    average /= 400.0;
+
+    for (x = 0; x < 4; x++)
+      calibrationOffsets[x] = average - calibrationOffsets[x] / 100.0;
     respond('C', PSTR("2,Calibration Finished"));
   }
 }
 
 bool calibrateInProgress()
 {
-  return (calibrationSampleCounter<CALIBRATION_FINISHED);
+  return (calibrationSampleCounter < CALIBRATION_FINISHED);
 }
 
 
@@ -355,10 +348,10 @@ void calculatePitotValues(float * P)
   const float paTocmH2O = 0.0101972;
   float  airflow, roughVolume, pitot_diff, pitot1, pitot2;
 
-  pitot1 = P[PITOT1] - visp_eeprom.calibrationOffsets[PITOT1];
-  pitot2 = P[PITOT2] - visp_eeprom.calibrationOffsets[PITOT2];
-  ambientPressure = P[AMBIANT_PRESSURE] - visp_eeprom.calibrationOffsets[AMBIANT_PRESSURE];
-  throatPressure = P[THROAT_PRESSURE] - visp_eeprom.calibrationOffsets[THROAT_PRESSURE];
+  pitot1 = P[PITOT1];
+  pitot2 = P[PITOT2];
+  ambientPressure = P[AMBIANT_PRESSURE];
+  throatPressure = P[THROAT_PRESSURE];
   pressure = (throatPressure - ambientPressure) * paTocmH2O;
 
   pitot_diff = (pitot1 - pitot2) / 100.0; // pascals to hPa
@@ -387,7 +380,7 @@ void calculateVenturiValues(float * P)
   // venturi calculations
   const float aPipe = 232.35219306;
   const float aRestriction = 56.745017403;
-  const float a_diff = (aPipe * aRestriction) / sqrt((aPipe * aRestriction) - (aPipe * aRestriction)); // area difference
+  const float a_diff = (aPipe * aRestriction) / sqrt((aPipe * aPipe) - (aRestriction * aRestriction)); // area difference
   float roughVolume, inletPressure, outletPressure;
 
   //    static float paTocmH2O = 0.00501972;

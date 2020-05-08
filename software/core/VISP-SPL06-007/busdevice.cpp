@@ -60,7 +60,7 @@ void busPrint(busDevice_t *bus, const char *function)
   }
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("%S(I2C: address=0x%x channel=%d enablePin=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin);
+    debug(PSTR("%S(0x%x I2C: address=0x%x channel=%d enablePin=%d refCount=%d)"), function, bus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin,bus->refCount);
     return;
   }
 
@@ -76,6 +76,7 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, b
   busDevice_t *dev = NULL;
 
   for (uint8_t x = 0; x < MAX_DEVICES; x++)
+  {
     if (devices[x].refCount == 0)
     {
       dev = &devices[x];
@@ -88,10 +89,15 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, b
       dev->busdev.i2c.channelDev = channelDev;
       dev->busdev.i2c.enablePin = enablePin;
       dev->refCount = 1;
+      busPrint(dev, PSTR("busDeviceInitI2C()"));
       if (channelDev)
+      {
         channelDev->refCount++;
+      busPrint(dev, PSTR("   busDeviceInitI2C() SUPPORTING MUX="));
+      }
       return dev;
     }
+  }
   return NULL;
 }
 
@@ -142,7 +148,7 @@ bool busDeviceDetect(busDevice_t *busDev)
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    // busPrint(busDev, PSTR("Detecting if present"));
+    busPrint(busDev, PSTR("Detecting if present"));
 
     // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
     if (busDev->busdev.i2c.enablePin != -1)
@@ -158,8 +164,8 @@ bool busDeviceDetect(busDevice_t *busDev)
 
     if (error == 0)
       busPrint(busDev, PSTR("DETECTED!!!"));
-    //else
-    //  busPrint(busDev, PSTR("MISSING..."));
+    else
+      busPrint(busDev, PSTR("MISSING..."));
     return (error == 0);
   }
   else

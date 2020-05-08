@@ -156,7 +156,7 @@ typedef void (*respondCallback)(struct settingsEntry_s *);
 
 struct settingsEntry_s {
   const uint32_t bitmask;
-  const int8_t validModes;
+  const int      validModes;
   const char * const theName;
   const int16_t theMin;
   const int16_t theMax;
@@ -206,10 +206,10 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_BREATH_PRESSURE,  MODE_PCCMV | MODE_OFF, strBreathPressure, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
   {RESPOND_BREATH_THRESHOLD, MODE_NONE, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
   {RESPOND_BODYTYPE,         MODE_NONE, strBodyType, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.bodyType},
-  {RESPOND_CALIB0,           MODE_NONE, strCalib0, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[0]},
-  {RESPOND_CALIB1,           MODE_NONE, strCalib1, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[1]},
-  {RESPOND_CALIB2,           MODE_NONE, strCalib2, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[2]},
-  {RESPOND_CALIB3,           MODE_NONE, strCalib3, -1000, 1000, NULL, noSet, respondFloat, NULL, &visp_eeprom.calibrationOffsets[3]},
+  {RESPOND_CALIB0,           MODE_NONE, strCalib0, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[0]},
+  {RESPOND_CALIB1,           MODE_NONE, strCalib1, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[1]},
+  {RESPOND_CALIB2,           MODE_NONE, strCalib2, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[2]},
+  {RESPOND_CALIB3,           MODE_NONE, strCalib3, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[3]},
   {RESPOND_SENSOR0,          MODE_NONE, strSensor0, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[0].sensorType},
   {RESPOND_SENSOR1,          MODE_NONE, strSensor1, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
   {RESPOND_SENSOR2,          MODE_NONE, strSensor2, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
@@ -613,7 +613,7 @@ void dataSend(float *P)
   hwSerial.print(volume, 4);
   hwSerial.print(',');
   hwSerial.print(tidalVolume, 4);
-  if (debug == DEBUG_DISABLED)
+  if (debug == DEBUG_ENABLED)
   {
     hwSerial.print(',');
     hwSerial.print(P[SENSOR_U5], 1);

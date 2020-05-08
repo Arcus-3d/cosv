@@ -417,7 +417,6 @@ void setup() {
 
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
-  debug = DEBUG_DISABLED;
   sanitizeVispData(); // Apply defaults
 
   homeThisPuppy(true);
@@ -429,7 +428,7 @@ void setup() {
   info(PSTR("motor state = %S"), motorFound ? PSTR("Found") : PSTR("Missing"));
   calibrateMotorSpeeds();
 
-  // Start the VISP calibration process  
+  // Start the VISP calibration process
   calibrateClear();
 }
 
@@ -467,20 +466,18 @@ void loop() {
     if (sensorsFound)
     {
       if (calibrateInProgress())
-          calibrateSensors(P);
+        calibrateSensors(P);
       else
       {
-          calibrateApply(P);
+        calibrateApply(P);
 
-          if (visp_eeprom.bodyType == 'P')
-            calculatePitotValues(P);
-          else
-            calculateVenturiValues(P);
+        if (visp_eeprom.bodyType == 'P')
+          calculatePitotValues(P);
+        else
+          calculateVenturiValues(P);
+        // TidalVolume is the same for both versions
+        calculateTidalVolume();
       }
-
-      // TidalVolume is the same for both versions
-      calculateTidalVolume();      
-
       // Take some time to write to the serial port
       dataSend(P);
     }

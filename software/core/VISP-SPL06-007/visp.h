@@ -92,14 +92,13 @@ typedef struct visp_eeprom_s {
   uint8_t zero;  // NULL Terminator, so we can Serial.print(*eeprom);
   uint8_t extra[2];
   sensor_mapping_t sensorMapping[4]; // 16 bytes for sensor mapping.
-  float calibrationOffsets[4]; // 4*4=16 bytes
   uint16_t breath_pressure; // For pressure controlled automatic ventilation
   uint16_t breath_volume;
   uint8_t breath_rate;
   uint8_t breath_ratio;
   uint16_t breath_threshold;
   uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
-  uint8_t extra2[10];
+  uint8_t extra2[26];
   uint16_t checksum; // TODO: future, paranoia about integrity
 
 
@@ -110,6 +109,8 @@ typedef struct visp_eeprom_s {
 
 
 extern visp_eeprom_t visp_eeprom;
+
+extern float calibrationOffsets[4]; // Used by dataSend in command.cpp
 
 extern float ambientPressure, throatPressure;
 extern float pressure; // Used for PC-CMV

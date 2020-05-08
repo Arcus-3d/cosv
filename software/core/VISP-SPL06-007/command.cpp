@@ -81,9 +81,11 @@ struct dictionary_s {
 
 // Put the strings in flash instead of SRAM
 const char strPCCMV [] PUTINFLASH = "PC-CMV";
-const char strPCCMVdesc [] PUTINFLASH = "Pressure Controlled";
+const char strPCCMVdesc [] PUTINFLASH = "Pressure Controlled CMV";
 const char strVCCMV [] PUTINFLASH = "VC-CMV";
-const char strVCCMVdesc [] PUTINFLASH = "Volume Controlled";
+const char strVCCMVdesc [] PUTINFLASH = "Volume Controlled CMV";
+const char strManual [] PUTINFLASH = "Manual";
+const char strManualdesc [] PUTINFLASH = "Manual mode - Controlled by analog dials on the unit";
 const char strDisable [] PUTINFLASH = "Disable";
 const char strEnable [] PUTINFLASH = "Enable";
 const char strDisabled [] PUTINFLASH = "Disabled";
@@ -102,8 +104,6 @@ const char strBMP280 [] PUTINFLASH = "BMP280";
 const char strSPL06 [] PUTINFLASH = "SPL06";
 const char strOff [] PUTINFLASH = "OFF";
 const char strModeOffDesc [] PUTINFLASH = "Offline";
-const char strManual [] PUTINFLASH = "Manual";
-const char strManualdesc [] PUTINFLASH = "Manual mode, analog dials on unit";
 
 const struct dictionary_s sensorDict[] PUTINFLASH = {
   {SENSOR_UNKNOWN, strUnknown, strUnknown},

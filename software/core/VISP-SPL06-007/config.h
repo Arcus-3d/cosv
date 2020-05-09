@@ -122,9 +122,10 @@
 #define MODE_OFF   0x01
 #define MODE_PCCMV 0x02
 #define MODE_VCCMV 0x04
-#define MODE_MANUAL 0x08 // No display, just some analog dial inputs that adjust breath_rate, I:E ratio, and pressure/volume limit
+#define MODE_MANUAL_PCCMV 0x20 // By ADC input
+#define MODE_MANUAL_VCCMV 0x40 // By ADC input
 #define MODE_ALL   0xFF
-
+#define MODE_MANUAL (MODE_MANUAL_PCCMV|MODE_MANUAL_VCCMV) // Used to disable things from a display interface if the ADC input is turned to a setting
 // rate, i:e, pressure, volume, mode as analog inputs  5 of them...  e have 6 available on the nano!
 
 extern uint8_t currentMode;
@@ -140,9 +141,10 @@ extern debugState_e debug;
 #define MAX_BREATH_RATIO 5
 #define MIN_BREATH_RATE  5 // TODO: saner limits 5 breaths/minute
 #define MAX_BREATH_RATE  20 // TODO: saner limits 30 breaths/minute
-#define MIN_BREATH_PRESSURE 0 // TODO: saner limits
-#define MAX_BREATH_PRESSURE 100// TODO: saner limits
-
+#define MIN_BREATH_PRESSURE 0    // TODO: saner limits
+#define MAX_BREATH_PRESSURE 100  // TODO: saner limits
+#define MIN_BREATH_VOLUME   0    // TODO: saner limits 
+#define MAX_BREATH_VOLUME   1000 // TODO: saner limits
 
 void clearCalibrationData();
 

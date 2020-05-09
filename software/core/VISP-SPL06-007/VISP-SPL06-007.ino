@@ -18,12 +18,10 @@
 */
 
 // TODO: Manual ADC Control
-// TODO: Rearrange the Nano/TEENSY pins so that PWM's for H-Bridge share the same timer
 // TODO: Better input validation
-// TODO: Break the motor stuff out into 3 parts and auto-identify what is attached
 // TODO: Failure modes (all of them) need to be accounted for and baked into the system
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
-// TODO: Get a (very tiny) I2C LCD working for basic text output.
+// TODO: Get a (very tiny code wise) I2C LCD working for basic text output.
 
 #include "config.h"
 
@@ -196,14 +194,14 @@ void timeToCheckPatient()
   {
     switch (currentMode)
     {
-      case MODE_MANUAL:
-        break;
+      case MODE_MANUAL_PCCMV:
       case MODE_PCCMV:
         if (pressure < visp_eeprom.breath_pressure)
           motorSpeedUp();
         if (pressure > visp_eeprom.breath_pressure)
           motorSlowDown();
         break;
+      case MODE_MANUAL_VCCMV:
       case MODE_VCCMV:
         if (volume < visp_eeprom.breath_volume)
           motorSpeedUp();
@@ -222,6 +220,36 @@ void timeToCheckSensors()
     detectVISP(i2cBus1, i2cBus2, ENABLE_PIN_BUS_A, ENABLE_PIN_BUS_B);
 }
 
+int scale(int analogIn, int minValue, int maxValue)
+{
+  float percentage = (float)analogIn/1024.0;
+  return minValue+(maxValue * percentage);
+}
+
+
+void timeToCheckADC()
+{
+  int analogMode = (analogRead(ADC_MODE)) >> 8; // 10 bits of analog, we need 4 values
+  switch (analogMode) {
+    case 0:
+    case 1:
+      break;
+    case 2:
+       currentMode = MODE_MANUAL_PCCMV;
+       visp_eeprom.breath_pressure = scale(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
+       visp_eeprom.breath_rate = scale(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+       visp_eeprom.breath_ratio = scale(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+       break;      
+    break;
+    case 3:
+       currentMode = MODE_MANUAL_VCCMV;
+       visp_eeprom.breath_volume = scale(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
+       visp_eeprom.breath_rate = scale(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+       visp_eeprom.breath_ratio = scale(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+       break;
+  }
+}
+
 
 // Timer Driven Tasks and their Schedules.
 // These are checked and executed in order.
@@ -230,6 +258,7 @@ t tasks[] = {
   {0, 20, timeToReadVISP},
   {0, 50,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
+  {0, 200, timeToCheckADC},
   {0, 500, timeToCheckSensors},
   {0, 0, NULL} // End of list
 };

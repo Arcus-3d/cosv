@@ -14,16 +14,16 @@ param_complexity=30; // [1:100]
 param_path_step=15; // [1:15]
 
 // Line width for laser cutting.  Affects hole sizes
-param_kerf=0.20; // [0.000:0.005:0.500]
+param_kerf=0.15; // [0.000:0.005:0.500]
 
 // Motor mount selection
-param_motor="bldc"; // [wiper:Ford F150 Wiper Motor,bldc:BLDC Brushless Motor,worm:Worm gear motor,nema23:Nema23 Stepper with 6mm shaft,nema23-635:Nema23 Stepper with 6.35mm shaft]
+param_motor="wiper"; // [wiper:Ford F150 Wiper Motor,bldc:BLDC Brushless Motor,worm:Worm gear motor,nema23:Nema23 Stepper with 6mm shaft,nema23-635:Nema23 Stepper with 6.35mm shaft]
 
 // Is the motor shaft D-Shaped?
 param_d_shaft = "auto"; // [zero:Circular,one:D-Shaped,two:Double-D shaped (wiper motor),auto:D or DD based on motor type]
 
 // Which one would you like to see?
-param_part = "arm_l"; // [cam:cam top/bottom - need 2,paddle:paddle for the arms - need 2,base_b:base plate/motor mount - need 1,base_t:top plate/electronics mount - need 1,bldc_motor_standoff:bldc motor standoff - need 1,bag_mount:Thin arms to support the bag ends and keep it from wandering - need 2,arm_l:Arm,supply_cover:Power Supply cover,chest_bar:Chest bar,flow_sensor_for_pcb:Flow sensor body for use with a PCB (pitot style),flow_sensor_venturi_for_pcb:Flow sensor body for use with a PCB (venturi style),flow_sensor_for_pcb_no_pocket:Flow sensor test body,flow_sensor_cover_oled:Flow sensor cover for use with embedded OLED,flow_sensor_cover:Flow sensor cover,flow_sensor_test:Test apparatus for the flow sensor,bearing_bushing:bearing_busing - used within the other FFF parts,bearing_washer:bearing_washer - used within the other FFF parts,laser_callibration_square_10x10mm:Laser calibration square - A 10x10mm square in case units don't go over with the svg export,laser_arm_mount:Laser arm mount - raised area by arm bearings as a layer,laser_bearing_washer:  washer - if laser cutting it,laser_cam:Laser cam top/bottom - need 2,laser_cam_center:Laser cam center - Stronger - but you need to glue it to top/bottom,laser_bearing_bushing:Laser bearing bushing to make up the difference between bolt_r and bearing_ir - need 2,laser_bldc_motor_standoff:Laser bldc motor has an input shaft that sticks out too far,laser_base_t:Laser base - top plate,laser_base_b:Laser base - bottom plate,laser_paddle:Laser paddle for arm ends - need 2,laser_arm:Laser arms - need 2,laser_bag_mount:Laset bag mounting arm - need 2]
+param_part = ""; // [cam:cam top/bottom - need 2,paddle:paddle for the arms - need 2,base_mount_bottom:base plate/motor mount - need 1,base_mount_top:top plate/electronics mount - need 1,bldc_motor_standoff:bldc motor standoff - need 1,bag_mount:Thin arms to support the bag ends and keep it from wandering - need 2,arm:Arm,supply_cover:Power Supply cover,chest_bar:Chest bar,flow_sensor_for_pcb:Flow sensor body for use with a PCB (pitot style),flow_sensor_venturi_for_pcb:Flow sensor body for use with a PCB (venturi style),flow_sensor_for_pcb_no_pocket:Flow sensor test body,flow_sensor_cover_oled:Flow sensor cover for use with embedded OLED,flow_sensor_cover:Flow sensor cover,flow_sensor_test:Test apparatus for the flow sensor,bearing_bushing:bearing_busing - used within the other FFF parts,bearing_washer:bearing_washer - used within the other FFF parts,laser_callibration_square_10x10mm:Laser calibration square - A 10x10mm square in case units don't go over with the svg export,laser_arm_mount:Laser arm mount - raised area by arm bearings as a layer,laser_bearing_washer:  washer - if laser cutting it,laser_cam:Laser cam top/bottom - need 2,laser_cam_center:Laser cam center - Stronger - but you need to glue it to top/bottom,laser_bearing_bushing:Laser bearing bushing to make up the difference between bolt_r and bearing_ir - need 2,laser_bldc_motor_standoff:Laser bldc motor has an input shaft that sticks out too far,laser_base_mount_top:Laser base - top plate,laser_base_mount_bottom:Laser base - bottom plate,laser_paddle:Laser paddle for arm ends - need 2,laser_arm:Laser arms - need 2,laser_bag_mount:Laset bag mounting arm - need 2]
 
 
 /* [Hidden] */
@@ -42,11 +42,11 @@ $fn=param_complexity;
 // while rotating both the cam and the arms.  This is the angle to rotate between steps when generating this.
 // Smaller values result in smoother, but more complicated surfaces.  
 // A good value for working is 15. A good value for rendering is 2-5.
-path_step=param_path_step; // [1:15]
+path_step=param_path_step; // [115]
 
 
 // Assembly views, a little broken.
-//cosv_assembly_view(cam_angle=$t*180,explode=0);
+rotate([90,0,0]) cosv_assembly_view(cam_angle=$t*180,explode=0);
 //cam_assembly_view(explode=10);
 //flow_sensor_assembly_view(rot=360*$t,explode=0.1);
 
@@ -64,20 +64,18 @@ if (PART == "cam") {
 	cam(); // cam top/bottom.  Need 2.
 } else if (PART == "paddle") {
 	paddle(); // paddle for the arms.  Need 2
-} else if (PART == "base_b") {
-	base_b(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
-} else if (PART == "base_t") {
-	base_t(); // top plate/electronics mount.  Need 1.
+} else if (PART == "base_mount_bottom") {
+	base_mount_bottom(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
+} else if (PART == "base_mount_top") {
+	base_mount_top(); // top plate/electronics mount.  Need 1.
 } else if (PART == "bldc_motor_standoff") {
 	bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
 } else if (PART == "bag_mount") {
 	bag_mount(); // thin arms to support the bag ends and keep it from wandering. Need 2.
-} else if (PART == "arm_l") {
-	arm_l();
+} else if (PART == "arm") {
+	arm();
 } else if (PART == "supply_cover") {
 	supply_cover();
-} else if (PART == "chest_bar") {
-	chest_bar();
 } else if (PART == "flow_sensor_for_pcb") {
 	flow_sensor_for_pcb();
 } else if (PART == "flow_sensor_venturi_for_pcb") {
@@ -111,10 +109,14 @@ if (PART == "cam") {
 	laser_bearing_bushing(); // bushing to make up the difference between bolt_r and bearing_ir
 } else if (PART == "laser_bldc_motor_standoff") {
 	laser_bldc_motor_standoff(); // bldc motor has an input shaft that sticks out too far
-} else if (PART == "laser_base_t") {
-	laser_base_t(); // base, top plate
-} else if (PART == "laser_base_b") {
-	laser_base_b(); // base, bottom plate
+} else if (PART == "laser_base_mount_top") {
+	laser_base_mount_top(); // base, top plate
+} else if (PART == "laser_base_end_bottom") {
+	laser_base_end_bottom(); // base, top plate
+} else if (PART == "laser_base_end_top") {
+	laser_base_end_top(); // base, top plate
+} else if (PART == "laser_base_mount_bottom") {
+	laser_base_mount_bottom(); // base, bottom plate
 } else if (PART == "laser_paddle") {
 	laser_paddle(); // paddle for arm ends
 } else if (PART == "laser_arm") {
@@ -122,6 +124,37 @@ if (PART == "cam") {
 } else if (PART == "laser_bag_mount") {
 	laser_bag_mount();
 }
+//laser_base_mount_top(); // base, top plate
+//laser_base_mount_bottom(); // base, top plate
+//laser_arm(); // base, top plate
+//laser_arm_mount(); // base, top plate
+//laser_base_end_bottom(); // base, top plate
+//laser_base_end_top(); // base, top plate
+
+//cam(); // cam top/bottom.  Need 2.
+//paddle(); // paddle for the arms.  Need 2
+//base_mount_bottom(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
+//base_mount_top(); // base plate opposite motor mount. Need 1.
+//base_front(); // base front
+//base_back(); // base front
+//base_end_top(); // base end plate/bag mounts.  Need 1, top bag end diameter.
+//base_plate(); // top plate/electronics mount.  Need 1.
+//bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
+//bag_mount(); // thin arms to support the bag ends and keep it from wandering. Need 2.
+//arm();
+//supply_cover();
+//flow_sensor_for_pcb();
+//flow_sensor_venturi_for_pcb();
+//flow_sensor_for_pcb_no_pocket();
+//flow_sensor_cover(oled=0);
+//flow_sensor_cover();
+//flow_sensor_test();
+//bearing_bushing(); // parts used within the other FFF parts
+//bearing_washer(); // parts used within the other FFF parts
+//laser_base_mount_top(); // base, bottom plate
+//laser_base_e(r=bvm_br); // base, bottom plate
+//laser_arm(); // The arms (when symetrical).  Make sure to reset arm_w to a larger value that for FFF printing.
+
 
 // Abbreviations
 // r=radius (and sometimes rotation within modules)
@@ -141,25 +174,42 @@ nozzle_r=0.4/2;
 
 // line width for laser cutting.  Affects hole sizes (param_kerf is CLI overridden by Makefile)
 kerf=param_kerf;
+// material thickness for laser cutting
+material_t=3.0;
 
-// bag dimensions and position
-bvm_r=125/2;
-bvm_br=70/2;
-bvm_tr=45/2;
-bvm_l=200;
-bvm_c=nozzle_r*2*8; // Thickness for bag parts
-bvm_y_offset=15; // Moves the bag location up/down
 
-// not used atm.. was added to the base model.
-chest_bar_l=bvm_r*2;
-
-// bearing choice.  Some things don't scale right yet if you change this.
+arm_w=12*nozzle_r*2; // bearing choice.  Some things don't scale right yet if you change this.
+arm_h=material_t*3;
 bearing_or=22/2-kerf;
 bearing_ir=8/2+kerf;
 bearing_h=7;
+// battery dimensions
+
+battery_x=150;
+battery_z=65;
+battery_y=100;
+battery_y_offset=0;
+battery_z_offset=0;
+
+// bag dimensions and position
+bvm_r=125/2;
+bvm_br=62/2;
+bvm_tr=41/2;
+bvm_l=200;
+bvm_c=nozzle_r*2*8; // Thickness for bag parts
+bvm_y_offset=30; // Moves the bag location up/down
+bvm_y_center=bvm_r+bearing_or/2+bvm_y_offset+arm_w*2;
+tft_h=50+clearance;
+tft_w=86+clearance;
+tft_d=6;
+tft_screen_h=50; // the whole glass poking through
+tft_screen_w=70;
+//tft_screen_h=45; // just the active part
+//tft_screen_w=59;
+//tft_d=8;
 
 // a little washer to clearance the bearing
-bearing_washer_h=clearance/2;
+bearing_washer_h=(arm_h-bearing_h)/2;
 
 // assembly bolt size
 cam_bolt_r=4/2+clearance/4-kerf;
@@ -171,7 +221,6 @@ wire_t=1.25;
 comp_rot=90;
 
 // arm width (If it is laser, do one thing, else FFF, do another
-arm_w=(PART == "laser_arm" ? 12*nozzle_r*2 : 12*nozzle_r*2 );
 
 // paddle internal ribs and top thickness
 paddle_scale=1.5;
@@ -181,18 +230,18 @@ paddle_rib_w=3*nozzle_r*2;
 // how far the arm rotates with a full comp_rot
 arm_rot=30; 
 // how far apart the arm bearings are from centerline
-arm_x_offset=18;
+arm_x_offset=22;
 
 // mechanical dimensions for the cam action
-cam_bearing_offset=18;
+cam_bearing_offset=22;
 cam_l=cam_bearing_offset*2+bearing_or*2;
-cam_thickness=3.2;
-cam_h=bearing_h+cam_thickness*2+clearance;
+cam_h=material_t*7;
 cam_y_offset=bearing_or+cam_l/2+arm_w/2;
 cam_pre_rot=-0;
-x_pos=arm_x_offset+cam_l/2.5;
-y_pos=-cam_y_offset-cam_l/2.5;
-
+x_pos=bvm_r+bvm_c*6;
+housing_h=cam_l+cam_y_offset;
+y_pos=bvm_y_center-bvm_r-bvm_c*4-housing_h/2;
+front_recess=arm_w*2;
 supply_cover_x=38;
 supply_cover_y=98;
 supply_cover_z=20;
@@ -275,7 +324,7 @@ motor_pilot_r = (MOTOR=="wiper" ? 24/2+clearance-kerf
               : (MOTOR == "worm" ? 6/2+clearance-kerf
               : (MOTOR == "nema23" ? 38.1/2+clearance-kerf
               : (MOTOR == "nema23-635" ? 38.1/2+clearance-kerf : 0))));
-motor_shaft_r = (MOTOR=="wiper" ? 6/2+clearance/4-kerf
+motor_shaft_r = (MOTOR=="wiper" ? 12/2+clearance/4-kerf
               : (MOTOR == "worm" ? 6/2-kerf
               : (MOTOR == "nema23" ? 8/2-kerf
               : (MOTOR == "nema23-635" ? 6.35/2-kerf
@@ -288,8 +337,8 @@ motor_body_y_offset = (MOTOR=="bldc" ? -7 : 0);
 module laser_bag_mount() {
 	projection(cut=true) bag_mount(t=arm_w*1.5);
 }
-module laser_base_t() {
-	projection(cut=false) base_t();
+module laser_base_mount_top() {
+	projection(cut=false) base_mount_top();
 }
 module laser_bearing_washer() {
 	projection(cut=true) bearing_washer();
@@ -303,7 +352,7 @@ module laser_cam_center() {
 module laser_arm_mount() {
 	projection(cut=true) difference() {
 		arm_mount();
-		translate([0,0,-cam_thickness*2]) motor_holes();
+		translate([0,0,-material_t*2]) motor_holes();
 	}
 }
 module laser_arm() {
@@ -312,13 +361,32 @@ module laser_arm() {
 }
 module laser_paddle() {
 	
-	projection(cut=true) paddle(laser=1,bearing_h=6.36*2+6.35/2+clearance/2);
+	projection(cut=true) paddle(laser=1,h=arm_w);
 }
 module laser_bearing_bushing() {
 	projection(cut=true) bearing_bushing();
 }
-module laser_base_b() {
-	projection(cut=false) base_b();
+module laser_base_end_bottom() {
+	projection(cut=false) base_end_bottom();
+}
+module laser_base_bottom() {
+	projection(cut=true) base_bottom();
+}
+module laser_base_top() {
+	projection(cut=true) base_top();
+}
+module laser_base_front() {
+	projection(cut=true) base_front();
+}
+module laser_base_front() {
+	projection(cut=true) base_front();
+}
+
+module laser_base_end_top() {
+	projection(cut=false) base_end_top();
+}
+module laser_base_mount_bottom() {
+	projection(cut=false) base_mount_bottom();
 }
 module laser_callibration_square(w=10) {
 	projection(cut=true) cube([w,w,w],center=true);
@@ -329,7 +397,7 @@ module laser_bldc_motor_standoff() {
 
 // now a little screwed up since I split the parts into layers
 module cosv_assembly_view(explode=0,cam_angle=0) {
-	if (0) translate([0,bvm_r+bearing_or+bvm_c+bvm_y_offset,0]) {
+	if (0) translate([0,bvm_y_center,0]) {
 	//if (0) {
 		//$fn=32;
 		if (cam_angle < comp_rot) {
@@ -352,36 +420,42 @@ module cosv_assembly_view(explode=0,cam_angle=0) {
 			}
 		}
 	}
-	if (0) translate([0,0,-cam_thickness*2-explode*4]) base_b();
-	if (0) translate([0,0,-cam_thickness-explode*3]) arm_mount();
+	if (0) translate([0,bvm_y_center+bvm_r*1.15,0]) cylinder(r=arm_bolt_r*2,h=bvm_l,center=true);
+	if (0) translate([0,0,-bvm_l/2-explode*3]) base_end_bottom();
+	if (0) translate([0,0,-cam_h/2-material_t*3-clearance*2]) base_mount_bottom();
+	if (0) translate([0,y_pos-housing_h/2-bvm_c*3+material_t/2-explode,0]) rotate([90,0,0]) base_bottom();
+	if (0) translate([0,y_pos+housing_h/2+bvm_c*3+material_t/2+explode/4,0]) rotate([90,0,0]) base_top();
+	if (1) translate([x_pos+bvm_c*3-material_t/2-front_recess+explode,y_pos,0]) rotate([90,0,90]) base_front();
+	if (0) translate([-x_pos-bvm_c*3+material_t/2+front_recess-explode,y_pos,0]) rotate([90,0,270]) base_back();
+	if (0) translate([0,0,cam_h/2+material_t*3+clearance*2]) rotate([0,180,0]) mirror([1,0,0]) base_mount_top();
+	if (0) translate([0,0,bvm_l/2+explode*3]) rotate([0,180,0]) base_end_top();
+	if (1) translate([0,y_pos,bvm_l/2-material_t-battery_z/2]) #cube([battery_x,battery_y,battery_z],center=true);
 	if (0) translate([0,-cam_y_offset,0]) rotate([0,0,-cam_angle+cam_pre_rot]) cam_assembly_view(explode=0);
-	if (0) translate([0,bvm_y_offset+bearing_or/2,explode*5]) rotate([90,0,90]) translate([0,0,-bearing_h/2]) bag_mount();
-	if (0) mirror([0,0,1]) translate([0,bvm_y_offset+bearing_or/2,-explode*5]) rotate([90,0,90]) translate([0,0,-bearing_h/2]) bag_mount();
-	if (1) translate([arm_x_offset,0,cam_thickness]) {
-		translate([0,0,bearing_h/2]) bearing();
+	if (0) translate([arm_x_offset,0,-material_t]) {
+		translate([0,0,bearing_h/2+extra/2]) bearing();
 		if (cam_angle < comp_rot) {
-			rotate([0,0,cam_angle/(comp_rot/arm_rot)]) {
+			translate([0,0,bearing_h/2-material_t*3/2]) rotate([0,0,cam_angle/(comp_rot/arm_rot)]) {
 				arm_r();
-				if (1) translate([-arm_x_offset+bvm_r+arm_w,bvm_r+bvm_y_offset+bearing_or+arm_w*5,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
+				if (1) translate([-arm_x_offset+bvm_r+arm_w,bvm_r+bvm_y_offset+bearing_or+arm_w*2.25,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*1.75]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		} else {
-			rotate([0,0,comp_rot/(comp_rot/arm_rot)*2-cam_angle/(comp_rot/arm_rot)]) {
-				arm_r();
-				if (1) translate([-arm_x_offset+bvm_r+arm_w,bvm_r+bvm_y_offset+bearing_or+arm_w*5,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
+			translate([0,0,bearing_h/2-material_t*3/2]) rotate([0,0,comp_rot/(comp_rot/arm_rot)*2-cam_angle/(comp_rot/arm_rot)]) {
+				%arm_r();
+				if (1) translate([-arm_x_offset+bvm_r+arm_w,bvm_r+bvm_y_offset+bearing_or+arm_w*2.25,bearing_h/2]) rotate([0,-90,0]) translate([0,0,-bvm_c*1.75]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		}
 	}
-	if (1) translate([-arm_x_offset,0,cam_thickness]) {
-		translate([0,0,bearing_h/2+clearance]) bearing();
+	if (0) translate([-arm_x_offset,0,-material_t]) {
+		translate([0,0,bearing_h/2+extra/2]) bearing();
 		if (cam_angle < comp_rot) {
-			rotate([0,0,-cam_angle/(comp_rot/arm_rot)]) {
-				arm_l();
-				if (1) translate([arm_x_offset-bvm_r-arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w*5,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
+			translate([0,0,bearing_h/2-material_t*3/2]) rotate([0,0,-cam_angle/(comp_rot/arm_rot)]) {
+				%arm();
+				if (1) translate([arm_x_offset-bvm_r-arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w*2.25,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*1.75]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		} else {
-			rotate([0,0,-comp_rot/(comp_rot/arm_rot)*2+cam_angle/(comp_rot/arm_rot)]) {
-				arm_l();
-				if (1) translate([arm_x_offset-bvm_r-arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w*5,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*2]) rotate([-arm_rot/2,0,0]) paddle();
+			translate([0,0,bearing_h/2-material_t*3/2]) rotate([0,0,-comp_rot/(comp_rot/arm_rot)*2+cam_angle/(comp_rot/arm_rot)]) {
+				%arm();
+				if (1) translate([arm_x_offset-bvm_r-arm_w/2,bvm_r+bvm_y_offset+bearing_or+arm_w*2.25,bearing_h/2]) rotate([0,90,0]) translate([0,0,-bvm_c*1.75]) rotate([-arm_rot/2,0,0]) paddle();
 			}
 		}
 	}
@@ -397,9 +471,10 @@ module flow_sensor_assembly_view(explode=0,rot=0) {
 }
 
 module cam_assembly_view(explode=0) {
-	translate([0,0,-explode*2-cam_h/2]) cam(explode=explode);
+	translate([0,0,-explode*2-material_t*7/2]) cam(explode=explode);
 	for(i=[-1,1]) translate([0,cam_bearing_offset*i,0]) bearing();
-	translate([0,0,explode*2+cam_h/2]) rotate([0,180,0]) cam(explode=explode);
+	translate([0,0,explode*2+material_t*7/2]) rotate([0,180,0]) cam(explode=explode);
+	translate([0,0,explode*3+material_t*14/2]) cam_encoder();
 }
 module flow_sensor_cover(oled=0) {
 	t=tube_or-tube_ir;
@@ -735,10 +810,6 @@ module flow_sensor_for_pcb() {
 				}
 			}
 		}
-		if (0) {
-			%translate([0,tube_or+t+pcb_t/2+pcb_c_t,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset]) cube([pcb_x-pcb_b,pcb_t+extra,pcb_y-pcb_b+extra],center=true);
-			#translate([0,tube_or+t+pcb_t/2+pcb_c_t,tube_l-(pcb_y+pcb_b)/2-pcb_z_offset]) cube([oled_x,pcb_t+extra,oled_y],center=true);
-		}
 		// SLA vent hole.  Without this, sometimes the tube ends up SOLID.
 		for (r=[0:90:365]) rotate([0,0,r]) translate([0,0,t]) rotate([0,90,0]) cylinder(r=t/2,h=tube_or*2+t*4,center=true);
 	}
@@ -788,110 +859,170 @@ module bearing_washer(h=bearing_washer_h,ir=cam_bolt_r,or=(bearing_or+bearing_ir
 	}
 }
 	
-module arm_mount_plate(h=cam_thickness) {
+module arm_mount_plate(h=material_t) {
 	difference() {
 		union() {
 			hull() {
 				for (x=[-1,1]) translate([x*arm_x_offset,0,h/2]) cylinder(r=bearing_or+bvm_c/4,h=h,center=true);
-				hull() for (x=[-1,1]) translate([x*(bearing_h),bvm_y_offset+bearing_or-bvm_c,h/2]) cylinder(r=bvm_c,h=h,center=true);
-				for (x=[-1,1]) translate([x*(bearing_h),bvm_y_offset+bearing_or-bvm_c,h/2]) cylinder(r=bvm_c,h=h,center=true);
+				hull() for (x=[-1,1]) translate([x*(arm_x_offset),bvm_y_offset-material_t*1.5,h/2]) cylinder(r=bvm_c,h=h,center=true);
 			}
 		}
 		for (x=[-1,1]) translate([x*arm_x_offset,0,0]) {
 			translate([0,0,h/2]) cylinder(r=arm_bolt_r,h=h+extra,center=true);
 		}
-		translate([0,bvm_y_offset,h/2]) cube([bearing_h,bearing_h*1.5,h+extra],center=true);
 	}
 }
-module arm_mount(h=cam_thickness) {
+module arm_mount(h=material_t) {
 	arm_mount_plate(h=h);
 }
 
-// not right anymore...
-module chest_bar(h=cam_thickness*3+bearing_h+bearing_washer_h*2) {
-	difference() {
-		union() {
-			hull() {
-				for (x=[-1,1]) for (y=[1]) translate([x*x_pos,y*(y_pos),h/2]) cylinder(r=bearing_or/2,h=h,center=true);
-				for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=bearing_or/2-clearance/4,h=h,center=true);
-				for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) cylinder(r=arm_bolt_r+bvm_c,h=h,center=true);
-				for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=arm_bolt_r+bvm_c*2,h=h,center=true);
-			}
-			hull() {
-				for (x=[-1,1]) translate([x*(x_pos*1.2),y_pos,h/2]) cylinder(r=arm_bolt_r+bvm_c,h=h,center=true);
-				for (x=[-1,1]) translate([x*x_pos,y_pos*0.85,h/2]) cylinder(r=arm_bolt_r+bvm_c,h=h,center=true);
-			}
-		}
-		base_holes(h=h);
-	}
+module base_plate(h=material_t,explode=0,r=bvm_c*5.5,x_pos=x_pos) {
+	hull() base_corners(h=h,r=r,x_pos=x_pos);
 }
-				
-module base_plate(h=cam_thickness,explode=0) {
-	difference() {
-		union() {
-			arm_mount(h=h);
-			hull() {
-				for (x=[-1,1]) for (y=[0,1]) translate([x*x_pos,y*y_pos,h/2]) cylinder(r=bearing_or/2,h=h,center=true);
-				//motor_mount(h=h);
-			}
-			if (1) translate([0,bvm_r+bearing_or/2+bvm_y_offset+arm_w,h/2]) intersection() {
-				difference() {
-					translate([0,0,0]) cylinder(r=bvm_r+arm_w*3,h=h,$fn=$fn*2,center=true);
-					translate([0,0,0]) cylinder(r=bvm_r,h=h+extra,$fn=$fn*2,center=true);
-				}
-				hull() {
-					for(r=[-60,60]) rotate([0,0,r]) translate([0,-bvm_r*8,0]) cube([extra,bvm_r*16,h+extra*3],center=true);
-				}
-			}
-			translate([0,bvm_r+bearing_or/2+bvm_y_offset+arm_w,h/2]) for (r=[-60,60]) rotate([0,0,r]) translate([0,-bvm_r-arm_w*1.5,0]) cylinder(r=arm_w*3/2,h=h,center=true);
-			for (x=[-1,1]) hull() {
-				translate([0,bvm_r+bearing_or/2+bvm_y_offset+arm_w,h/2]) rotate([0,0,x*60]) translate([0,-bvm_r-arm_w*1.5,0]) cylinder(r=arm_w*3/2,h=h,center=true);
 
-				translate([x*(arm_x_offset)*1.3,0,h/2]) cylinder(r=bearing_or,h=h,center=true);
-				translate([x*x_pos,0,h/2]) cylinder(r=bearing_or/2,h=h,center=true);
-			}
-			chest_bar(h=h);
+module base_end_model(r=bvm_br,h=material_t,explode=0) {
+	difference() {
+		hull() {
+			base_plate(h=h);
+			translate([0,bvm_y_center+bvm_r*1.15,h/2]) cylinder(r=bvm_r/3,h=h,center=true);
 		}
-		base_holes(h=h);
-	}
+		translate([0,bvm_y_center,h/2]) cylinder(r=r,h=h+extra,$fn=$fn*2,center=true);
+		//translate([0,y_pos+housing_h/2,h/2]) cylinder(r=arm_bolt_r,h=h+extra,$fn=$fn*2,center=true);
+		translate([0,bvm_y_center+bvm_r*1.15,h/2]) cylinder(r=arm_bolt_r,h=h,center=true);
+		base_corners(h=h,extra=extra,x_pos=x_pos-front_recess);
 		
+		translate([0,bvm_y_center-bvm_r/1.25,h/2]) {
+			for (x=[-1,1]) translate([x*bvm_c*1.5,bvm_c*3,0]) cylinder(r=arm_bolt_r/2,h=h+extra,center=true);
+			cylinder(r=arm_bolt_r*1.25,h=h+extra,center=true);
+		}
+		base_end_pin_slots(h=h,x_pos=x_pos-front_recess);
+	}
 }
 
-module base_t(h=cam_thickness,explode=0) {
+module base_end_top(r=bvm_tr,h=material_t,explode=0) {
+	base_end_model(r=r,h=h,explode=explode);
+}
+
+module base_end_bottom(r=bvm_br,h=material_t,explode=0) {
+	base_end_model(r=r,h=h,explode=explode);
+}
+
+module base_mount_top(h=material_t*2,explode=0) {
 	difference() {
 		union() {
-			translate([0,0,0]) base_plate(h=h);
-			translate([0,0,h+explode]) arm_mount(h=h*2);
+			translate([0,0,0]) base_plate(h=material_t*2,r=bvm_c*3-material_t/2,x_pos=x_pos-front_recess);
+			base_end_pin_slots(h=h,x_pos=x_pos-front_recess);
+			translate([0,0,h+explode]) arm_mount(h=material_t*3);
 			for (x=[-1,1]) translate([arm_x_offset*x,0,0]) {
-				translate([0,0,h*3+explode*2]) bearing_washer();
-				translate([0,0,h*3+explode*3+bearing_washer_h]) bearing_bushing(h=bearing_h/2);
+				translate([0,0,material_t*5+explode*2]) bearing_washer();
+			}
+			for (x=[-1]) for (y=[-0.75,0,0.75]) translate([x*(x_pos+bvm_c*3-front_recess-extra*2),y_pos+y*housing_h/2,h/2]) difference() {
+				hull() {
+					cube([material_t+extra*4,material_t*5,h],center=true);
+					translate([-material_t*5/2,0,0]) cylinder(r=material_t*5/2,h=h,center=true);
+				}
+				translate([-material_t*5/2,0,0]) cylinder(r=material_t*3/2,h=h+extra,center=true);
 			}
 		}
-		translate([0,-cam_y_offset,h/2]) cylinder(r=motor_shaft_r*1.25+clearance,h=h+extra,center=true);
-		base_holes(h=h);
+		base_corners(h=h+extra,extra=extra,r=arm_bolt_r,x_pos=x_pos-front_recess);
+		base_wire_holes(h=h+extra,extra=extra);
+		base_hall_holes(h=h+extra,extra=extra);
+		arm_holes(h=h+extra,extra=extra);
+		motor_shaft_hole(r=motor_shaft_r*2,h=h+extra,extra=extra);
+		translate([x_pos-(tft_d-material_t)/2,y_pos+housing_h/5,h/2]) cube([tft_d+material_t,tft_h,h+extra],center=true);
+		translate([x_pos,y_pos,h/2]) cube([material_t+extra,housing_h,h+extra],center=true);
+	}
+}
+module motor_shaft_hole(r=motor_shaft_r*2,h=material_t,extra=extra) {
+	translate([0,-cam_y_offset,h/2]) cylinder(r=r,h=h+extra,center=true);
+}
+module base_mount_bottom(h=material_t*2) {
+	difference() {
+		base_mount_top(h=h);
+		motor_holes(h=h+extra);
+	}
+}
+module base_bottom(h=material_t) {
+	difference() {
+		union() {
+			hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*(x_pos+bvm_c*4),y*(bvm_l/2-h),h/2]) cylinder(r=extra,h=h,center=true);
+			for (x=[-0.75,0,0.75]) for (y=[-1,1]) translate([x*(x_pos-front_recess),y*(bvm_l/2-h/2),h/2]) cube([material_t*5,material_t,h],center=true);
+		}
+		for (x=[-1,1]) for (y=[-0.75,-0.75/2,0,0.75/2,0.75]) translate([x*(x_pos+bvm_c*3-front_recess),y*(bvm_l/2),h/2]) cube([material_t,material_t*5,h+extra*4],center=true);
+		for (x=[-0.75,0,0.75]) for (y=[-1,1]) translate([x*(x_pos-front_recess),y*(material_t*5.5+clearance*2),h/2]) cube([material_t*5,material_t*2,h+extra*4],center=true);
+	}
+}
+module base_front_model(h=material_t) {
+	difference() {
+		union() {
+			hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*(housing_h/2+bvm_c*3-material_t/2),y*(bvm_l/2-h),h/2]) cylinder(r=extra,h=h,center=true);
+			for (x=[-0.75,0,0.75]) for (y=[-1,1]) translate([x*(housing_h/2),y*(bvm_l/2-h/2),h/2]) cube([material_t*5,material_t,h],center=true);
+			for (x=[-1,1]) for (y=[-0.75,-0.75/2,0,0.75/2,0.75]) translate([x*(housing_h/2+bvm_c*3),y*(bvm_l/2),h/2]) cube([material_t,material_t*5,h],center=true);
+		}
+		if (0) for (x=[0]) for (y=[-0.65,-0.65/2,0.65/2,0.65]) translate([x*(housing_h/2+bvm_c*3),y*(bvm_l/2),h/2]) cylinder(r=7/2,h=h,center=true);
+	}
+}
+		
+		
+module base_front(h=material_t) {
+	difference() {
+		base_front_model(h=h);
+		translate([housing_h/5,0,h/2]) cube([tft_screen_h,tft_screen_w,h+extra],center=true);
+		for (x=[-1,0,1]) translate([housing_h/2-bvm_c*3,-bvm_l/3+bvm_c*x*5,0]) led();
+		for (y=[-1,0,1]) #translate([housing_h/3.5*y-housing_h/10,-bvm_l/3,0]) pot();
+		#for (x=[-1,1]) translate([-housing_h/4,bvm_l/9*x,0]) rotate([0,0,180]) pot();
 	}
 }
 
-module base_b(h=cam_thickness) {
+module pot(r=7/2,h=material_t) {
+	translate([0,0,15.6/2]) cylinder(r=6/2,h=15.6+extra,center=true);
+	translate([0,0,7/2]) cylinder(r=7/2,h=7+extra,center=true);
+	translate([0,8,h/2]) cube([3,1.5,h+extra],center=true);
+	translate([0,0,-9/2]) cylinder(r=17.5/2,h=9+extra,center=true);
+	translate([-17.5/2,0,-9/2]) cube([17.5,17.5,9+extra],center=true);
+}
+module led(r=6/2,h=material_t) {
+	translate([0,0,h/2]) cylinder(r=r,h=h+extra,center=true);
+}
+module base_back(h=material_t) {
+	motor_x=42;
+	motor_y=36;
 	difference() {
-		base_t(h=h);
-		motor_holes(h=h);
-		base_holes(h=h);
+		base_front_model(h=h);
+		translate([housing_h/2*0.75,material_t*9.5,0]) cylinder(r=arm_bolt_r,h=bvm_r*1.5,center=true);
+		translate([y_pos+cam_y_offset-motor_x,-material_t*7-motor_y,0]) {
+			
+		 	#cylinder(r=61/2,h=bvm_r*1.5,center=true);
+		 	translate([61/2+50/2,0,0]) {
+				#cube([32,50,50],center=true);
+				for (x=[-1,1]) for (y=[-1,1]) translate([x*40/2-1.2,y*40/2,0]) cylinder(r=cover_bolt_r,h=bvm_r,center=true);
+			}
+		}
+		for (x=[-0.75,0,0.75]) for (y=[-1,1]) translate([x*(housing_h/2),y*(material_t*5.5+clearance*2),h/2]) cube([material_t*5,material_t*2,h+extra*4],center=true);
+	}	
+}	
+
+module base_top(h=material_t) {
+	difference() {
+		base_bottom(h=h);
+		translate([arm_x_offset,bvm_l/2-arm_w*4,0]) cylinder(r=arm_bolt_r,h=h*5+extra,center=true);
+		for (x=[-1,1]) translate([arm_x_offset*2*x,0,h/2]) cube([arm_x_offset*2+arm_w*3.5,material_t*3+clearance*2,h+extra],center=true);
 	}
 }
-module bldc_motor_standoff(h=cam_thickness*2) {
+
+module bldc_motor_standoff(h=material_t*2) {
 	difference() {
 		translate([0,-cam_y_offset-motor_body_y_offset,h/2]) cylinder(r=motor_r,h=h,center=true);
 		motor_holes(h=h);
 	}
 }
 			
-module motor_mount(h=cam_thickness,r=motor_bolt_r+bvm_c*2){
+module motor_mount(h=material_t,r=motor_bolt_r+bvm_c*2){
 	for (x=[-1,1]) for (y=[0,1]) translate([x*motor_mount_x/2,-cam_y_offset-motor_mount_offset+motor_mount_y*y,h/2]) cylinder(r=r,h=h,center=true);
 }
 
 
-module motor_holes(h=cam_thickness) {
+module motor_holes(h=material_t) {
 	if (motor_tri) {
 		translate([0,-cam_y_offset,h/2]) {
 			cylinder(r=motor_pilot_r+clearance,h=h+extra,center=true);
@@ -900,7 +1031,7 @@ module motor_holes(h=cam_thickness) {
 			}
 			translate([0,-motor_mount_y,h/2]) {
 				cylinder(r=motor_bolt_r,h=h*2+extra,center=true);
-				translate([0,0,cam_thickness*1.5]) cylinder(r=motor_bolt_r*2,h=h*2+extra,center=true);
+				translate([0,0,material_t*1.5]) cylinder(r=motor_bolt_r*2,h=h*2+extra,center=true);
 			}
 		}
 	} else {
@@ -913,53 +1044,38 @@ module motor_holes(h=cam_thickness) {
 	}
 }
 
-module base_holes(h=cam_thickness) {
+module base_wire_holes(h=material_t) {
+        for (x=[-0.85,0.85]) translate([x*(x_pos+bvm_c*2),y_pos-housing_h/5.3,h/2]) hull() for (a=[-1,1]) for (b=[-1,1]) translate([bvm_c*a,bvm_c*b*3,0]) cylinder(r=arm_bolt_r,h=h+extra,center=true);
+}
+
+module base_hall_holes(h=material_t) {
+	translate([0,-cam_y_offset-cam_bearing_offset-bearing_or/2,h/2]) cylinder(r=5/2,h=h+extra,center=true);
+}
+
+module base_corners(h=material_t,r=arm_bolt_r,extra=0,x_pos=x_pos) {
+	for (x=[-1,1]) for (y=[-1,1]) translate([x*x_pos,y_pos+y*housing_h/2,h/2]) cylinder(r=r,h=h+extra,center=true);
+}
+
+module arm_holes(h=material_t) {
 	for (x=[-1,1]) translate([x*arm_x_offset,0,h*8/2]) {
 		cylinder(r=arm_bolt_r,h=h*8+extra,center=true);
 	}
-	if (0) for (x=[-1,1]) translate([x*x_pos,y_pos,h/2]) {
-		cylinder(r=arm_bolt_r,h=h+extra,center=true);
-	}
-	translate([0,-cam_y_offset-cam_bearing_offset-bearing_or/2,h/2]) cylinder(r=5/2,h=h+extra,center=true);
-	for (x=[-1,1]) translate([x*chest_bar_l/2,y_pos-bvm_c*2,h/2]) cylinder(r=arm_bolt_r,h=h+extra,center=true);
-	translate([0,bvm_y_offset,h/2]) cube([bearing_h,bearing_h*1.5,h+extra],center=true);
 }
 
-module bag_mount(w=arm_w*1.5) {
-	union() {
-		translate([bvm_r+bearing_h/2,0,bearing_h/2]) scale([1,bvm_l/1.7/bvm_r,1]) {
-			union() {
-				intersection() {
-					difference() {
-						translate([0,1.2,0]) cylinder(r=bvm_r+w,h=bearing_h,$fn=$fn*2,center=true);
-						cylinder(r=bvm_r,h=bearing_h+extra*2,$fn=$fn*2,center=true);
-					}
-					intersection() {
-						translate([-bvm_r-bvm_tr/1.1,-bvm_r,0]) cube([bvm_r*2,bvm_r*2,bearing_h+extra*3],center=true);
-					}
-				}
-				translate([-bvm_tr/1.5-bearing_h/2,-bvm_r,0]) difference() {
-					hull() for (x=[-1,1]) for(y=[-1,1]) translate([x*(bearing_h/4),bearing_h/4*y,0]) cylinder(r=cam_thickness,h=bearing_h,center=true);
-					hull() for(y=[-1,1]) translate([0,bearing_h/8*y,0]) cylinder(r=cam_thickness/2,h=bearing_h+extra,center=true);
-				}
-			}
-		}
-		hull() {
-			translate([-bearing_h/1.9/2-arm_w,3,bearing_h/2]) cube([bearing_h*1.5-clearance,bearing_h*1.5-clearance/2,bearing_h+extra],center=true);
-			translate([bearing_h/3,-25,bearing_h/2]) cube([clearance/2,bearing_h*1.5-clearance/2,bearing_h+extra],center=true);
-		}
-	}
+module base_end_pin_slots(h=material_t,x_pos=x_pos) {
+	for (x=[-1,1]) for (y=[-0.75,0,0.75]) translate([x*(x_pos+bvm_c*3-extra*2),y_pos+y*housing_h/2,h/2]) cube([material_t+extra*4,material_t*5,h],center=true);
+	for (x=[-0.75,0,0.75]) for (y=[-1,1]) translate([x*x_pos,y_pos+y*(housing_h/2+bvm_c*3-extra*2),h/2]) cube([material_t*5,material_t+extra*4,h],center=true);
+	
+	//translate([0,bvm_y_offset,h/2]) cube([bearing_h,bearing_h*1.5,h+extra],center=true);
 }
-				
-module paddle(laser=0,bearing_h=bearing_h) {
+
+module paddle(laser=0,h=material_t*3) {
 	difference() {
-		union() {
-			scale([paddle_scale,paddle_scale,1]) intersection() {
-				translate([0,0,-bvm_r/2+bvm_r/6]) sphere(r=bvm_r/2,center=true);
-				translate([0,0,bvm_r/2]) cylinder(r=bvm_r/3,h=bvm_r,center=true);
-			}
+		hull() for (x=[-1,1]) scale([paddle_scale,paddle_scale,1]) intersection() {
+			translate([x*bvm_r/3,0,-bvm_r/2+bvm_r/6]) sphere(r=bvm_r/2,center=true);
+			translate([x*bvm_r/3,0,bvm_r/2]) cylinder(r=bvm_r/3,h=bvm_r,center=true);
 		}
-		if (! laser) union() {
+		if (0) union() {
 			difference() {
 				scale([paddle_scale,paddle_scale,1]) intersection() {
 					translate([0,0,-bvm_r/2+bvm_r/6-paddle_t-extra]) sphere(r=bvm_r/2,center=true);
@@ -973,25 +1089,12 @@ module paddle(laser=0,bearing_h=bearing_h) {
 			}
 		}
 		if (1) hull() {
-			for (z=[0,bvm_c*1.5]) translate([0,0,z]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/2,h=bearing_h+clearance/4,center=true);
+			for (z=[0,bvm_c*1.5]) translate([0,0,z]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/2,h=h+clearance/4,center=true);
 		}
 	}
 }
 
 	
-module cam_model(over_r=0,over_h=0,rot=0) {
-	union() { 
-		hull() {
-			rotate([0,0,cam_pre_rot]) translate([0,-cam_bearing_offset,bearing_h/2]) cylinder(r=bearing_or+over_r+clearance/4-kerf,h=bearing_h+over_h,center=true,$fn=30);
-			//rotate([0,0,cam_pre_rot+rot]) translate([0,-cam_bearing_offset,bearing_h/2]) cylinder(r=bearing_or+over_r,h=bearing_h+over_h,center=true,$fn=16);
-		}
-		hull() {
-			rotate([0,0,cam_pre_rot]) translate([0,cam_bearing_offset,bearing_h/2]) cylinder(r=bearing_or+over_r+clearance/4-kerf,h=bearing_h+over_h,center=true,$fn=30);
-			//rotate([0,0,cam_pre_rot+rot]) translate([0,cam_bearing_offset,bearing_h/2]) cylinder(r=bearing_or+over_r,h=bearing_h+over_h,center=true,$fn=16);
-		}
-		rotate([0,0,cam_pre_rot]) hull() for(i=[-1,1]) translate([0,cam_bearing_offset*i,bearing_h/2]) cylinder(r=bearing_or/1.25+over_r,h=bearing_h+over_h,center=true,$fn=8);
-	}
-}
 
 
 module bearing(outer=bearing_or*2,inner=bearing_ir*2,width=bearing_h) {
@@ -1011,69 +1114,75 @@ module bearing(outer=bearing_or*2,inner=bearing_ir*2,width=bearing_h) {
 	}
 }
 
-module arm_model() {
-	y_pos=-cam_y_offset-cam_l/2;
-	c1=arm_w*9.5;
-	c2=arm_w*3.25;
+module arm_model(h=material_t*3,return_spring=0) {
+	c1=arm_w*8.35;
+	c2=arm_w*4;
 	difference() {
 		union() {
 			// end_mounts
-			if (1) translate([arm_x_offset-bvm_r-arm_w*4,bvm_r+bvm_y_offset+bearing_or/2+arm_w*5.5,bearing_h/2]) {
-				rotate([0,0,arm_rot/2]) {
+			if (1) translate([arm_x_offset-bvm_r-arm_w*3,bvm_y_center,h/2]) {
+				rotate([0,0,arm_rot/1.5]) {
 					hull() {
-						translate([arm_w*1.5,0,0]) cylinder(r=bvm_c*1.5,h=bearing_h,center=true);
-						translate([arm_w*2.75,-bvm_c,0]) cylinder(r=bvm_c/2,h=bearing_h,center=true);
-						translate([arm_w*2.75,bvm_c,0]) cylinder(r=bvm_c/2,h=bearing_h,center=true);
+						translate([arm_w*1.5,0,0]) cylinder(r=bvm_c*1.5,h=h,center=true);
+						translate([arm_w*2.75,-bvm_c,0]) cylinder(r=bvm_c/2,h=h,center=true);
+						translate([arm_w*2.75,bvm_c,0]) cylinder(r=bvm_c/2,h=h,center=true);
 					}
 					hull() {
-						translate([arm_w/1.25,0,0]) cylinder(r=arm_w,h=bearing_h,center=true);
-						translate([arm_w*1.5,-arm_w*3,0]) cylinder(r=arm_w/2,h=bearing_h,center=true);
-						translate([arm_w*1.5,arm_w*2.5,0]) cylinder(r=arm_w/2,h=bearing_h,center=true);
+						translate([arm_w/2-clearance,0,0]) cylinder(r=arm_w*1.5,h=h,center=true);
+						translate([arm_w*1.25,-arm_w*3,0]) cylinder(r=arm_w/1.5,h=h,center=true);
+						translate([0,-arm_w*3,0]) cylinder(r=arm_w/2,h=h,center=true);
+						translate([arm_w*1.25,arm_w*3,0]) cylinder(r=arm_w/1.5,h=h,center=true);
 					}
 				}
 			}
+			if (0) rotate([0,0,arm_rot/2]) translate([arm_x_offset/2.5,cam_y_offset/1.5,h/2]) {
+				cube([material_t*5,material_t,h/2],center=true);	
+				cube([material_t*2,material_t*3,h/2],center=true);
+			}	
 			// end curve
-			if (1) translate([arm_x_offset+arm_w,bvm_r+bearing_or/2+bvm_y_offset+arm_w,bearing_h/2]) intersection() {
+			if (1) translate([arm_x_offset,bvm_y_center,h/2]) intersection() {
 				difference() {
-					translate([arm_w*3.5,-arm_w,0]) cylinder(r=bvm_r+c1,h=bearing_h,$fn=$fn*2,center=true);
-					translate([arm_w/2,arm_w,0]) cylinder(r=bvm_r+c2,h=bearing_h+extra*2,$fn=$fn*2,center=true);
+					translate([c1/2,-c2/2,0]) scale([1,1.2,1]) cylinder(r=bvm_r+c1,h=h,$fn=$fn*2,center=true);
+					translate([c2/2,c2,0]) scale([1,1.3,1]) cylinder(r=bvm_r+c2,h=h+extra*2,$fn=$fn*2,center=true);
 				}
 				hull() {
-					rotate([0,0,-15]) translate([0,-bvm_r*2,0]) cube([extra,bvm_r*2,bearing_h+extra*4],center=true);
-					translate([-bvm_r/2,-bvm_r,0]) rotate([0,0,-145]) translate([0,-bvm_r*2,0]) cube([extra,bvm_r*4,bearing_h+extra*4],center=true);
+					rotate([0,0,-25]) translate([0,-bvm_r*2,0]) cube([extra,bvm_r*2,h+extra*4],center=true);
+					translate([-bvm_r/2,-bvm_r,0]) rotate([0,0,-138]) translate([0,-bvm_r*2,0]) cube([extra,bvm_r*4,h+extra*4],center=true);
 				}
 			}
 			// cam drive and bearing mount
 			if (1) hull() {
-				translate([arm_x_offset+arm_w,bvm_r+bearing_or+bvm_y_offset,bearing_h/2]) rotate([0,0,-30]) translate([0,-bvm_r-c2,0]) cylinder(r=extra,$fn=1,h=bearing_h,center=true);
-				translate([arm_x_offset+arm_w*4.5,bvm_r+bearing_or+bvm_y_offset-arm_w,bearing_h/2]) rotate([0,0,-64]) translate([0,-bvm_r-c1,0]) cylinder(r=extra,$fn=1,h=bearing_h,center=true);
-				translate([0,0,bearing_h/2]) cylinder(r=arm_x_offset-clearance,h=bearing_h,center=true);
-				translate([arm_x_offset-bearing_or,-cam_y_offset,bearing_h/2]) {
-					translate([bearing_or*.75/2-clearance,0,0])  rotate([0,0,cam_pre_rot]) cube([bearing_or*1.25,cam_l+arm_w*2,bearing_h],center=true);
-					translate([0,(cam_l/2-bearing_or)*-1,0]) cylinder(r=bearing_or/2, h=bearing_h,center=true);
+				translate([arm_x_offset+c1/2,bvm_y_center-c2/2,h/2]) scale([1,1.2,1]) rotate([0,0,-64]) translate([0,-bvm_r-c1,0]) cylinder(r=extra,$fn=1,h=h,center=true);
+				translate([arm_x_offset+c2/2,bvm_y_center+c2,h/2]) scale([1,1.3,1]) rotate([0,0,-35]) translate([0,-bvm_r-c2,0]) cylinder(r=extra,$fn=1,h=h,center=true);
+				translate([0,0,h/2]) cylinder(r=arm_x_offset-clearance,h=h,center=true);
+				translate([arm_x_offset-bearing_or,-cam_y_offset,h/2]) {
+					translate([bearing_or*.75/2-clearance,0,0])  rotate([0,0,cam_pre_rot]) cube([bearing_or*1.25,cam_l+arm_w*2,h],center=true);
+					translate([0,(cam_l/2-bearing_or)*-1,0]) cylinder(r=bearing_or/2, h=h,center=true);
 				}
+				translate([arm_x_offset-bvm_c*2,-cam_y_offset-cam_l/2-bvm_c,h/2]) cylinder(r=bvm_c,h=h,center=true);
 			}
 		}
 		rot=0;
-		if (0) translate([arm_x_offset+arm_w,bvm_r+bearing_or/2+bvm_y_offset-arm_w,bearing_h/2]) 
-			rotate([0,0,-55.9]) translate([0,-bvm_r*4-arm_w*4*2,0]) cylinder(r=bvm_r*3+arm_w*4,h=bearing_h+extra,$fn=$fn*2,center=true);
+		// positioning pin holes
+		translate([arm_x_offset-bvm_r-arm_w*3,bvm_y_center,h/2]) rotate([0,0,arm_rot/2.25])  translate([bvm_c,0,0]) cylinder(r=cover_bolt_r,h=h+extra,center=true);
+		translate([arm_x_offset-bvm_c*2,-cam_y_offset-cam_l/2-bvm_c,h/2]) cylinder(r=cover_bolt_r,h=h+extra,center=true);
 		// cam cutout
 		if (1) for (i=[0:path_step:180]) {
 			if (i<comp_rot) {
-				rotate([0,0,i/(comp_rot/arm_rot)]) translate([arm_x_offset,-cam_y_offset,0]) rotate([0,0,-i-rot]) cam_model(over_h=extra*4,over_r=0,rot=rot);
+				rotate([0,0,i/(comp_rot/arm_rot)]) translate([arm_x_offset,-cam_y_offset,0]) rotate([0,0,-i-rot]) cam_model(h=h+extra,over_h=extra*4,over_r=0,rot=rot);
 			} else {
-				rotate([0,0,comp_rot/(comp_rot/arm_rot)*2-i/(comp_rot/arm_rot)]) translate([arm_x_offset,-cam_y_offset,0]) rotate([0,0,-i-rot]) cam_model(over_h=extra*4,over_r=0,rot=rot);
+				rotate([0,0,comp_rot/(comp_rot/arm_rot)*2-i/(comp_rot/arm_rot)]) translate([arm_x_offset,-cam_y_offset,0]) rotate([0,0,-i-rot]) cam_model(h=h+extra,over_h=extra*4,over_r=0,rot=rot);
 			}
 		}
 		// bearing cutout
 		intersection() {
-			translate([0,0,bearing_h/2]) cylinder(r=bearing_or+clearance/4,h=bearing_h+extra*2,center=true);
-			translate([0,0,bearing_h/2]) cube([bearing_or*2-clearance/8,bearing_or*2,bearing_h+extra*2],center=true);
+			translate([0,0,h/2]) cylinder(r=bearing_or+clearance/4,h=h+extra*2,center=true);
+			translate([0,0,h/2]) cube([bearing_or*2-clearance/8,bearing_or*2,h+extra*2],center=true);
 		}
 	}
 }
 
-module arm_l() {
+module arm() {
 	arm_model();
 }
  
@@ -1081,27 +1190,52 @@ module arm_r() {
 	mirror([1,0,0]) arm_model();
 }
  
-module cam(h=cam_thickness,explode=0,d_shaft=d_shaft) {
+module cam(h=material_t,explode=0,d_shaft=d_shaft) {
 	union() {
-		translate([0,0,-explode]) cam_plate(d_shaft=d_shaft);
-		translate([0,0,h-extra]) {
+		translate([0,0,-explode]) cam_end_plate(h=material_t*2,d_shaft=d_shaft);
+		translate([0,0,material_t*2]) {
 			for (y=[-1,1]) translate([0,cam_bearing_offset*y,0]) {
-				translate([0,0,explode+bearing_washer_h]) bearing_bushing(h=bearing_h/2+extra*2);
 				bearing_washer();
+				translate([0,0,explode+bearing_washer_h]) bearing_bushing(h=h);
 			}
-			translate([0,0,explode+bearing_washer_h]) cam_center(d_shaft=d_shaft);
-			cam_center(h=bearing_washer_h,d_shaft=d_shaft);
+			translate([0,0,explode]) cam_center(d_shaft=d_shaft,h=material_t*3/2);
+			//cam_center(h=bearing_washer_h,d_shaft=d_shaft);
 			
 		}
 	}
 }
-module cam_plate(h=cam_thickness,d_shaft=d_shaft) {
+
+module cam_model(over_r=0,over_h=0,rot=0) {
+	union() { 
+		hull() {
+			rotate([0,0,cam_pre_rot]) translate([0,-cam_bearing_offset,h/2]) cylinder(r=bearing_or+over_r+clearance/4-kerf,h=h+over_h,center=true,$fn=30);
+			//rotate([0,0,cam_pre_rot+rot]) translate([0,-cam_bearing_offset,h/2]) cylinder(r=bearing_or+over_r,h=h+over_h,center=true,$fn=16);
+		}
+		hull() {
+			rotate([0,0,cam_pre_rot]) translate([0,cam_bearing_offset,h/2]) cylinder(r=bearing_or+over_r+clearance/4-kerf,h=h+over_h,center=true,$fn=30);
+			//rotate([0,0,cam_pre_rot+rot]) translate([0,cam_bearing_offset,h/2]) cylinder(r=bearing_or+over_r,h=h+over_h,center=true,$fn=16);
+		}
+		rotate([0,0,cam_pre_rot]) hull() for(i=[-1,1]) translate([0,cam_bearing_offset*i,h/2]) cylinder(r=bearing_or/1.25+over_r,h=h+over_h,center=true,$fn=8);
+	}
+}
+
+module cam_plate(h=material_t,d_shaft=d_shaft) {
 	difference() {
 		union() {
 			for(y=[-1,1]) translate([0,cam_bearing_offset*y,h/2]) cylinder(r=bearing_or-clearance*3,h=h,center=true);
-			hull() for(y=[-1,1]) translate([0,cam_bearing_offset*y,h/2]) cylinder(r=bearing_or/1.25-clearance,h=h,center=true);
+			hull() for(y=[-1,1]) translate([0,cam_bearing_offset*y,h/2]) cylinder(r=bearing_or/1.25,h=h,center=true);
 		}
-		cam_holes(h=cam_thickness,d_shaft=d_shaft);
+		cam_holes(h=material_t,d_shaft=d_shaft);
+	}
+}
+
+module cam_end_plate(h=material_t,d_shaft=d_shaft) {
+	difference() {
+		hull() {
+			cam_plate(h=h,d_shaft=d_shaft);
+			translate([0,0,h/2]) cylinder(r=cam_l/2,h=h,center=true);
+		}
+		cam_holes(h=material_t,d_shaft=d_shaft);
 	}
 }
 
@@ -1117,7 +1251,16 @@ module cam_holes(d_shaft=d_shaft) {
 	}
 }
 
-module cam_center(h=bearing_h/2,d_shaft=d_shaft) {
+module cam_encoder(h=material_t/3,r=cam_l/2+bvm_c*2) {
+	translate([0,0,h/2]) difference() {
+		cylinder(r=r,h=h,center=true);
+		for (a=[1:1.8:179]) rotate([0,0,a]) for (b=[1,-1]) translate([(r-4)*b,0,0]) cube([4,kerf*3,h+extra],center=true);
+		cylinder(r=motor_bolt_r,h=h+extra,center=true);
+	}
+} 	
+
+
+module cam_center(h=material_t*3,d_shaft=d_shaft) {
 	difference() {
 		cam_plate(h=h,d_shaft=d_shaft);
 		for(i=[-1,1]) translate([0,cam_bearing_offset*i,h/2]) {

@@ -1,7 +1,14 @@
 //COSV - Cam Open Source Ventilator
 // Project home: https://hackaday.io/project/170507
 // Project files: https://github.com/Arcus-3d/cosv
-// Project author: Daren Schwenke
+// Project authors: Daren Schwenke, Steven Carr
+// Project license: <This really needs to get absolutely nailed down. 
+//                   Here. 
+//                   *Now*  
+//                   Feel free to fix this problem by modifying this structure and committing the resulting files with a *very* specific OSHW license for computationally generated hardware design files.
+//                   Welcome to my everlasting grey area of which I do not know how to get out of, but I am desperately to avoid.>
+//                   *end of line*
+//
 
 
 /* [Global] */

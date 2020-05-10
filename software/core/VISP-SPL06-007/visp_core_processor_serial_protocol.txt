@@ -11,15 +11,11 @@ g,<t>,<debug string>
 w,<t>,<warning string>
 c,<t>,<critical string>
 
-Health Status Reports have the text "good" or "bad" based on the active status of the core. (UNSOLICITED)
-H,<t>,[good|bad]
-
-
-Ping the core.
-P
+Health Status Reports have the text "good" or "bad" based on the active status of the core. (can be UNSOLICITED)
+H
 
 Core responds with timestamp and status string.
-P,<t>,<I am alive!>
+H,<t>,[good|bad]
 
 
 Calibrate now
@@ -47,10 +43,11 @@ I,<t>,<string>,<major>,<minor>,<revision>
 EEPROM read/write
 An empty parameter string makes the core echo back all 128 bytes of EEPROM data.
 Providing the address will reply with a full page (16-bytes) starting at that address,
-Providing the address and data will write the data to the EEPROM.
+Providing the address and data will write the data to the EEPROM, on write
+to byte 127, the EEPROM data will be committed to the EEPROM.
 E
 E,<address>
-E,<address>,<b_0>,<b_1>,<b_2>...
+E,<address>,<b_0>
 
 Response will always consist of a time, address, and data bytes
 E,<t>,<address>,<b0>,<b1>,<b2>...
@@ -104,49 +101,48 @@ Q
 The Core will respond with 'H', and 'S' responses for all settings and limits/dictionaries.
 
 Example Q output
-H,129157,bad
-S,129157,mode_dict,Unknown,Unknown,PC-CMV,Pressure Controlled,VC-CMV,Volume Controlled
-S,129160,mode,Unknown
-S,129162,debug_dict,Disable,Disabled,Enable,Enabled
-S,129166,debug,Disable
-S,129168,bodytype_dict,Unknown,Unknown,Pitot,Pitot body style,Venturi,Venturi body style
-S,129176,bodytype,Unknown
-S,129178,volume_min,0
-S,129180,volume_max,1000
-S,129182,volume,0
-S,129184,rate_min,0
-S,129185,rate_max,1000
-S,129187,rate,0
-S,129189,breath_interval_min,0
-S,129191,breath_interval_max,1000
-S,129195,breath_interval,0
-S,129198,breath_threshold_min,0
-S,129200,breath_threshold_max,1000
-S,129203,breath_threshold,0
-S,129206,motor_speed_min,0
-S,129208,motor_speed_max,1000
-S,129211,motor_speed,0
-S,129213,calib0_min,-1000
-S,129215,calib0_max,1000
-S,129217,calib0,   0.00
-S,129219,calib1_min,-1000
-S,129221,calib1_max,1000
-S,129224,calib1,   0.00
-S,129226,calib2_min,-1000
-S,129228,calib2_max,1000
-S,129230,calib2,   0.00
-S,129232,calib3_min,-1000
-S,129234,calib3_max,1000
-S,129238,calib3,   0.00
-S,129240,sensor0_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,129246,sensor0,Unknown
-S,129248,sensor1_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,129255,sensor1,Unknown
-S,129257,sensor2_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,129264,sensor2,Unknown
-S,129266,sensor3_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,129272,sensor3,Unknown
-Q,129274,Finished
+H,25882,bad
+S,25882,mode_dict,OFF,Offline,PC-CMV,Pressure Controlled,VC-CMV,Volume Controlled
+S,25885,mode,OFF
+S,25886,debug_dict,Disable,Disabled,Enable,Enabled
+S,25891,debug,Disable
+S,25893,bodytype_dict,Unknown,Unknown,Pitot,Pitot body style,Venturi,Venturi body style
+S,25901,bodytype,Unknown
+S,25903,volume_min,0
+S,25905,volume_max,1000
+S,25907,volume,0
+S,25909,rate_min,10
+S,25910,rate_max,30
+S,25912,rate,10
+S,25913,pressure_min,0
+S,25915,pressure_max,100
+S,25918,pressure,0
+S,25919,ie_dict,1:2,50% duty cyce,1:3,33% duty cyce,1:4,25% duty cyce,1:5,20% duty cyce
+S,25927,ie,1:2
+S,25928,breath_threshold_min,0
+S,25931,breath_threshold_max,1000
+S,25934,breath_threshold,0
+S,25936,calib0_min,-1000
+S,25938,calib0_max,1000
+S,25940,calib0,   0.00
+S,25943,calib1_min,-1000
+S,25945,calib1_max,1000
+S,25947,calib1,   0.00
+S,25949,calib2_min,-1000
+S,25951,calib2_max,1000
+S,25954,calib2,   0.00
+S,25956,calib3_min,-1000
+S,25958,calib3_max,1000
+S,25960,calib3,   0.00
+S,25962,sensor0_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,25968,sensor0,Unknown
+S,25970,sensor1_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,25977,sensor1,Unknown
+S,25979,sensor2_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,25986,sensor2,Unknown
+S,25988,sensor3_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,25995,sensor3,Unknown
+Q,25997,Finished
 
 
 

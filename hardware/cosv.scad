@@ -140,9 +140,9 @@ if (PART == "cam") {
 //laser_arm_end_support(path_step=1,$fn=90); // extend the normal arm end +z for a stacked solution to flex
 //laser_arm_mount(); // base, top plate
 //laser_base_end_bottom(slots=0); // base, top plate
-laser_base_end_top(slots=0); // base, top plate
+//laser_base_end_top(slots=0); // base, top plate
 //laser_base_front(); // base front
-//laser_base_back(); // base back
+laser_base_back(); // base back
 //laser_cam_end_plate_t(); // base back
 //laser_cam_end_plate_b(); // base back
 //laser_cam_center_b(); // base back
@@ -1021,9 +1021,9 @@ module base_front(h=material_t) {
 module h_bridge(h=material_t) {
 	translate([0,0,21/2]) cube([32,50,21],center=true);
 	for (x=[-1,1]) for (y=[-1,1]) translate([x*40/2-1.2,y*40/2,h]) cylinder(r=cover_bolt_r,h=h*2+extra,center=true);
-	hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*40/2-1.2,y*40/2,-h/2]) cylinder(r=6/2,$fn=4,h=h,center=true);
-	hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*2/2-21,y*25/2,-20/2]) cylinder(r=6/2,$fn=4,h=20,center=true);
-	#hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*5/2+18,y*5-10,-10/2]) cube([extra,extra,10],center=true);
+	hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*40/2-1.2,y*40/2,-h/2-extra]) cylinder(r=6/2,$fn=4,h=h,center=true);
+	hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*2/2-21,y*25/2,-20/2-extra]) cylinder(r=6/2,$fn=4,h=20,center=true);
+	hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*5/2+18,y*5-10,-10/2-extra]) cube([extra,extra,10],center=true);
 }
 module wiper_motor() {
 	motor_x=35;

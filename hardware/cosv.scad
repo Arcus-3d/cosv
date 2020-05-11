@@ -142,7 +142,7 @@ if (PART == "cam") {
 //laser_base_end_bottom(slots=0); // base, top plate
 //laser_base_end_top(slots=0); // base, top plate
 //laser_base_front(); // base front
-laser_base_back(); // base back
+//laser_base_back(); // base back
 //laser_cam_end_plate_t(); // base back
 //laser_cam_end_plate_b(); // base back
 //laser_cam_center_b(); // base back
@@ -157,7 +157,7 @@ laser_base_back(); // base back
 //base_mount_top(); // base plate opposite motor mount. Need 1.
 //base_end_top(); // base end plate/bag mounts.  Need 1, top bag end diameter.
 //base_plate(); // top plate/electronics mount.  Need 1.
-//base_front(); // top plate/electronics mount.  Need 1.
+base_front(); // top plate/electronics mount.  Need 1.
 //base_back(); // top plate/electronics mount.  Need 1.
 //base_top();
 //arm();

@@ -141,22 +141,26 @@ if (PART == "cam") {
 //laser_arm_mount(); // base, top plate
 //laser_base_end_bottom(); // base, top plate
 //laser_base_end_top(); // base, top plate
-//laser_base_front(); // base front
+laser_base_front(); // base front
 //laser_base_back(); // base back
 //laser_cam_end_plate_t(); // base back
 //laser_cam_end_plate_b(); // base back
 //laser_cam_center_b(); // base back
 //laser_cam_center_t(); // base back
 //laser_bearing_bushing(r=6/2); // parts used within the other FFF parts
+//laser_base_top();
+//laser_base_bottom();
 
 //cam(); // cam top/bottom.  Need 2.
-paddle(); // paddle for the arms.  Need 2
+//paddle(); // paddle for the arms.  Need 2
 //base_mount_bottom(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
 //base_mount_top(); // base plate opposite motor mount. Need 1.
 //base_end_top(); // base end plate/bag mounts.  Need 1, top bag end diameter.
 //base_plate(); // top plate/electronics mount.  Need 1.
-//bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
+//base_front(); // top plate/electronics mount.  Need 1.
+//base_top();
 //arm();
+//bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
 //supply_cover();
 //flow_sensor_for_pcb();
 //flow_sensor_venturi_for_pcb();
@@ -1007,7 +1011,7 @@ module base_front(h=material_t) {
 	difference() {
 		base_front_model(h=h);
 		#translate([tft_y_offset,0,h/2]) cube([tft_screen_h,tft_screen_w,h+extra],center=true);
-		#for (y=[0:1:3.9]) translate([housing_h/2-bvm_c*3,y*bvm_c*5.5-bvm_c*5.5*1.5,0]) led();
+		for (y=[0:1:3.9]) translate([housing_h/2-bvm_c*3,y*bvm_c*5.5-bvm_c*5.5*1.5,0]) led();
 		#for (x=[-1,1]) translate([housing_h/2-bvm_c*3.25,-bvm_l/3.15+bvm_c*3.75*x,0]) button();
 		#for (y=[-1,0,1]) translate([housing_h/4*y-housing_h/10,-bvm_l/3.15,0]) rotate([0,0,-90]) pot();
 		#for (x=[-1,1]) translate([-housing_h/4-housing_h/10,bvm_l/10*x,0]) rotate([0,0,180]) pot();
@@ -1043,9 +1047,9 @@ module pot(r=7/2,h=material_t) {
 }
 module led(r=6/2,h=material_t) {
 	translate([0,0,h+2/2]) sphere(r=r-1,center=true);
-	translate([0,0,h+1/2]) cylinder(r=r+1,h=1,center=true);
+	translate([0,0,h+1/2+extra]) cylinder(r=r+1,h=1,center=true);
 	translate([0,0,h/2]) cylinder(r=r,h=h+extra,center=true);
-	translate([0,0,-6/2]) cylinder(r=r+1,h=6,center=true);
+	translate([0,0,-6/2-extra]) cylinder(r=r+1,h=6,center=true);
 }
 module button(r=16/2,h=material_t) {
 	translate([0,0,h-8/2]) cylinder(r=r,h=8+extra,center=true);

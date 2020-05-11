@@ -139,10 +139,10 @@ if (PART == "cam") {
 //laser_arm(path_step=1,$fn=90); // base, top plate
 //laser_arm_end_support(path_step=1,$fn=90); // extend the normal arm end +z for a stacked solution to flex
 //laser_arm_mount(); // base, top plate
-//laser_base_end_bottom(slots=0); // base, top plate
+laser_base_end_bottom(slots=0); // base, top plate
 //laser_base_end_top(slots=0); // base, top plate
 //laser_base_front(); // base front
-laser_base_back(); // base back
+//laser_base_back(); // base back
 //laser_cam_end_plate_t(); // base back
 //laser_cam_end_plate_b(); // base back
 //laser_cam_center_b(); // base back

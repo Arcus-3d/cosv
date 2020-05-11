@@ -139,10 +139,10 @@ if (PART == "cam") {
 //laser_arm(path_step=1,$fn=90); // base, top plate
 //laser_arm_end_support(path_step=1,$fn=90); // extend the normal arm end +z for a stacked solution to flex
 //laser_arm_mount(); // base, top plate
-laser_base_end_bottom(slots=0); // base, top plate
+//laser_base_end_bottom(slots=0); // base, top plate
 //laser_base_end_top(slots=0); // base, top plate
 //laser_base_front(); // base front
-//laser_base_back(); // base back
+laser_base_back(); // base back
 //laser_cam_end_plate_t(); // base back
 //laser_cam_end_plate_b(); // base back
 //laser_cam_center_b(); // base back
@@ -1027,8 +1027,8 @@ module h_bridge(h=material_t) {
 }
 module wiper_motor() {
 	motor_x=35;
-	motor_y=37.5;
-	translate([0,0,0]) rotate([0,0,0]) h_bridge();
+	motor_y=33.5;
+	translate([0,0,0]) rotate([0,0,-90]) h_bridge();
 	translate([y_pos+cam_y_offset,-60/2-material_t*7,-x_pos]) {
 		rotate([90,0,0]) cylinder(r=79/2,h=60,center=true);
 		translate([-motor_x,-motor_y+60/2,x_pos]) {
@@ -1081,7 +1081,7 @@ module base_back(h=material_t) {
 		translate([-housing_h/2*0.75,0,0]) #slide_switch();
 		translate([housing_h/2*0.75,0,0]) #power_jack();
 		#wiper_motor();
-		for (x=[-0.75,0,0.75]) for (y=[-1,1]) translate([x*(housing_h/2),y*(material_t*5.5+clearance*2),h/2]) cube([material_t*5,material_t*2,h+extra*4],center=true);
+		for (x=[-0.75,0.75]) for (y=[-1,1]) translate([x*(housing_h/2),y*(material_t*5.5+clearance*2),h/2]) cube([material_t*5,material_t*2,h+extra*4],center=true);
 	}	
 }	
 

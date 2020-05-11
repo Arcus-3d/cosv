@@ -53,7 +53,7 @@ path_step=param_path_step; // [115]
 
 
 // Assembly views, a little broken.
-//rotate([90,0,0]) cosv_assembly_view(cam_angle=$t*180,explode=20);
+//rotate([90,0,0]) cosv_assembly_view(cam_angle=$t*180,explode=0);
 //cam_assembly_view(explode=10);
 //flow_sensor_assembly_view(rot=360*$t,explode=0.1);
 
@@ -139,9 +139,9 @@ if (PART == "cam") {
 //laser_arm(path_step=1,$fn=90); // base, top plate
 //laser_arm_end_support(path_step=1,$fn=90); // extend the normal arm end +z for a stacked solution to flex
 //laser_arm_mount(); // base, top plate
-//laser_base_end_bottom(); // base, top plate
-//laser_base_end_top(); // base, top plate
-laser_base_front(); // base front
+//laser_base_end_bottom(slots=0); // base, top plate
+laser_base_end_top(slots=0); // base, top plate
+//laser_base_front(); // base front
 //laser_base_back(); // base back
 //laser_cam_end_plate_t(); // base back
 //laser_cam_end_plate_b(); // base back
@@ -158,6 +158,7 @@ laser_base_front(); // base front
 //base_end_top(); // base end plate/bag mounts.  Need 1, top bag end diameter.
 //base_plate(); // top plate/electronics mount.  Need 1.
 //base_front(); // top plate/electronics mount.  Need 1.
+//base_back(); // top plate/electronics mount.  Need 1.
 //base_top();
 //arm();
 //bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
@@ -397,8 +398,8 @@ module laser_paddle() {
 module laser_bearing_bushing(r=cam_bolt_r) {
 	projection(cut=true) bearing_bushing(r=r);
 }
-module laser_base_end_bottom() {
-	projection(cut=false) base_end_bottom();
+module laser_base_end_bottom(slots=1) {
+	projection(cut=false) base_end_bottom(slots=slots);
 }
 module laser_base_bottom() {
 	projection(cut=true) base_bottom();
@@ -413,8 +414,8 @@ module laser_base_back() {
 	projection(cut=true) base_back();
 }
 
-module laser_base_end_top() {
-	projection(cut=false) base_end_top();
+module laser_base_end_top(slots=1) {
+	projection(cut=false) base_end_top(slots=slots);
 }
 module laser_base_mount_bottom() {
 	projection(cut=false) base_mount_bottom();
@@ -428,7 +429,7 @@ module laser_bldc_motor_standoff() {
 
 // now a little screwed up since I split the parts into layers
 module cosv_assembly_view(explode=0,cam_angle=0) {
-	if (1) translate([0,bvm_y_center,0]) {
+	if (0) translate([0,bvm_y_center,0]) {
 	//if (0) {
 		//$fn=32;
 		if (cam_angle < comp_rot) {
@@ -460,11 +461,11 @@ module cosv_assembly_view(explode=0,cam_angle=0) {
 	if (0) translate([x_pos+bvm_c*3-material_t/2-front_recess+explode,y_pos,0]) rotate([90,0,90]) base_front();
 	if (1) translate([-x_pos-bvm_c*3+material_t/2+front_recess-explode,y_pos,0]) rotate([90,0,270]) base_back();
 	if (1) translate([0,0,cam_h/2+material_t*3+clearance*2]) rotate([0,180,0]) mirror([1,0,0]) base_mount_top();
-	if (1) translate([0,0,bvm_l/2+explode*3]) rotate([0,180,0]) base_end_top();
-	if (0) translate([0,y_pos,bvm_l/2-material_t-battery_z/2]) #cube([battery_x,battery_y,battery_z],center=true);
-	if (1) translate([0,-cam_y_offset,0]) rotate([0,0,-cam_angle+cam_pre_rot]) cam_assembly_view(explode=0);
+	if (0) translate([0,0,bvm_l/2+explode*3]) rotate([0,180,0]) base_end_top();
+	if (1) translate([0,y_pos,bvm_l/2-material_t-battery_z/2]) #cube([battery_x,battery_y,battery_z],center=true);
+	if (0) translate([0,-cam_y_offset,0]) rotate([0,0,-cam_angle+cam_pre_rot]) cam_assembly_view(explode=0);
 	if (1) translate([0,0,-bvm_l/2-bvm_c*3/2]) #base_corners(x_pos=x_pos-front_recess,r=arm_bolt_r,h=bvm_l+bvm_c*3);
-	if (1) translate([arm_x_offset,0,-material_t]) {
+	if (0) translate([arm_x_offset,0,-material_t]) {
 		translate([0,0,bearing_h/2+extra/2]) bearing();
 		if (cam_angle < comp_rot) {
 			translate([0,0,bearing_h/2-material_t*3/2]) rotate([0,0,cam_angle/(comp_rot/arm_rot)]) {
@@ -478,7 +479,7 @@ module cosv_assembly_view(explode=0,cam_angle=0) {
 			}
 		}
 	}
-	if (1) translate([-arm_x_offset,0,-material_t]) {
+	if (0) translate([-arm_x_offset,0,-material_t]) {
 		translate([0,0,bearing_h/2+extra/2]) bearing();
 		if (cam_angle < comp_rot) {
 			translate([0,0,bearing_h/2-material_t*3/2]) rotate([0,0,-cam_angle/(comp_rot/arm_rot)]) {
@@ -913,7 +914,7 @@ module base_plate(h=material_t,explode=0,r=bvm_c*5.5,x_pos=x_pos) {
 	hull() base_corners(h=h,r=r,x_pos=x_pos);
 }
 
-module base_end_model(r=bvm_br,h=material_t,explode=0) {
+module base_end_model(r=bvm_br,h=material_t,explode=0,slots=1) {
 	difference() {
 		hull() {
 			base_plate(h=h);
@@ -928,16 +929,16 @@ module base_end_model(r=bvm_br,h=material_t,explode=0) {
 			for (x=[-1,1]) translate([x*bvm_c*1.5,bvm_c*3,0]) cylinder(r=arm_bolt_r/2,h=h+extra,center=true);
 			cylinder(r=arm_bolt_r*1.25,h=h+extra,center=true);
 		}
-		base_end_pin_slots(h=h,x_pos=x_pos-front_recess);
+		if (slots) base_end_pin_slots(h=h,x_pos=x_pos-front_recess);
 	}
 }
 
-module base_end_top(r=bvm_tr,h=material_t,explode=0) {
-	base_end_model(r=r,h=h,explode=explode);
+module base_end_top(r=bvm_tr,h=material_t,explode=0,slots=1) {
+	base_end_model(r=r,h=h,explode=explode,slots=slots);
 }
 
-module base_end_bottom(r=bvm_br,h=material_t,explode=0) {
-	base_end_model(r=r,h=h,explode=explode);
+module base_end_bottom(r=bvm_br,h=material_t,explode=0,slots=1) {
+	base_end_model(r=r,h=h,explode=explode,slots=slots);
 }
 
 module base_mount_model(h=material_t*2,explode=0) {
@@ -949,7 +950,7 @@ module base_mount_model(h=material_t*2,explode=0) {
 			for (x=[-1,1]) translate([arm_x_offset*x,0,0]) {
 				translate([0,0,material_t*5+explode*2]) bearing_washer();
 			}
-			for (x=[-1]) for (y=[-0.75,0,0.75]) translate([x*(x_pos+bvm_c*3-front_recess-extra*2),y_pos+y*housing_h/2,h/2]) difference() {
+			for (x=[-1]) for (y=[-0.75,0.75]) translate([x*(x_pos+bvm_c*3-front_recess-extra*2),y_pos+y*housing_h/2,h/2]) difference() {
 				hull() {
 					cube([material_t+extra*4,material_t*5,h],center=true);
 					translate([-material_t*5/2,0,0]) cylinder(r=material_t*5/2,h=h,center=true);
@@ -964,7 +965,7 @@ module base_mount_model(h=material_t*2,explode=0) {
 		motor_shaft_hole(r=bearing_or,h=h+extra,extra=extra);
 		translate([x_pos-(tft_d-material_t)/2,y_pos+tft_y_offset,h/2]) cube([tft_d+material_t,tft_h,h+extra],center=true);
 		translate([x_pos,y_pos,h/2]) cube([material_t+extra,housing_h,h+extra],center=true);
-		for (a=[-1,1]) hull() for (x=[0,1]) for (y=[-1,1]) translate([-x_pos+x*bvm_c*5,y_pos+housing_h/5.5*a+y*bvm_c*2,h/2]) cylinder(r=6/2,h=h+extra,center=true);
+		hull () for (a=[-1,1]) for (x=[0,1]) for (y=[-1,1]) translate([-x_pos+x*bvm_c*6.5,y_pos+housing_h/5.5*a+y*bvm_c*2,h/2]) cylinder(r=6/2,h=h+extra,center=true);
 		hull() for (x=[0,1]) for (y=[-1,0]) translate([x_pos-(17*2-material_t)/2+x*17,-cam_y_offset+y*23,h/2]) cylinder(r=6/2,h=h+extra,center=true);
 		hull() for (x=[0,1]) for (y=[1,0]) translate([x_pos-(17*2-material_t)/2+x*17,y_pos+housing_h/2-bvm_c*4.5+y*5,h/2]) cylinder(r=6/2,h=h+extra,center=true);
 	}
@@ -1025,14 +1026,14 @@ module h_bridge(h=material_t) {
 	#hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*5/2+18,y*5-10,-10/2]) cube([extra,extra,10],center=true);
 }
 module wiper_motor() {
-	motor_x=42;
-	motor_y=36;
+	motor_x=35;
+	motor_y=37.5;
+	translate([0,0,0]) rotate([0,0,0]) h_bridge();
 	translate([y_pos+cam_y_offset,-60/2-material_t*7,-x_pos]) {
 		rotate([90,0,0]) cylinder(r=79/2,h=60,center=true);
 		translate([-motor_x,-motor_y+60/2,x_pos]) {
 			cylinder(r=61/2,h=108,center=true);
 			translate([0,0,-30]) cylinder(r=30/2,h=188,center=true);
-			translate([61/2+50/2+2/2,0,-1]) rotate([0,0,-90]) h_bridge();
 		}
 	}
 }
@@ -1077,7 +1078,7 @@ module base_back(h=material_t) {
 	difference() {
 		base_front_model(h=h);
 		
-		translate([-housing_h/2*0.0,0,0]) #slide_switch();
+		translate([-housing_h/2*0.75,0,0]) #slide_switch();
 		translate([housing_h/2*0.75,0,0]) #power_jack();
 		#wiper_motor();
 		for (x=[-0.75,0,0.75]) for (y=[-1,1]) translate([x*(housing_h/2),y*(material_t*5.5+clearance*2),h/2]) cube([material_t*5,material_t*2,h+extra*4],center=true);

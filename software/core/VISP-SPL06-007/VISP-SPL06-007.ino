@@ -17,12 +17,20 @@
    Author: Steven.Carr@hammontonmakers.org
 */
 
+// TODO: Manual ADC Control
+// TODO: Better input validation
+// TODO: Failure modes (all of them) need to be accounted for and baked into the system
+// TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
+// TODO: Get a (very tiny code wise) I2C LCD working for basic text output.
 
 #include "config.h"
-#include <AccelStepper.h>
 
 #ifdef ARDUINO_TEENSY40
 TwoWire *i2cBus1 = &Wire1;
+TwoWire *i2cBus2 = &Wire2;
+#elif ARDUINO_BLUEPILL_F103C8
+TwoWire *i2cBus1 = &Wire;
+TwoWire Wire2(PB11,PB10);
 TwoWire *i2cBus2 = &Wire2;
 #elif ARDUINO_AVR_NANO
 TwoWire *i2cBus1 = &Wire;
@@ -34,72 +42,12 @@ TwoWire *i2cBus2 = NULL;
 #error Unsupported board selection.
 #endif
 
-#define STEPPER_STEPS_PER_REV 200
-#define SWEEP_SPEED 150 // Ford F150 motor wiper
-#define HOMING_SPEED 255
-
-volatile bool motorFound = false;
-volatile bool motorHoming = false;
-uint8_t motorMinSpeedDetected = 0; // Max speed is 255 on the PWM
-uint8_t motorMaxSpeedDetected = 0; // Max speed is 255 on the PWM
 
 uint8_t currentMode = MODE_OFF;
 debugState_e debug = DEBUG_DISABLED;
 
 
-//The Arduino has 3 timers and 6 PWM output pins. The relation between timers and PWM outputs is:
-//
-//    Pins 5 and 6: controlled by Timer0   (On the Uno and similar boards, pins 5 and 6 have a frequency of approximately 980 Hz.)
-//    Pins 9 and 10: controlled by Timer1  (490 Hz)
-//    Pins 11 and 3: controlled by Timer2  (490 Hz)
-//
-// We should rebalance the PWM's to give Timer1 or Timer2 to AccelStepper.
-//
-// The Arduino does not have a built-in digital-to-analog converter (DAC),
-// but it can pulse-width modulate (PWM) a digital signal to achieve some
-// of the functions of an analog output. The function used to output a
-// PWM signal is analogWrite(pin, value). pin is the pin number used for
-// the PWM output. value is a number proportional to the duty cycle of
-// the signal.
-// When value = 0, the signal is always off.
-// When value = 255, the signal is always on.
-// On most Arduino boards, the PWM function is available on pins 3, 5, 6, 9, 10, and 11. The frequency of the PWM signal on most pins is approximately 490 Hz.
 
-// Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
-// This is detected if needed
-#define ENABLE_PIN_BUS_A 4
-#define ENABLE_PIN_BUS_B 5
-
-#define M_PWM_1 6 // Hardware PWM on a Nano
-#define M_PWM_2 9 // Hardware PWM on a Nano
-#define M_DIR_1 12
-#define M_DIR_2 13
-
-#define STEPPER_DIR  7
-#define STEPPER_STEP 8
-#define HOME_SENSOR   3 // IRQ on low.
-
-#define BLDC_DIR     10 // 
-#define BLDC_PWM     11 // Hardware PWM output for BLDC motor
-#define BLDC_FEEDBACK 2 // Interrupt pin, let's us know the core motor has done 1 Rev
-
-// If all of the ADC's are set to zero, then the display controls things
-#define ADC_VOLUME   A0 // How much to push, 0->1023 milliliters, if it reads 0, then display can control this (parameter)
-#define ADC_RATIO    A1 // How much time to push, 0->1023.   Scaled to 1/2 the interval???
-#define ADC_RATE     A2 // When to timeout and trigger a new breath.   0..1023 is scaled from 0 to 3 seconds.  0=display controls the parameter
-#define ADC_HALL     A3 // Used for sensing home with Hall Effect Sensors
-#define ADC_SDA      A4
-#define ADC_SCL      A5
-#define ADC_UNKNOWN1 A6
-#define ADC_UNKNOWN2 A7
-
-
-#define MISSING_PULSE_PIN  2   // Output a pulse every time we check the sensors.
-
-// We only have ADC inputs A6 and A7 left...
-
-AccelStepper mystepper(AccelStepper::DRIVER, STEPPER_STEP, STEPPER_DIR); // Direction: High means forward.
-// mystepper adds 3674 bytes of code and 94 bytes of ram
 
 // DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
 //
@@ -127,28 +75,31 @@ AccelStepper mystepper(AccelStepper::DRIVER, STEPPER_STEP, STEPPER_DIR); // Dire
 //                             +-- SDA2 to the VISP
 //
 // Shamelessly swiped from: https://i.stack.imgur.com/WnsM0.png
-
-
-
-bool timeToReadSensors = false;
-
+//
+// Put a transistor inverter on ENABLE_PIN_BUS_A to eliminate needing the second ENABLE_PIN_BUS_B
+//
 
 /*** Timer callback subsystem ***/
 
 typedef void (*tCBK)() ;
 typedef struct t  {
   unsigned long tStart;
-  unsigned long tTimeout;
+  unsigned int  tTimeout; // 64 second max timeout
   tCBK cbk;
 } t_t;
 
 
-void tCheck (struct t * t ) {
+unsigned long tCheck (struct t * t ) {
+  unsigned long accrued = 0L;
+
   if (millis() > t->tStart + t->tTimeout)
   {
+    unsigned long startTime = micros();
     t->cbk();
     t->tStart = millis();
+    accrued += (micros() - startTime);
   }
+  return accrued;
 }
 
 // Periodically pulse a pin
@@ -164,22 +115,48 @@ void timeToPulseWatchdog()
 
 void timeToReadVISP()
 {
-  timeToReadSensors = true;
+  static float P[4], T[4];
+  // Read them all NOW
+  if (sensorsFound)
+  {
+    for (int x = 0; x < 4; x++)
+    {
+      P[x] = 0;
+      // If any of the sensors fail, stop trying to do others
+      if (!sensors[x].calculate(&sensors[x], &P[x], &T[x]))
+        break;
+    }
+  }
+
+  // OK, the cable might have just been unplugged, and the sensors have gone away.
+  // Hence the double checks one above, and this one below
+  if (sensorsFound)
+  {
+    if (calibrateInProgress())
+      calibrateSensors(P);
+    else
+    {
+      calibrateApply(P);
+
+      if (visp_eeprom.bodyType == 'P')
+        calculatePitotValues(P);
+      else
+        calculateVenturiValues(P);
+      // TidalVolume is the same for both versions
+      calculateTidalVolume();
+      // Take some time to write to the serial port
+      dataSend(P);
+    }
+  }
 }
-
-int16_t modeBreathRateToMotorSpeed()
-{
-  //  if (currentMode == MODE_PCCMV)
-
-  return motorMinSpeedDetected;
-}
-
-void homeThisPuppy(bool forced);
 
 
 unsigned long timeToInhale = 0;
-unsigned long timeToStopInhale = 0;
-bool lastBreathMotorDirection = false;
+unsigned long timeToStopInhale = -1;
+bool isInInhaleCycle = false;
+
+#define isInInhaleCycle() (timeToStopInhale < 0)
+
 void timeToCheckPatient()
 {
   unsigned long theMillis = millis();
@@ -189,6 +166,7 @@ void timeToCheckPatient()
   if (currentMode == MODE_OFF)
     return;
 
+  // The patenti hasn't tried to breath on their own...
   if (theMillis > timeToInhale)
   {
     unsigned long nextBreathCycle = ((60.0 / (float)visp_eeprom.breath_rate) * 1000.0);
@@ -200,24 +178,39 @@ void timeToCheckPatient()
     timeToInhale += theMillis;
     timeToStopInhale += theMillis;
 
-    // Switch direction each time.
-    if (lastBreathMotorDirection)
-    {
-      motorForward(modeBreathRateToMotorSpeed());
-      lastBreathMotorDirection = false;
-    }
-    else
-    {
-      motorReverse(modeBreathRateToMotorSpeed());
-      lastBreathMotorDirection = true;
-    }
+    motorReverseDirection();
+    motorSpeedUp();
   }
 
   if (timeToStopInhale >= 0 && theMillis > timeToStopInhale)
   {
     motorStop();
-    homeThisPuppy(false);
+    motorGoHome();
     timeToStopInhale = -1;
+  }
+
+  // TODO: if in the middle of the inhalation time, and we don't have any pressure from the VISP,
+  // TODO: either we have a motor fault or we have a disconnected tube
+
+  if (isInInhaleCycle() && sensorsFound)
+  {
+    switch (currentMode)
+    {
+      case MODE_MANUAL_PCCMV:
+      case MODE_PCCMV:
+        if (pressure < visp_eeprom.breath_pressure)
+          motorSpeedUp();
+        if (pressure > visp_eeprom.breath_pressure)
+          motorSlowDown();
+        break;
+      case MODE_MANUAL_VCCMV:
+      case MODE_VCCMV:
+        if (volume < visp_eeprom.breath_volume)
+          motorSpeedUp();
+        if (volume > visp_eeprom.breath_volume)
+          motorSlowDown();
+        break;
+    }
   }
 }
 
@@ -229,14 +222,51 @@ void timeToCheckSensors()
     detectVISP(i2cBus1, i2cBus2, ENABLE_PIN_BUS_A, ENABLE_PIN_BUS_B);
 }
 
+int scaleAnalog(int analogIn, int minValue, int maxValue)
+{
+  float percentage = (float)analogIn/(float)MAX_ANALOG; // THis is CPU dependent, 1024 on Nano, 4096 on STM32
+  return minValue+(maxValue * percentage);
+}
+
+
+void timeToCheckADC()
+{
+  int analogMode = scaleAnalog(analogRead(ADC_MODE), 0, 3);
+  switch (analogMode) {
+    case 0:
+      break;
+    case 1:
+       currentMode = MODE_MANUAL_PCCMV;
+       visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
+       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+       break;      
+    break;
+    case 2:
+       currentMode = MODE_MANUAL_VCCMV;
+       visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
+       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+       break;
+  }
+}
+
+void timeToSendHealthStatus()
+{
+  sendCurrentSystemHealth();
+}
+
+
 // Timer Driven Tasks and their Schedules.
 // These are checked and executed in order.
 // If something takes priority over another task, put it at the top of the list
 t tasks[] = {
   {0, 20, timeToReadVISP},
-  {0, 5,  timeToCheckPatient},
+  {0, 50,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
+  {0, 200, timeToCheckADC},
   {0, 500, timeToCheckSensors},
+  {0, 3000, timeToSendHealthStatus},
   {0, 0, NULL} // End of list
 };
 
@@ -244,143 +274,15 @@ t tasks[] = {
 
 
 
-// Let the motor run until we get the correct number of pulses
 void homeTriggered() // IRQ function
 {
-  // This is tested a lot, we need to fail on not homing.
-  if (motorHoming)
-  {
-    motorFound = true;
-    motorHoming = false;
-  }
+  motorFound = true;
 
   motorStop();
 }
 
-bool motorWasGoingForward = false;
-void motorReverse(int rate)
-{
-  motorWasGoingForward = false;
-  digitalWrite(M_DIR_1, 0);
-  digitalWrite(M_DIR_2, 1);
-  //digitalWrite(BLDC_DIR, HIGH);
 
-  analogWrite(M_PWM_1, rate);
-  analogWrite(M_PWM_2, rate);
 
-  //  analogWrite(BLDC_PWM, rate);
-  rate = -rate;
-  mystepper.setSpeed(rate);
-}
-
-void motorForward(int rate)
-{
-  motorWasGoingForward = true;
-  digitalWrite(M_DIR_1, 1);
-  digitalWrite(M_DIR_2, 0);
-  //  digitalWrite(BLDC_DIR, LOW);
-
-  analogWrite(M_PWM_1, rate);
-  analogWrite(M_PWM_2, rate);
-
-  //  analogWrite(BLDC_PWM, rate);
-  mystepper.setSpeed(rate);
-}
-
-void motorStop()
-{
-  // Short the motor, so it stops faster
-  digitalWrite(M_DIR_1, 0);
-  digitalWrite(M_DIR_2, 0);
-
-  analogWrite(M_PWM_1, 0);
-  analogWrite(M_PWM_2, 0);
-
-  //  analogWrite(BLDC_PWM, 0);
-  mystepper.stop(); // Stop as fast as possible: sets new target
-  mystepper.setSpeed(0);
-}
-
-void motorRunStepper()
-{
-  mystepper.runSpeed();
-}
-
-bool runWhileHomeSensorReads(int value)
-{
-  unsigned long timeout = millis() + 6000; // 6 seconds...
-  do
-  {
-    if (digitalRead(HOME_SENSOR) != value)
-      return true;
-    motorRunStepper();
-  }
-  while (millis() < timeout);
-  return false;
-}
-
-// If forced, this is for the initial setup
-void homeThisPuppy(bool forced)
-{
-  if (forced || digitalRead(HOME_SENSOR) == HIGH)
-  {
-    motorHoming = true;
-    if (motorWasGoingForward)
-      motorReverse(HOMING_SPEED);
-    else
-      motorForward(HOMING_SPEED);
-  }
-}
-
-unsigned long timeTillNextMagnet(uint8_t motorSpeed)
-{
-  unsigned long startTime, stopTime;
-
-  if (motorFound)
-  {
-    startTime = millis();
-    motorForward(motorSpeed);
-    runWhileHomeSensorReads(LOW);
-    runWhileHomeSensorReads(HIGH);
-    stopTime = millis();
-
-    return (stopTime - startTime);
-  }
-
-  return 0L;
-}
-
-void calibrateMotorSpeeds()
-{
-  if (motorFound)
-  {
-    unsigned long minTimeToGetToOtherMagnet = ((60000.0 / (float)MIN_BREATH_RATE) / MIN_BREATH_RATIO); // 10 and 1:2
-    unsigned long maxTimeToGetToOtherMagnet = ((60000.0 / (float)MAX_BREATH_RATE) / MAX_BREATH_RATIO); // 40 and 1:5
-    unsigned long runTime = 0;
-    for (uint8_t x = 250; x > 10; x -= 10)
-    {
-
-      runTime = timeTillNextMagnet(x);
-      if (runTime < maxTimeToGetToOtherMagnet || motorMaxSpeedDetected == 0)
-      {
-        if (motorMaxSpeedDetected == 0 && runTime > maxTimeToGetToOtherMagnet)
-          info(PSTR("Motor not fast enough for fastest %l compress time"), maxTimeToGetToOtherMagnet);
-        motorMaxSpeedDetected = x;
-      }
-
-      info(PSTR("Calibrated speed %d=%l millis"), x, runTime);
-
-      if (runTime > minTimeToGetToOtherMagnet)
-      {
-        info(PSTR("Motor range is %d to %d for %l to %l compress times"), motorMinSpeedDetected, motorMaxSpeedDetected, minTimeToGetToOtherMagnet, maxTimeToGetToOtherMagnet);
-        return;
-      }
-      motorMinSpeedDetected = x;
-    }
-
-    info(PSTR("Motor not slow enough for lowest %l compress time"), minTimeToGetToOtherMagnet);
-  }
-}
 
 
 void setup() {
@@ -391,16 +293,11 @@ void setup() {
   digitalWrite(ENABLE_PIN_BUS_B, LOW);
   pinMode(MISSING_PULSE_PIN, OUTPUT);
   digitalWrite(MISSING_PULSE_PIN, LOW);
-  pinMode(M_PWM_1, OUTPUT);
-  pinMode(M_PWM_2, OUTPUT);
-  pinMode(M_DIR_1, OUTPUT);
-  pinMode(M_DIR_2, OUTPUT);
-  //  pinMode(BLDC_DIR, OUTPUT);
 
-  // Setup the motor output
-  pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
+  motorSetup();
 
   // Setup the home sensor as an interrupt
+  pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
   attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
 
   hwSerial.begin(SERIAL_BAUD);
@@ -409,8 +306,6 @@ void setup() {
   busDeviceInit();
   vispInit();
 
-  mystepper.setAcceleration(2000);
-  mystepper.setMaxSpeed(STEPPER_STEPS_PER_REV * 3);
 
   i2cBus1->begin();
   i2cBus1->setClock(400000); // Typical
@@ -419,14 +314,7 @@ void setup() {
   sensorsFound = false;
   sanitizeVispData(); // Apply defaults
 
-  homeThisPuppy(true);
-
-  for (unsigned long timeout = millis() + 6000; millis() < timeout && !motorFound; )
-    motorRunStepper();
-
-  motorStop(); /* sensor detached, motor unplugged, etc */
-  info(PSTR("motor state = %S"), motorFound ? PSTR("Found") : PSTR("Missing"));
-  calibrateMotorSpeeds();
+  motorGoHome();
 
   // Start the VISP calibration process
   calibrateClear();
@@ -435,75 +323,33 @@ void setup() {
 
 
 
+// Every second, compute how much time we spent working, and report the percentage
+unsigned long currentUtilization = 0;
+unsigned long utilizationTimeout = 0;
 
-
+// loop() gets called repeatedly forever, so there is no 'idle' time
+// do not compute the time checking for things to be done, only compute the time we do things.
 void loop() {
-  static float P[4], T[4];
+  unsigned long startMicros;
 
-  motorRunStepper();
+  startMicros = micros();
+  motorRun();
+  currentUtilization += micros() - startMicros;
 
   for (t_t *entry = tasks; entry->cbk; entry++)
-    tCheck(entry);
+    currentUtilization += tCheck(entry);
 
-  if (timeToReadSensors)
-  {
-    timeToReadSensors = false;
-
-    // Read them all NOW
-    if (sensorsFound)
-    {
-      for (int x = 0; x < 4; x++)
-      {
-        P[x] = 0;
-        // If any of the sensors fail, stop trying to do others
-        if (!sensors[x].calculate(&sensors[x], &P[x], &T[x]))
-          break;
-      }
-    }
-
-    // OK, the cable might have just been unplugged, and the sensors have gone away.
-    // Hence the double checks one above, and this one below
-    if (sensorsFound)
-    {
-      if (calibrateInProgress())
-        calibrateSensors(P);
-      else
-      {
-        calibrateApply(P);
-
-        if (visp_eeprom.bodyType == 'P')
-          calculatePitotValues(P);
-        else
-          calculateVenturiValues(P);
-        // TidalVolume is the same for both versions
-        calculateTidalVolume();
-      }
-      // Take some time to write to the serial port
-      dataSend(P);
-    }
-  }
-#ifdef NEWISH
-  if (timeToCheckMotors && sensorsFound)
-  {
-    switch (currentMode == MODE_PCCMV)
-    {
-      case PC_CMV:
-        if (pressure < visp_eeprom.pressure)
-          motorSpeedUp();
-        if (pressure < visp_eeprom.pressure)
-          motorSpeedDown();
-        break;
-      case VC_CMV:
-        if (volume < visp_eeprom.volume)
-          motorSpeedUp();
-        if (volume < visp_eeprom.volume)
-          motorSpeedDown();
-        break;
-    }
-  }
-#endif
-  // Command parser uses 6530 bytes of flash... This is a LOT
+  // Command parser uses >6K bytes of flash... This is a LOT
   // Handle user input, 1 character at a time
+  startMicros = micros();
   while (hwSerial.available())
     commandParser(hwSerial.read());
+  currentUtilization += micros() - startMicros;
+
+  if (millis() > utilizationTimeout)
+  {
+    debug(PSTR("Utilization %l%%"), currentUtilization / 10000);
+    currentUtilization = 0;
+    utilizationTimeout = millis() + 1000;
+  }
 }

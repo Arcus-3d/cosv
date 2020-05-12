@@ -250,8 +250,8 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
   // Make sure they are all there
   missing = 0;
   for (int x = 0; x < 4; x++)
-    missing |= (sensors[x].busDev ? 0 : 1<<x);
-    
+    missing |= (sensors[x].busDev ? 0 : 1 << x);
+
   if (missing)
   {
     warning(PSTR("Sensors missing 0x%x"), missing);
@@ -313,20 +313,25 @@ void calibrateApply(float * P)
 void calibrateSensors(float * P)
 {
   int x;
-  if (calibrationSampleCounter == 1)
-    respond('C', PSTR("0,Starting Calibration"));
-  for (x = 0; x < 4; x++)
-    calibrationOffsets[x] += P[x];
-  calibrationSampleCounter++;
-  if (calibrationSampleCounter == CALIBRATION_FINISHED) {
-    float average = 0.0;
-    for (x = 0; x < 4; x++)
-      average += calibrationOffsets[x];
-    average /= 400.0;
 
+  // If we are moving motors around, we cannot calibrate the sensor properly
+  if (!motorDetectionInProgress())
+  {
+    if (calibrationSampleCounter == 1)
+      respond('C', PSTR("0,Starting Calibration"));
     for (x = 0; x < 4; x++)
-      calibrationOffsets[x] = average - calibrationOffsets[x] / 100.0;
-    respond('C', PSTR("2,Calibration Finished"));
+      calibrationOffsets[x] += P[x];
+    calibrationSampleCounter++;
+    if (calibrationSampleCounter == CALIBRATION_FINISHED) {
+      float average = 0.0;
+      for (x = 0; x < 4; x++)
+        average += calibrationOffsets[x];
+      average /= 400.0;
+
+      for (x = 0; x < 4; x++)
+        calibrationOffsets[x] = average - calibrationOffsets[x] / 100.0;
+      respond('C', PSTR("2,Calibration Finished"));
+    }
   }
 }
 

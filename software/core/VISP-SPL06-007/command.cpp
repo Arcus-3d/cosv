@@ -71,6 +71,7 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
 #define RESPOND_SENSOR1            1UL<<15
 #define RESPOND_SENSOR2            1UL<<16
 #define RESPOND_SENSOR3            1UL<<17
+#define RESPOND_MOTOR_TYPE         1UL<<18
 
 
 struct dictionary_s {
@@ -81,9 +82,11 @@ struct dictionary_s {
 
 // Put the strings in flash instead of SRAM
 const char strPCCMV [] PUTINFLASH = "PC-CMV";
-const char strPCCMVdesc [] PUTINFLASH = "Pressure Controlled";
+const char strPCCMVdesc [] PUTINFLASH = "Pressure Controlled CMV";
 const char strVCCMV [] PUTINFLASH = "VC-CMV";
-const char strVCCMVdesc [] PUTINFLASH = "Volume Controlled";
+const char strVCCMVdesc [] PUTINFLASH = "Volume Controlled CMV";
+const char strManual [] PUTINFLASH = "Manual";
+const char strManualdesc [] PUTINFLASH = "Manual mode - Controlled by analog dials on the unit";
 const char strDisable [] PUTINFLASH = "Disable";
 const char strEnable [] PUTINFLASH = "Enable";
 const char strDisabled [] PUTINFLASH = "Disabled";
@@ -102,7 +105,9 @@ const char strBMP280 [] PUTINFLASH = "BMP280";
 const char strSPL06 [] PUTINFLASH = "SPL06";
 const char strOff [] PUTINFLASH = "OFF";
 const char strModeOffDesc [] PUTINFLASH = "Offline";
-
+const char strBldc [] PUTINFLASH = "BLDC";
+const char strWiper [] PUTINFLASH = "Wiper";
+const char strStepper [] PUTINFLASH = "Stepper";
 
 const struct dictionary_s sensorDict[] PUTINFLASH = {
   {SENSOR_UNKNOWN, strUnknown, strUnknown},
@@ -113,9 +118,10 @@ const struct dictionary_s sensorDict[] PUTINFLASH = {
 };
 
 const struct dictionary_s modeDict[] PUTINFLASH = {
-  {MODE_OFF,     strOff, strModeOffDesc},
+  {MODE_OFF,     strOff,     strModeOffDesc},
   {MODE_PCCMV,   strPCCMV,   strPCCMVdesc},
   {MODE_VCCMV,   strVCCMV,   strVCCMVdesc},
+  {MODE_MANUAL,  strManual,  strManualdesc},
   { -1, NULL, NULL}
 };
 
@@ -131,6 +137,16 @@ const struct dictionary_s bodyDict[] PUTINFLASH = {
   {VISP_BODYTYPE_VENTURI, strVenturi, strVenturiDesc},
   { -1, NULL, NULL}
 };
+
+const struct dictionary_s motorTypeDict[] PUTINFLASH = {
+  {MOTOR_UNKNOWN, strUnknown, strUnknown},
+  {MOTOR_BLDC,     strBldc,   strBldc},
+  {MOTOR_STEPPER, strStepper, strStepper},
+  {MOTOR_WIPER,   strWiper,   strWiper},
+  { -1, NULL, NULL}
+};
+
+
 
 const char strBreathRatio2 [] PUTINFLASH = "1:2";
 const char strBreathRatio3 [] PUTINFLASH = "1:3";
@@ -179,6 +195,7 @@ const char strCalib0 [] PUTINFLASH = "calib0";
 const char strCalib1 [] PUTINFLASH = "calib1";
 const char strCalib2 [] PUTINFLASH = "calib2";
 const char strCalib3 [] PUTINFLASH = "calib3";
+const char strMotorType [] PUTINFLASH = "motor_type";
 
 bool noSet(struct settingsEntry_s * entry, const char *arg);
 bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg);
@@ -197,11 +214,12 @@ void handleNewVolume(struct settingsEntry_s * entry)
   //volumeTimeout=((motorCycleTime/2)*(visp_eeprom.vreath_volume/MAX_VOLUME); // Half way through a cycle is full compression
 }
 
+
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
-  {RESPOND_MODE,             MODE_ALL, strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
-  {RESPOND_BREATH_RATE,      MODE_ALL, strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
-  {RESPOND_BREATH_RATIO,     MODE_ALL, strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
+  {RESPOND_MODE,             (MODE_ALL^MODE_MANUAL), strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
+  {RESPOND_BREATH_RATE,      (MODE_ALL^MODE_MANUAL), strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
+  {RESPOND_BREATH_RATIO,     (MODE_ALL^MODE_MANUAL), strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
   {RESPOND_BREATH_VOLUME,    MODE_VCCMV | MODE_OFF, strBreathVolume, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
   {RESPOND_BREATH_PRESSURE,  MODE_PCCMV | MODE_OFF, strBreathPressure, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
   {RESPOND_BREATH_THRESHOLD, MODE_NONE, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
@@ -214,6 +232,7 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_SENSOR1,          MODE_NONE, strSensor1, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
   {RESPOND_SENSOR2,          MODE_NONE, strSensor2, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
   {RESPOND_SENSOR3,          MODE_NONE, strSensor3, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
+  {RESPOND_MOTOR_TYPE,       MODE_NONE, strMotorType, 0, 0, motorTypeDict, noSet, respondInt8ToDict, NULL, &motorType},
   {RESPOND_DEBUG,            MODE_NONE, strDebug, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &debug},
   {0, MODE_NONE,  NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
@@ -449,7 +468,10 @@ void handleSettingCommand(const char *arg1, const char *arg2)
           return;
         }
         else
+        {
           warning(PSTR("Invalid %S value %s"), entry.theName, arg2);
+          return;
+        }
       }
     }
   } while (entry.bitmask);
@@ -478,7 +500,7 @@ void handleCalibrateCommand(const char *arg1, const char *arg2)
 // Also we have to add motor failure detection to this.
 void sendCurrentSystemHealth()
 {
-  respond('H', (sensorsFound ? PSTR("good") : PSTR("bad")));
+  respond('H', (sensorsFound && motorFound ? PSTR("good") : PSTR("bad")));
 }
 
 void handleHealthCommand(const char *arg1, const char *arg2)
@@ -508,6 +530,14 @@ void handleEepromCommand(const char *arg1, const char *arg2)
     sendEEPROMdata(0, 128);
 }
 
+void handleBatteryCommand(const char *arg1, const char *arg2)
+{
+  int b=analogRead(ADC_BATTERY);
+
+  // TODO: calculate runtime based on voltage
+  respond('B',PSTR("%d"),b, b);
+}
+
 typedef void (*commandCallback)(const char *arg1, const char *arg2);
 
 struct commandEntry_s {
@@ -522,6 +552,7 @@ const struct commandEntry_s commands[] PUTINFLASH = {
   { 'S', handleSettingCommand },
   { 'E', handleEepromCommand },
   { 'H', handleHealthCommand },
+  { 'B', handleBatteryCommand },
   { 'R', NULL}, // declare reset function at address 0
   { 0, NULL}
 };

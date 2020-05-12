@@ -36,4 +36,11 @@ extern motorFunction motorReverseDirection;
 
 extern motorFunction motorRun; // call in loop()
 
+
+extern int8_t motorType;
+#define MOTOR_UNKNOWN -1
+#define MOTOR_BLDC     1
+#define MOTOR_STEPPER  2
+#define MOTOR_WIPER    3
+ 
 #endif

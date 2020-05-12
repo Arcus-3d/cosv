@@ -24,8 +24,9 @@
 // fyi: mystepper adds 3674 bytes of code and 94 bytes of ram
 
 #define STEPPER_STEPS_PER_REV 200
-#define SWEEP_SPEED 150 // Ford F150 motor wiper
-#define HOMING_SPEED 255
+#define WIPER_SWEEP_SPEED 150 // Ford F150 motor wiper
+#define STEPPER_SWEEP_SPEED 128
+#define BLDC_SWEEP_SPEED   128
 
 // ok, we can have a simple H bridge  HiLetGo BTS7960
 #define MOTOR_HBRIDGE_R_EN    MOTOR_PIN_B   // R_EN: forware drive enable input, high-level enable, low level off  (ACTIVE_HIGH)
@@ -34,7 +35,7 @@
 // WARNING: If you enable R_EN and L_EN at the same time, you fry the chip, so always set both to 0 first, then enable delay(1) and then set the direction pin
 
 // We can have a stepper motor - Schmalz easy driver (Does not fry H if used mistakenly)
-#define MOTOR_STEPPER_ENABLE  MOTOR_PIN_A  //  enable input, low-level enable, high level off   (ACTIVE LOW)
+#define MOTOR_STEPPER_ENABLE  MOTOR_PIN_A  //  enable input, low-level enable, high level off   (ACTIVE LOW)<-- This is important as BLDC detection pulls this pin HIGH and looks for a pull to zero
 #define MOTOR_STEPPER_DIR     MOTOR_PIN_C
 #define MOTOR_STEPPER_STEP    MOTOR_PIN_PWM
 
@@ -51,6 +52,9 @@ volatile bool motorFound = false;
 static bool motorWasGoingForward = false;
 static uint8_t motorSpeed = 0;
 static int8_t motorState = 0;
+
+int8_t motorType = -1;
+static int8_t homingSpeed = 150; // Based on motor type detected above
 
 void hbridgeReverseDirection()
 {
@@ -89,7 +93,7 @@ void hbridgeStop()
 
 void hbridgeSpeedUp()
 {
-  if (motorSpeed < 255)
+  if (motorSpeed < MAX_PWM)
   {
     motorSpeed++;
     analogWrite(MOTOR_HBRIDGE_PWM, motorSpeed);
@@ -131,7 +135,7 @@ void bldcStop()
 
 void bldcSpeedUp()
 {
-  if (motorSpeed < 255)
+  if (motorSpeed < MAX_PWM)
   {
     motorSpeed++;
     analogWrite(MOTOR_BLDC_PWM, motorSpeed);
@@ -147,7 +151,7 @@ void bldcSlowDown()
   }
 }
 
-unsigned long bldcCount=0;
+unsigned long bldcCount = 0;
 
 void bldcTriggered() // IRQ function (Future finding the perfect home)
 {
@@ -165,9 +169,9 @@ void stepperReverseDirection()
 
 void stepperStop()
 {
-  mystepper.stop(); // Stop as fast as possible: sets new target
-  motorSpeed = 0;
-  mystepper.setSpeed(motorSpeed);
+  motorSpeed=0;
+  mystepper.setSpeed(0);
+  mystepper.stop(); // Stop as fast as possible: sets new target (not runSpeed)
 }
 
 void stepperRun()
@@ -177,7 +181,7 @@ void stepperRun()
 
 void stepperSpeedUp()
 {
-  if (motorSpeed < 255)
+  if (motorSpeed < MAX_PWM)
   {
     motorSpeed++;
     analogWrite(MOTOR_HBRIDGE_PWM, (motorWasGoingForward ? motorSpeed : -motorSpeed));
@@ -197,7 +201,7 @@ void stepperSlowDown()
 // Default no motor function callbacks
 static void doNothing()
 {
-    /* This is what is called when the motor has not been identified */
+  /* This is what is called when the motor has not been identified */
 }
 
 
@@ -207,16 +211,25 @@ void motorGoHome()
 {
   if (digitalRead(HOME_SENSOR) == HIGH)
   {
-    motorSpeed = HOMING_SPEED;
+    motorSpeed = homingSpeed;
     motorReverseDirection();
   }
 }
 
 bool motorDetectionInProgress()
 {
-  return motorState>0;
+  return motorState > 0;
 }
 
+#define DETECT_START   0
+#define DETECT_BLDC    1
+#define WAIT_BLDC      2
+#define DETECT_STEPPER 3
+#define WAIT_STEPPER   4
+#define DETECT_WIPER   5
+#define WAIT_WIPER     6
+#define DETECT_TIMEOUT 7
+#define WAIT_TIMEOUT   8
 
 // Will get called repeatedly
 void motorDetect()
@@ -226,26 +239,29 @@ void motorDetect()
   {
     case -1:
       return;
-    case 0: // Initialize
+    case DETECT_START: // Initialize
+      motorType = MOTOR_UNKNOWN;
       digitalWrite(MOTOR_HBRIDGE_R_EN, LOW);
       digitalWrite(MOTOR_HBRIDGE_L_EN, LOW);
       digitalWrite(MOTOR_STEPPER_ENABLE, HIGH);
       if (!calibrateInProgress())
         motorState++;
       break;
-    case 1: // Get the bldc motor running (MUST BE DONE BEFORE STEPPER)
+    case DETECT_BLDC: // Get the bldc motor running (MUST BE DONE BEFORE STEPPER)
       info(PSTR("Detecting BLDC motor"));
       motorFound = false;
       bldcCount = 0;
-      pinMode(MOTOR_BLDC_FEEDBACK, INPUT_PULLUP); // Short to ground to trigger.  This is also STEPPER_ENABLE output if the stepper is connected
-      attachInterrupt(digitalPinToInterrupt(MOTOR_BLDC_FEEDBACK), bldcTriggered, FALLING);
-      motorSpeed=255;
+      homingSpeed = BLDC_SWEEP_SPEED;
+      motorSpeed = BLDC_SWEEP_SPEED;
       bldcReverseDirection(); // Get your motor running...
+      pinMode(MOTOR_BLDC_FEEDBACK, INPUT_PULLUP); // Short to ground to trigger.  This is also STEPPER_ENABLE output if the stepper is connected
+      delay(5); // Give it a chance to be pulled up
+      attachInterrupt(digitalPinToInterrupt(MOTOR_BLDC_FEEDBACK), bldcTriggered, FALLING);
       timeout = millis() + 2500; // 2.5 seconds of waiting
       motorState++;
       break;
-    case 2:
-      if (motorFound && bldcCount>0)
+    case WAIT_BLDC:
+      if (motorFound && bldcCount > 2)
       {
         motorSpeedUp = bldcSpeedUp;
         motorSlowDown = bldcSlowDown;
@@ -253,7 +269,8 @@ void motorDetect()
         motorStop = bldcStop;
         motorRun = doNothing;
         motorState = -1; // YEA! Motor has been found!
-        info(PSTR("Detected BLDC Motor (%s %d)"), (motorFound?"Home":""),bldcCount);
+        motorType = MOTOR_BLDC;
+        info(PSTR("Detected BLDC Motor (%s %d)"), (motorFound ? "Home" : ""), bldcCount);
         return;
       }
       // Tis a crying shame, must be a wiper motor
@@ -262,19 +279,22 @@ void motorDetect()
         bldcStop();
         detachInterrupt(digitalPinToInterrupt(MOTOR_BLDC_FEEDBACK));
         pinMode(MOTOR_BLDC_FEEDBACK, OUTPUT);
-        digitalWrite(MOTOR_BLDC_FEEDBACK, LOW);
         motorState++;
       }
       break;
 
-    case 3: // Get the stepper motor running
+    case DETECT_STEPPER: // Get the stepper motor running
       info(PSTR("Detecting Stepper motor"));
       motorFound = false;
-      mystepper.setSpeed(SWEEP_SPEED);
       timeout = millis() + 2500; // 2.5 seconds of waiting
+      mystepper.enableOutputs();
+      homingSpeed = STEPPER_SWEEP_SPEED;
+      mystepper.setSpeed(STEPPER_SWEEP_SPEED);
+      delay(100);
       motorState++;
       break;
-    case 4:
+    case WAIT_STEPPER:
+      mystepper.runSpeed();
       if (motorFound)
       {
         motorSpeedUp = stepperSpeedUp;
@@ -283,6 +303,7 @@ void motorDetect()
         motorStop = stepperStop;
         motorRun = stepperRun;
         motorState = -1; // YEA! Motor has been found!
+        motorType = MOTOR_STEPPER;
         info(PSTR("Detected Stepper Motor"));
         return;
       }
@@ -290,19 +311,22 @@ void motorDetect()
       if (millis() > timeout)
       {
         mystepper.stop();
+        digitalWrite(MOTOR_STEPPER_ENABLE, HIGH); // LOW enable...
+
         motorState++;
       }
       break;
 
-    case 5: // Detect wiper motor
+    case DETECT_WIPER: // Detect wiper motor
       info(PSTR("Detecting Wiper motor"));
       motorFound = false;
-      motorSpeed = SWEEP_SPEED; // As fast as she can go!
+      homingSpeed = WIPER_SWEEP_SPEED;
+      motorSpeed = WIPER_SWEEP_SPEED; // As fast as she can go!
       hbridgeReverseDirection();
       timeout = millis() + 2500; // 2.5 seconds of waiting
       motorState++;
       break;
-    case 6:
+    case WAIT_WIPER:
       if (motorFound)
       {
         motorSpeedUp = hbridgeSpeedUp;
@@ -311,6 +335,7 @@ void motorDetect()
         motorStop = hbridgeStop;
         motorRun = doNothing; // HBRIDGE does not need to be told to step
         motorState = -1; // YEA! It's found!
+        motorType = MOTOR_WIPER;
         info(PSTR("Detected Wiper Motor"));
         break;
       }
@@ -321,12 +346,12 @@ void motorDetect()
         motorState++;
       }
       break;
-    case 7:
+    case DETECT_TIMEOUT:
       timeout = millis() + 2500; // Wait 2.5 seconds before trying again (10-second motor detection cycle)
       motorState++;
       critical(PSTR("Motor not detected"));
       break;
-    case 8: // When timed out, go back to state 0 and retry
+    case WAIT_TIMEOUT: // When timed out, go back to state 0 and retry
       if (millis() > timeout)
         motorState = 0;
       break;
@@ -355,7 +380,8 @@ void motorSetup()
   mystepper.setEnablePin(MOTOR_STEPPER_ENABLE);
   mystepper.setAcceleration(2000);
   mystepper.setMaxSpeed(STEPPER_STEPS_PER_REV * 3);
-
+  mystepper.disableOutputs();
+  mystepper.setPinsInverted(false,false,true);
   motorSpeedUp = doNothing;
   motorSlowDown = doNothing;
   motorReverseDirection = doNothing;

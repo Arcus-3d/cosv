@@ -28,6 +28,10 @@
 #ifdef ARDUINO_TEENSY40
 TwoWire *i2cBus1 = &Wire1;
 TwoWire *i2cBus2 = &Wire2;
+#elif ARDUINO_BLUEPILL_F103C8
+TwoWire *i2cBus1 = &Wire;
+TwoWire Wire2(PB11,PB10);
+TwoWire *i2cBus2 = &Wire2;
 #elif ARDUINO_AVR_NANO
 TwoWire *i2cBus1 = &Wire;
 TwoWire *i2cBus2 = NULL;
@@ -71,18 +75,16 @@ debugState_e debug = DEBUG_DISABLED;
 //                             +-- SDA2 to the VISP
 //
 // Shamelessly swiped from: https://i.stack.imgur.com/WnsM0.png
-
-
-
-bool timeToReadSensors = false;
-
+//
+// Put a transistor inverter on ENABLE_PIN_BUS_A to eliminate needing the second ENABLE_PIN_BUS_B
+//
 
 /*** Timer callback subsystem ***/
 
 typedef void (*tCBK)() ;
 typedef struct t  {
   unsigned long tStart;
-  unsigned long tTimeout;
+  unsigned int  tTimeout; // 64 second max timeout
   tCBK cbk;
 } t_t;
 
@@ -220,34 +222,38 @@ void timeToCheckSensors()
     detectVISP(i2cBus1, i2cBus2, ENABLE_PIN_BUS_A, ENABLE_PIN_BUS_B);
 }
 
-int scale(int analogIn, int minValue, int maxValue)
+int scaleAnalog(int analogIn, int minValue, int maxValue)
 {
-  float percentage = (float)analogIn/1024.0;
+  float percentage = (float)analogIn/(float)MAX_ANALOG; // THis is CPU dependent, 1024 on Nano, 4096 on STM32
   return minValue+(maxValue * percentage);
 }
 
 
 void timeToCheckADC()
 {
-  int analogMode = (analogRead(ADC_MODE)) >> 8; // 10 bits of analog, we need 4 values
+  int analogMode = scaleAnalog(analogRead(ADC_MODE), 0, 3);
   switch (analogMode) {
     case 0:
-    case 1:
       break;
-    case 2:
+    case 1:
        currentMode = MODE_MANUAL_PCCMV;
-       visp_eeprom.breath_pressure = scale(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
-       visp_eeprom.breath_rate = scale(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-       visp_eeprom.breath_ratio = scale(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+       visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
+       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
        break;      
     break;
-    case 3:
+    case 2:
        currentMode = MODE_MANUAL_VCCMV;
-       visp_eeprom.breath_volume = scale(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
-       visp_eeprom.breath_rate = scale(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-       visp_eeprom.breath_ratio = scale(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+       visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
+       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
        break;
   }
+}
+
+void timeToSendHealthStatus()
+{
+  sendCurrentSystemHealth();
 }
 
 
@@ -260,6 +266,7 @@ t tasks[] = {
   {0, 100, timeToPulseWatchdog},
   {0, 200, timeToCheckADC},
   {0, 500, timeToCheckSensors},
+  {0, 3000, timeToSendHealthStatus},
   {0, 0, NULL} // End of list
 };
 

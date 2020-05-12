@@ -264,7 +264,7 @@ t tasks[] = {
   {0, 20, timeToReadVISP},
   {0, 50,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
-  {0, 200, timeToCheckADC},
+// {0, 200, timeToCheckADC}, disabled for now
   {0, 500, timeToCheckSensors},
   {0, 3000, timeToSendHealthStatus},
   {0, 0, NULL} // End of list
@@ -304,8 +304,8 @@ void setup() {
   respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
 
   busDeviceInit();
-  vispInit();
 
+  vispInit();
 
   i2cBus1->begin();
   i2cBus1->setClock(400000); // Typical
@@ -313,8 +313,6 @@ void setup() {
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
   sanitizeVispData(); // Apply defaults
-
-  motorGoHome();
 
   // Start the VISP calibration process
   calibrateClear();

@@ -20,10 +20,16 @@
 #ifndef __MOTOR_H__
 #define __MOTOR_H__
 
+#define MOTOR_UNKNOWN    -1
+#define MOTOR_AUTODETECT  0
+#define MOTOR_BLDC        1
+#define MOTOR_STEPPER     2
+#define MOTOR_WIPER       3
+
+
 extern volatile bool motorFound;
 
-void motorSetup(); // call in setup()
-void motorGoHome(); 
+void motorSetup();
 bool motorDetectionInProgress(); // calibration cannot happen while we are running motors for detection
 
 
@@ -32,15 +38,17 @@ typedef void (*motorFunction)();
 extern motorFunction motorSpeedUp;
 extern motorFunction motorSlowDown;
 extern motorFunction motorStop;
+extern motorFunction motorGo;
+extern motorFunction motorGoHome;
 extern motorFunction motorReverseDirection;
 
 extern motorFunction motorRun; // call in loop()
 
 
 extern int8_t motorType;
-#define MOTOR_UNKNOWN -1
-#define MOTOR_BLDC     1
-#define MOTOR_STEPPER  2
-#define MOTOR_WIPER    3
- 
+extern int motorHomingSpeed;
+extern int motorMinSpeed;
+extern int motorStepsPerRev;
+extern int motorSpeed;
+
 #endif

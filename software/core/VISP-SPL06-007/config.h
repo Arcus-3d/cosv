@@ -157,13 +157,19 @@
 #define MOTOR_PIN_PWM  6 // HARDWARE PWM Capable output required (MOTOR_HBRIDGE_PWM, MOTOR_STEPPER_STEP, MOTOR_BLDC_PWM)
 
 // Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
-#define ENABLE_PIN_BUS_A 7 // Future: this toggles HIGH=busA, LOW=busB
+#define ENABLE_PIN_BUS_A 7 // Future: this toggles HIGH=busA, LOW=busB  NOTE: also is SPI 2.8" display DC/RS 
 #define ENABLE_PIN_BUS_B 8
 
 #define LINE_POWER_DETECTION 8 // Future: need to detect line power
 #define MISSING_PULSE_PIN  9   // Output a pulse every time we check the sensors.
 
 // This leaves the entire SPI bus available for a display or alternate IO:  10, 11, 12, and 13
+// SS=D10
+// MOSI=D11
+// MISO=D12
+// SCL=D13
+// 2.8" screen needs another signal... 
+// DC/RS: LCD register / data selection signal, high level: register, low level: data 
 
 // System modes (This needs to be a bitmask friendly for settings validity checking (setting Volume when in Pressure mode is an error)
 #define MODE_NONE  0x00

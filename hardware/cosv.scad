@@ -150,6 +150,7 @@ if (PART == "cam") {
 //laser_bearing_bushing(r=6/2); // parts used within the other FFF parts
 //laser_base_top();
 //laser_base_bottom();
+//laser_cam_encoder();
 
 //cam(); // cam top/bottom.  Need 2.
 //paddle(); // paddle for the arms.  Need 2
@@ -157,10 +158,12 @@ if (PART == "cam") {
 //base_mount_top(); // base plate opposite motor mount. Need 1.
 //base_end_top(); // base end plate/bag mounts.  Need 1, top bag end diameter.
 //base_plate(); // top plate/electronics mount.  Need 1.
-base_front(); // top plate/electronics mount.  Need 1.
+//base_front(); // top plate/electronics mount.  Need 1.
 //base_back(); // top plate/electronics mount.  Need 1.
 //base_top();
 //arm();
+cam_encoder();
+
 //bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
 //supply_cover();
 //flow_sensor_for_pcb();

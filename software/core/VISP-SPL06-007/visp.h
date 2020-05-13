@@ -123,12 +123,12 @@ extern bool sensorsFound ;
 void vispInit();
 
 void handleSensorFailure();
-void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1);
-bool detectMuxedSensors(TwoWire *wire, int enablePin=-1);
-bool detectXLateSensors(TwoWire * wire, int enablePin=-1);
-bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, int enablePinA=-1, int enablePinB=-1);
+void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDevice_t *muxDevice = NULL, busDeviceEnableCbk enableCbk = noEnableCbk);
+bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk = noEnableCbk);
+bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk = noEnableCbk);
+bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk enableCbkA = noEnableCbk, busDeviceEnableCbk enableCbkB = noEnableCbk);
 void sanitizeVispData();
-void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA=-1, int enablePinB=-1);
+void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableCbkA = noEnableCbk, busDeviceEnableCbk enableCbkB = noEnableCbk);
 void saveParametersToVISP();
 
 void calibrateClear();

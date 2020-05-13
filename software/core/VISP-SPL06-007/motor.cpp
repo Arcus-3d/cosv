@@ -408,7 +408,7 @@ void motorSetup()
       motorRun = doNothing;
       motorState = -1; // YEA! Motor has been found!
       motorMinSpeed = BLDC_SWEEP_SPEED;
-      motorHomingSpeed = BLDC_SWEEP_SPEED+1;
+      motorHomingSpeed = BLDC_SWEEP_SPEED + 1;
       motorGo = bldcGo;
       break;
     case MOTOR_STEPPER:
@@ -419,7 +419,7 @@ void motorSetup()
       motorRun = stepperRun;
       motorState = -1; // YEA! Motor has been found!
       motorMinSpeed = STEPPER_SWEEP_SPEED;
-      motorHomingSpeed = STEPPER_SWEEP_SPEED+1;
+      motorHomingSpeed = STEPPER_SWEEP_SPEED + 1;
       motorGo = stepperGo;
       break;
     case MOTOR_WIPER:
@@ -430,12 +430,12 @@ void motorSetup()
       motorRun = doNothing; // HBRIDGE does not need to be told to step
       motorState = -1; // YEA! It's found!
       motorMinSpeed = WIPER_SWEEP_SPEED;
-      motorHomingSpeed = WIPER_SWEEP_SPEED+1;
+      motorHomingSpeed = WIPER_SWEEP_SPEED + 1;
       motorGo = hbridgeGo;
       break;
     default:
       motorHomingSpeed = 0;
-      motorSpeed=0;
+      motorSpeed = 0;
       motorSpeedUp = doNothing;
       motorSlowDown = doNothing;
       motorReverseDirection = doNothing;

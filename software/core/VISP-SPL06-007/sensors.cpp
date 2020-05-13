@@ -776,9 +776,9 @@ bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
 }
 #endif
 
-void detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1)
+void detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, busDeviceEnableCbk enableCbk=noEnableCbk)
 {
-  busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enablePin);
+  busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enableCbk);
 
   if (!device)
     return;

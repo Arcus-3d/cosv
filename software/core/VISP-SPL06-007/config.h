@@ -89,9 +89,23 @@
 
 #define PUTINFLASH PROGMEM
 
-#define WANT_BMP388 1 // 1822 bytes
-#define WANT_BMP280 1
-#define WANT_SPL06  1
+#define WANT_BMP388 1 // 1858 bytes and 112bytes of ram
+#define WANT_BMP280 1 // 2306 bytes
+#define WANT_SPL06  1 // 1350 bytes
+//Sketch uses 29378 bytes (95%) of program storage space. Maximum is 30720 bytes.
+//Global variables use 1264 bytes (61%) of dynamic memory, leaving 784 bytes for local variables. Maximum is 2048 bytes.
+//Sketch uses 29432 bytes (95%) of program storage space. Maximum is 30720 bytes.
+//Global variables use 1256 bytes (61%) of dynamic memory, leaving 792 bytes for local variables. Maximum is 2048 bytes.
+// No BMP388
+//Sketch uses 27574 bytes (89%) of program storage space. Maximum is 30720 bytes.
+//Global variables use 1144 bytes (55%) of dynamic memory, leaving 904 bytes for local variables. Maximum is 2048 bytes.
+//No BMP280
+//Sketch uses 27126 bytes (88%) of program storage space. Maximum is 30720 bytes.
+//Global variables use 1256 bytes (61%) of dynamic memory, leaving 792 bytes for local variables. Maximum is 2048 bytes.
+// No SPL06
+//Sketch uses 28082 bytes (91%) of program storage space. Maximum is 30720 bytes.
+//Global variables use 1256 bytes (61%) of dynamic memory, leaving 792 bytes for local variables. Maximum is 2048 bytes.
+
 
 #define MAX_ANALOG 1024
 #define MAX_PWM 255
@@ -168,8 +182,8 @@
 // MOSI=D11
 // MISO=D12
 // SCL=D13
-// 2.8" screen needs another signal... 
-// DC/RS: LCD register / data selection signal, high level: register, low level: data 
+// 2.8" screen needs another signal...
+// DC/RS: LCD register / data selection signal, high level: register, low level: data
 
 // System modes (This needs to be a bitmask friendly for settings validity checking (setting Volume when in Pressure mode is an error)
 #define MODE_NONE  0x00

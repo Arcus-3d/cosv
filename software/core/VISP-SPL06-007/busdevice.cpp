@@ -60,18 +60,23 @@ void busPrint(busDevice_t *bus, const char *function)
   }
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("%S(0x%x I2C: address=0x%x channel=%d enablePin=%d refCount=%d)"), function, bus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->busdev.i2c.enablePin,bus->refCount);
+    debug(PSTR("%S(0x%x I2C: address=0x%x channel=%d refCount=%d)"), function, bus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
     return;
   }
 
   if (bus->busType == BUSTYPE_SPI)
   {
-    debug(PSTR("%S(SPI CSPIN=%d)"), function, bus->busdev.spi.csnPin);
+    debug(PSTR("%S(SPI)"), function);
     return;
   }
 }
 
-busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, busDevice_t *channelDev, int8_t enablePin, hwType_e hwType)
+void noEnableCbk(busDevice_t *busDevice, bool enableFlag)
+{
+  /* Do nothing */
+}
+
+busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, busDevice_t *channelDev, busDeviceEnableCbk enableCbk, hwType_e hwType)
 {
   busDevice_t *dev = NULL;
 
@@ -83,17 +88,17 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, b
       memset(dev, 0, sizeof(busDevice_t));
       dev->busType = BUSTYPE_I2C;
       dev->hwType = hwType;
+      dev->enableCbk = enableCbk;
       dev->busdev.i2c.i2cBus = wire;
       dev->busdev.i2c.address = address;
       dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
       dev->busdev.i2c.channelDev = channelDev;
-      dev->busdev.i2c.enablePin = enablePin;
       dev->refCount = 1;
       busPrint(dev, PSTR("busDeviceInitI2C()"));
       if (channelDev)
       {
         channelDev->refCount++;
-      busPrint(dev, PSTR("   busDeviceInitI2C() SUPPORTING MUX="));
+        busPrint(dev, PSTR("   busDeviceInitI2C() SUPPORTING MUX="));
       }
       return dev;
     }
@@ -101,7 +106,7 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, b
   return NULL;
 }
 
-busDevice_t *busDeviceInitSPI(SPIClass *spiBus, uint8_t csnPin, hwType_e hwType)
+busDevice_t *busDeviceInitSPI(SPIClass *spiBus, busDeviceEnableCbk enableCbk, hwType_e hwType)
 {
   busDevice_t *dev = NULL;
 
@@ -112,8 +117,8 @@ busDevice_t *busDeviceInitSPI(SPIClass *spiBus, uint8_t csnPin, hwType_e hwType)
       memset(dev, 0, sizeof(busDevice_t));
       dev->busType = BUSTYPE_SPI;
       dev->hwType = hwType;
+      dev->enableCbk = enableCbk;
       dev->busdev.spi.spiBus = spiBus;
-      dev->busdev.spi.csnPin = csnPin;
       dev->refCount = 1;
       return dev;
     }
@@ -151,21 +156,17 @@ bool busDeviceDetect(busDevice_t *busDev)
     busPrint(busDev, PSTR("Detecting if present"));
 
     // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
-    if (busDev->busdev.i2c.enablePin != -1)
-      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
+    busDev->enableCbk(busDev, true);
     muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
     wire->beginTransmission(address);
     error = wire->endTransmission();
 
-    // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
-    if (busDev->busdev.i2c.enablePin != -1)
-      digitalWrite(busDev->busdev.i2c.enablePin, LOW);
-
     if (error == 0)
       busPrint(busDev, PSTR("DETECTED!!!"));
     else
       busPrint(busDev, PSTR("MISSING..."));
+    busDev->enableCbk(busDev, false);
     return (error == 0);
   }
   else
@@ -173,7 +174,6 @@ bool busDeviceDetect(busDevice_t *busDev)
 
   return false;
 }
-
 
 bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
 {
@@ -184,9 +184,7 @@ bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, 
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
-    if (busDev->busdev.i2c.enablePin != -1)
-      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
+    busDev->enableCbk(busDev, true);
 
     muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
@@ -206,17 +204,12 @@ bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, 
       for (uint8_t x = 0; x < length; x++)
         values[x] = wire->read();
 
-      // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
-      if (busDev->busdev.i2c.enablePin != -1)
-        digitalWrite(busDev->busdev.i2c.enablePin, LOW);
-
+      busDev->enableCbk(busDev, false);
       return true;
     }
 
-    if (busDev->busdev.i2c.enablePin != -1)
-      digitalWrite(busDev->busdev.i2c.enablePin, LOW);
-
     //debug(PSTR("endTransmission() returned %s"), error);
+    busDev->enableCbk(busDev, false);
     return false;
   }
   return false;
@@ -231,8 +224,7 @@ bool busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values,
     int address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    if (busDev->busdev.i2c.enablePin != -1)
-      digitalWrite(busDev->busdev.i2c.enablePin, HIGH);
+    busDev->enableCbk(busDev, true);
 
     muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
@@ -257,8 +249,7 @@ bool busWriteBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values,
       }
     }
 
-    if (busDev->busdev.i2c.enablePin != -1)
-      digitalWrite(busDev->busdev.i2c.enablePin, LOW);
+    busDev->enableCbk(busDev, false);
 
     return (error == 0 ? true : false);
   }

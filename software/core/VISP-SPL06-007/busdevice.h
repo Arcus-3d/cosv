@@ -34,31 +34,33 @@ typedef enum {
   HWTYPE_EEPROM = 3
 } hwType_e;
 
+typedef void (*busDeviceEnableCbk)(struct busDevice_s *, bool enableFlag);
+
+
 typedef struct busDevice_s {
   busType_e busType;
   hwType_e hwType;
   uint8_t currentChannel; // If this device is a HWTYPE_MUX
   uint8_t refCount; // Reference count (mux is used by multiple sources)
+  busDeviceEnableCbk enableCbk; // Used to set the appropriate enable pin for SPI peripherals or I2C bus switching
   union {
     struct {
-      SPIClass *spiBus;            // SPI bus
-      uint8_t csnPin;         // IO for CS# pin
+      SPIClass *spiBus;       // SPI bus
     } spi;
     struct {
       TwoWire *i2cBus;        // I2C bus ID
-      uint8_t address;        // I2C bus device address
-      uint8_t channel;        // MUXed I2C Channel
       struct busDevice_s *channelDev; // MUXed I2C Channel Address
-      int8_t enablePin;
+      uint8_t channel;        // MUXed I2C Channel
+      uint8_t address;        // I2C bus device address
     } i2c;
   } busdev;
 } busDevice_t;
 
 void busDeviceInit();
-
+void noEnableCbk(busDevice_t *busDevice, bool enableFlag);
 void busPrint(busDevice_t *bus, const char *function);
-busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, int8_t enablePin = -1, hwType_e hwType = HWTYPE_NONE);
-busDevice_t *busDeviceInitSPI(SPIClass *spiBus, uint8_t csnPin, hwType_e hwType = HWTYPE_NONE);
+busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, busDeviceEnableCbk enableCbk = noEnableCbk, hwType_e hwType = HWTYPE_NONE);
+busDevice_t *busDeviceInitSPI(SPIClass *spiBus, busDeviceEnableCbk enableCbk = noEnableCbk, hwType_e hwType = HWTYPE_NONE);
 void busDeviceFree(busDevice_t *dev);
 bool busDeviceDetect(busDevice_t *busDev);
 

@@ -30,7 +30,7 @@ TwoWire *i2cBus1 = &Wire1;
 TwoWire *i2cBus2 = &Wire2;
 #elif ARDUINO_BLUEPILL_F103C8
 TwoWire *i2cBus1 = &Wire;
-TwoWire Wire2(PB11,PB10);
+TwoWire Wire2(PB11, PB10);
 TwoWire *i2cBus2 = &Wire2;
 #elif ARDUINO_AVR_NANO
 TwoWire *i2cBus1 = &Wire;
@@ -214,40 +214,44 @@ void timeToCheckPatient()
   }
 }
 
+// NANO uses NPN switches to enable/disable a bus for DUAL_I2C with a single hardware I2C bus
+void enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
+{
+  digitalWrite(ENABLE_PIN_BUS_A, (enableFlag == true ? HIGH : LOW));
+}
+void enableI2cBusB(busDevice_t *busDevice, bool enableFlag)
+{
+  digitalWrite(ENABLE_PIN_BUS_B, (enableFlag == true ? HIGH : LOW));
+}
+
 void timeToCheckSensors()
 {
   // If debug is on, and a VISP is NOT connected, we flood the system with sensor scans.
   // Do it every half second (or longer)
   if (!sensorsFound)
-    detectVISP(i2cBus1, i2cBus2, ENABLE_PIN_BUS_A, ENABLE_PIN_BUS_B);
+    detectVISP(i2cBus1, i2cBus2, enableI2cBusA, enableI2cBusB);
 }
 
-int scaleAnalog(int analogIn, int minValue, int maxValue)
+// Scales the analog input to a range.
+static int scaleAnalog(int analogIn, int minValue, int maxValue)
 {
-  float percentage = (float)analogIn/(float)MAX_ANALOG; // THis is CPU dependent, 1024 on Nano, 4096 on STM32
-  return minValue+(maxValue * percentage);
+  float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
+  return minValue + (maxValue * percentage);
 }
 
-
+// 344 bytes
 void timeToCheckADC()
 {
   int analogMode = scaleAnalog(analogRead(ADC_MODE), 0, 3);
-  switch (analogMode) {
-    case 0:
-      break;
-    case 1:
-       currentMode = MODE_MANUAL_PCCMV;
-       visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
-       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
-       break;      
-    break;
-    case 2:
-       currentMode = MODE_MANUAL_VCCMV;
-       visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
-       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
-       break;
+
+  // if analogMode==0 then 100% software control from the rPi
+  if (analogMode)
+  {
+    currentMode = (analogMode == 1 ? MODE_MANUAL_PCCMV : MODE_MANUAL_VCCMV);
+    visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
+    visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
+    visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+    visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
   }
 }
 
@@ -264,7 +268,7 @@ t tasks[] = {
   {0, 20, timeToReadVISP},
   {0, 50,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
-// {0, 200, timeToCheckADC}, disabled for now
+  //  {0, 200, timeToCheckADC}, // disabled for now
   {0, 500, timeToCheckSensors},
   {0, 3000, timeToSendHealthStatus},
   {0, 0, NULL} // End of list

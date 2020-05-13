@@ -160,10 +160,10 @@ const char strBreathRatio3 [] PUTINFLASH = "1:3";
 const char strBreathRatio4 [] PUTINFLASH = "1:4";
 const char strBreathRatio5 [] PUTINFLASH = "1:5";
 
-const char strBreathRatioDesc2 [] PUTINFLASH = "50% duty cyce";
-const char strBreathRatioDesc3 [] PUTINFLASH = "33% duty cyce";
-const char strBreathRatioDesc4 [] PUTINFLASH = "25% duty cyce";
-const char strBreathRatioDesc5 [] PUTINFLASH = "20% duty cyce";
+const char strBreathRatioDesc2 [] PUTINFLASH = "50% duty cycle";
+const char strBreathRatioDesc3 [] PUTINFLASH = "33% duty cycle";
+const char strBreathRatioDesc4 [] PUTINFLASH = "25% duty cycle";
+const char strBreathRatioDesc5 [] PUTINFLASH = "20% duty cycle";
 
 const struct dictionary_s breathRatioDict[] PUTINFLASH = {
   {2,  strBreathRatio2, strBreathRatioDesc2},
@@ -227,20 +227,20 @@ void handleNewVolume(struct settingsEntry_s * entry)
 
 void handleMotorChange(struct settingsEntry_s * entry)
 {
-   motorSetup();
+  motorSetup();
 }
 
 void handleMotorSpeed(struct settingsEntry_s * entry)
 {
-   motorGo();
+  motorGo();
 }
 
 
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
-  {RESPOND_MODE,                (MODE_ALL^MODE_MANUAL), strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
-  {RESPOND_BREATH_RATE,         (MODE_ALL^MODE_MANUAL), strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
-  {RESPOND_BREATH_RATIO,        (MODE_ALL^MODE_MANUAL), strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
+  {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
+  {RESPOND_BREATH_RATE,         (MODE_ALL ^ MODE_MANUAL), strBreathRate, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
+  {RESPOND_BREATH_RATIO,        (MODE_ALL ^ MODE_MANUAL), strBreathRatio, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
   {RESPOND_BREATH_VOLUME,       MODE_VCCMV | MODE_OFF, strBreathVolume, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
   {RESPOND_BREATH_PRESSURE,     MODE_PCCMV | MODE_OFF, strBreathPressure, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
   {RESPOND_BREATH_THRESHOLD,    MODE_NONE, strBreathThreshold, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
@@ -253,12 +253,12 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_SENSOR1,             MODE_NONE, strSensor1, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
   {RESPOND_SENSOR2,             MODE_NONE, strSensor2, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
   {RESPOND_SENSOR3,             MODE_NONE, strSensor3, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
-  {RESPOND_MOTOR_TYPE,          (MODE_ALL^MODE_MANUAL), strMotorType, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, &motorType},
-  {RESPOND_MOTOR_SPEED,         (MODE_ALL^MODE_MANUAL), strMotorSpeed,       0, MAX_PWM, NULL, verifyLimitsToInt16, respondInt16,    handleMotorSpeed, &motorSpeed},
-  {RESPOND_MOTOR_MIN_SPEED,     (MODE_ALL^MODE_MANUAL), strMotorMinSpeed,    0, MAX_PWM, NULL, verifyLimitsToInt16, respondInt16, NULL, &motorMinSpeed},
-  {RESPOND_MOTOR_HOMING_SPEED,  (MODE_ALL^MODE_MANUAL), strMotorHomingSpeed, 0, MAX_PWM, NULL, verifyLimitsToInt16, respondInt16, NULL, &motorHomingSpeed},
-  {RESPOND_MOTOR_STEPS_PER_REV, (MODE_ALL^MODE_MANUAL), strMotorStepsPerRev, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, handleMotorChange, &motorStepsPerRev},
-  {RESPOND_DEBUG,               (MODE_ALL^MODE_MANUAL), strDebug, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &debug},
+  {RESPOND_MOTOR_TYPE,          (MODE_ALL ^ MODE_MANUAL), strMotorType, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, &motorType},
+  {RESPOND_MOTOR_SPEED,         (MODE_ALL ^ MODE_MANUAL), strMotorSpeed,       0, MAX_PWM, NULL, verifyLimitsToInt16, respondInt16,    handleMotorSpeed, &motorSpeed},
+  {RESPOND_MOTOR_MIN_SPEED,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed,    0, MAX_PWM, NULL, verifyLimitsToInt16, respondInt16, NULL, &motorMinSpeed},
+  {RESPOND_MOTOR_HOMING_SPEED,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, 0, MAX_PWM, NULL, verifyLimitsToInt16, respondInt16, NULL, &motorHomingSpeed},
+  {RESPOND_MOTOR_STEPS_PER_REV, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, handleMotorChange, &motorStepsPerRev},
+  {RESPOND_DEBUG,               (MODE_ALL ^ MODE_MANUAL), strDebug, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &debug},
   {0, MODE_NONE,  NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
 
@@ -414,7 +414,7 @@ void respondSettingLimits(struct settingsEntry_s * entry)
 void respondEnabled(struct settingsEntry_s * entry)
 {
   respond('S', PSTR("%S_display,%S"), entry->theName,
-          ((entry->validModes & currentMode)==0 ? strDisabled : strEnabled));
+          ((entry->validModes & currentMode) == 0 ? strDisabled : strEnabled));
 }
 
 void actionUpdateDisplayIcons(struct settingsEntry_s *)
@@ -428,7 +428,7 @@ void actionUpdateDisplayIcons(struct settingsEntry_s *)
     memcpy_P(&entry, & settings[x], sizeof(entry));
     x++;
     if (entry.bitmask)
-        respondEnabled(&entry);
+      respondEnabled(&entry);
   }
   while (entry.bitmask != 0);
 }
@@ -557,10 +557,10 @@ void handleEepromCommand(const char *arg1, const char *arg2)
 
 void handleBatteryCommand(const char *arg1, const char *arg2)
 {
-  int b=analogRead(ADC_BATTERY);
+  int b = analogRead(ADC_BATTERY);
 
   // TODO: calculate runtime based on voltage
-  respond('B',PSTR("%d"),b, b);
+  respond('B', PSTR("%d"), b, b);
 }
 
 typedef void (*commandCallback)(const char *arg1, const char *arg2);

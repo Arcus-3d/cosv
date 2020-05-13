@@ -179,10 +179,9 @@ float spl06_compensate_pressure(baroDev_t * baro, int32_t pressure_raw, int32_t 
   return pressure_cal + p_temp_comp;
 }
 
-bool spl06Calculate(baroDev_t * baro, float * pressure, float * temperature)
+bool spl06Calculate(baroDev_t * baro)
 {
 
-  if (pressure) {
     // Is the pressure ready?
     //if (!(busRead(baro->busDev, SPL06_MODE_AND_STATUS_REG, &sstatus) && (sstatus & SPL06_MEAS_CFG_PRESSURE_RDY)))
     //  return false;   // error reading status or pressure is not ready
@@ -190,10 +189,8 @@ bool spl06Calculate(baroDev_t * baro, float * pressure, float * temperature)
     //  return false;
     if (!spl06_read_pressure(baro))
       return false;
-    *pressure = spl06_compensate_pressure(baro, baro->chip.spl06.pressure_raw, baro->chip.spl06.temperature_raw);
-  }
+    baro->pressure = spl06_compensate_pressure(baro, baro->chip.spl06.pressure_raw, baro->chip.spl06.temperature_raw);
 
-  if (temperature) {
     // Is the temperature ready?
     //if (!(busRead(baro->busDev, SPL06_MODE_AND_STATUS_REG, &sstatus) && (sstatus & SPL06_MEAS_CFG_TEMPERATURE_RDY)))
     //  return false;   // error reading status or pressure is not ready
@@ -201,8 +198,7 @@ bool spl06Calculate(baroDev_t * baro, float * pressure, float * temperature)
     //  return false;
     if (!spl06_read_temperature(baro))
       return false;
-    *temperature = spl06_compensate_temperature(baro, baro->chip.spl06.temperature_raw);
-  }
+    baro->temperature = spl06_compensate_temperature(baro, baro->chip.spl06.temperature_raw);
 
   return true;
 }
@@ -415,7 +411,7 @@ uint32_t bmp280CompensatePressure(baroDev_t * baro, int32_t adc_P)
   return (uint32_t)p;
 }
 
-bool bmp280Calculate(baroDev_t * baro, float * pressure, float * temperature)
+bool bmp280Calculate(baroDev_t * baro)
 {
   int32_t t;
   uint32_t p;
@@ -426,13 +422,8 @@ bool bmp280Calculate(baroDev_t * baro, float * pressure, float * temperature)
   t = bmp280CompensateTemperature(baro, baro->chip.bmp280.ut); // Must happen before bmp280CompensatePressure() (see t_fine)
   p = bmp280CompensatePressure(baro, baro->chip.bmp280.up);
 
-  if (pressure) {
-    *pressure = (p / 256.0);
-  }
-
-  if (temperature) {
-    *temperature = t / 100.0;
-  }
+  baro->pressure = (p / 256.0);
+  baro->temperature = t / 100.0;
 
   return true;
 }
@@ -653,7 +644,7 @@ float bmp388CompensatePressure(baroDev_t *baro, float t_lin)
 
 
 
-bool bmp388Calculate(baroDev_t * baro, float * pressure, float * temperature)
+bool bmp388Calculate(baroDev_t * baro)
 {
   float t;
 
@@ -662,13 +653,8 @@ bool bmp388Calculate(baroDev_t * baro, float * pressure, float * temperature)
 
   t = bmp388CompensateTemperature(baro);
 
-  if (pressure) {
-    *pressure = bmp388CompensatePressure(baro, t);
-  }
-
-  if (temperature) {
-    *temperature = t / 100.0;
-  }
+  baro->pressure = bmp388CompensatePressure(baro, t);
+  baro->temperature = t / 100.0;
 
   return true;
 }

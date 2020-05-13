@@ -19,7 +19,7 @@
 
 #include "config.h"
 
-
+#define VISP_SIGNATURE ((uint32_t)'V'<<24 | (uint32_t)'I'<<16 | (uint32_t)'S'<<8 | (uint32_t)'P')
 
 // Do your venturi mapping here
 #define VENTURI0 0
@@ -58,10 +58,7 @@ void formatVisp(busDevice_t *busDev, struct visp_eeprom_s *data, uint8_t busType
 {
   memset(data, 0, sizeof(visp_eeprom));
 
-  data->VISP[0] = 'V';
-  data->VISP[1] = 'I';
-  data->VISP[2] = 'S';
-  data->VISP[3] = 'p';
+  data->VISP = VISP_SIGNATURE;
   data->busType = busType;
   data->bodyType = bodyType;
   data->bodyVersion = '0';
@@ -142,6 +139,7 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
 // TODO: verify mapping
 bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
 {
+  const int8_t addresses[4] = {0x76, 0x77, 0x74, 0x75};
   // XLATE version has chips at 0x74, 0x75, 0x76, and 0x77
   // So, if we find 0x74... We are good to go
 
@@ -214,6 +212,7 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
   return true;
 }
 
+
 void sanitizeVispData()
 {
   if (visp_eeprom.breath_ratio > MAX_BREATH_RATIO)
@@ -268,10 +267,7 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
     //debug(PSTR("Reading VISP EEPROM"));
     readEEPROM(eeprom, 0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
 
-    if (visp_eeprom.VISP[0] != 'V'
-        ||  visp_eeprom.VISP[1] != 'I'
-        ||  visp_eeprom.VISP[2] != 'S'
-        ||  visp_eeprom.VISP[3] != 'p')
+    if (visp_eeprom.VISP != VISP_SIGNATURE)
     {
       // ok, unformatted VISP
       format = true;
@@ -304,13 +300,13 @@ void calibrateClear()
 }
 
 
-void calibrateApply(float * P)
+void calibrateApply()
 {
   for (int x = 0; x < 4; x++)
-    P[x] += calibrationOffsets[x];
+    sensors[x].pressure += calibrationOffsets[x];
 }
 
-void calibrateSensors(float * P)
+void calibrateSensors()
 {
   int x;
 
@@ -320,7 +316,7 @@ void calibrateSensors(float * P)
     if (calibrationSampleCounter == 1)
       respond('C', PSTR("0,Starting Calibration"));
     for (x = 0; x < 4; x++)
-      calibrationOffsets[x] += P[x];
+      calibrationOffsets[x] += sensors[x].pressure;
     calibrationSampleCounter++;
     if (calibrationSampleCounter == CALIBRATION_FINISHED) {
       float average = 0.0;
@@ -342,21 +338,21 @@ bool calibrateInProgress()
 
 
 
-// Use these definitions to map sensors output P[SENSOR_Ux] to their usage
+// Use these definitions to map sensors output sensor[SENSOR_Ux] to their usage
 #define THROAT_PRESSURE  SENSOR_U5
 #define AMBIANT_PRESSURE SENSOR_U6
 #define PITOT1           SENSOR_U7
 #define PITOT2           SENSOR_U8
 
-void calculatePitotValues(float * P)
+void calculatePitotValues()
 {
   const float paTocmH2O = 0.0101972;
   float  airflow, roughVolume, pitot_diff, pitot1, pitot2;
 
-  pitot1 = P[PITOT1];
-  pitot2 = P[PITOT2];
-  ambientPressure = P[AMBIANT_PRESSURE];
-  throatPressure = P[THROAT_PRESSURE];
+  pitot1 = sensors[PITOT1].pressure;
+  pitot2 = sensors[PITOT2].pressure;
+  ambientPressure = sensors[AMBIANT_PRESSURE].pressure;
+  throatPressure = sensors[THROAT_PRESSURE].pressure;
   pressure = (throatPressure - ambientPressure) * paTocmH2O;
 
   pitot_diff = (pitot1 - pitot2) / 100.0; // pascals to hPa
@@ -373,13 +369,13 @@ void calculatePitotValues(float * P)
 }
 
 
-// Use these definitions to map sensors output P[SENSOR_Ux] to their usage
+// Use these definitions to map sensors output sensors[SENSOR_Ux] to their usage
 //U7 is input tube, U8 is output tube, U5 is venturi, U6 is ambient
 #define VENTURI_SENSOR  SENSOR_U5
 #define VENTURI_AMBIANT SENSOR_U6
 #define VENTURI_INPUT   SENSOR_U7
 #define VENTURI_OUTPUT  SENSOR_U8
-void calculateVenturiValues(float * P)
+void calculateVenturiValues()
 {
   const float paTocmH2O = 0.0101972;
   // venturi calculations
@@ -389,11 +385,11 @@ void calculateVenturiValues(float * P)
   float roughVolume, inletPressure, outletPressure;
 
   //    static float paTocmH2O = 0.00501972;
-  ambientPressure = P[VENTURI_AMBIANT];
-  inletPressure = P[VENTURI_INPUT];
-  outletPressure = P[VENTURI_OUTPUT];
-  // patientPressure = P[VENTURI_SENSOR];   // This is not used?
-  throatPressure = P[VENTURI_SENSOR];
+  ambientPressure = sensors[VENTURI_AMBIANT].pressure;
+  inletPressure = sensors[VENTURI_INPUT].pressure;
+  outletPressure = sensors[VENTURI_OUTPUT].pressure;
+  // patientPressure = sensors[VENTURI_SENSOR].pressure;   // This is not used?
+  throatPressure = sensors[VENTURI_SENSOR].pressure;
   pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;
 
   //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m

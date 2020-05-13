@@ -85,7 +85,7 @@ typedef struct sensor_mapping_s {
 // WARNING: Must be a multiple of the eeprom's write page.   Assume 8-byte multiples
 // This is at address 0 in the eeprom
 typedef struct visp_eeprom_s {
-  char VISP[4];  // LETTERS VISP
+  uint32_t VISP;  // LETTERS VISP
   uint8_t busType;  // Character type "M"=mux "X"=XLate, "D"=Dual "S"=SPI
   uint8_t bodyType; // "V"=Venturi "P"=Pitot "H"=Hybrid
   uint8_t bodyVersion; // printable character
@@ -133,11 +133,11 @@ void saveParametersToVISP();
 
 void calibrateClear();
 bool calibrateInProgress();
-void calibrateSensors(float * P);
-void calibrateApply(float * P);
+void calibrateSensors();
+void calibrateApply();
 
-void calculatePitotValues(float * P);
-void calculateVenturiValues(float * P);
+void calculatePitotValues();
+void calculateVenturiValues();
 void calculateTidalVolume();
 
 #endif

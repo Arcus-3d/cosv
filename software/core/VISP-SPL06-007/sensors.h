@@ -76,13 +76,16 @@ typedef struct {
 
 struct baroDev_s;
 typedef bool (*baroOpFuncPtr)(struct baroDev_s * baro);
-typedef bool (*baroCalculateFuncPtr)(struct baroDev_s * baro, float *pressure, float *temperature);
+typedef bool (*baroCalculateFuncPtr)(struct baroDev_s * baro);
 
 
 typedef struct baroDev_s {
   busDevice_t * busDev;
   baroCalculateFuncPtr calculate;
   uint8_t sensorType; // Used by the interface to get the types of sensors we have
+  float pressure;  // valid after calculate
+  float temperature; // valid after calculate
+
   union {
 #ifdef WANT_BMP280
     struct {

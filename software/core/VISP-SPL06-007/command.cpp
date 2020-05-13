@@ -657,9 +657,8 @@ void commandParser(int cmdByte)
   }
 }
 
-void dataSend(float *P)
+void dataSend()
 {
-  return;
   // Take some time to write to the serial port
   hwSerial.print('d');
   hwSerial.print(',');
@@ -673,13 +672,13 @@ void dataSend(float *P)
   if (debug == DEBUG_ENABLED)
   {
     hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U5], 1);
+    hwSerial.print(sensors[SENSOR_U5].pressure, 1);
     hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U6], 1);
+    hwSerial.print(sensors[SENSOR_U6].pressure, 1);
     hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U7], 1);
+    hwSerial.print(sensors[SENSOR_U7].pressure, 1);
     hwSerial.print(',');
-    hwSerial.print(P[SENSOR_U8], 1);
+    hwSerial.print(sensors[SENSOR_U8].pressure, 1);
   }
   hwSerial.println();
 }

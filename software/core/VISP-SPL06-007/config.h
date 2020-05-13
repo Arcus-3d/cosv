@@ -92,20 +92,6 @@
 #define WANT_BMP388 1 // 1858 bytes and 112bytes of ram
 #define WANT_BMP280 1 // 2306 bytes
 #define WANT_SPL06  1 // 1350 bytes
-//Sketch uses 29378 bytes (95%) of program storage space. Maximum is 30720 bytes.
-//Global variables use 1264 bytes (61%) of dynamic memory, leaving 784 bytes for local variables. Maximum is 2048 bytes.
-//Sketch uses 29432 bytes (95%) of program storage space. Maximum is 30720 bytes.
-//Global variables use 1256 bytes (61%) of dynamic memory, leaving 792 bytes for local variables. Maximum is 2048 bytes.
-// No BMP388
-//Sketch uses 27574 bytes (89%) of program storage space. Maximum is 30720 bytes.
-//Global variables use 1144 bytes (55%) of dynamic memory, leaving 904 bytes for local variables. Maximum is 2048 bytes.
-//No BMP280
-//Sketch uses 27126 bytes (88%) of program storage space. Maximum is 30720 bytes.
-//Global variables use 1256 bytes (61%) of dynamic memory, leaving 792 bytes for local variables. Maximum is 2048 bytes.
-// No SPL06
-//Sketch uses 28082 bytes (91%) of program storage space. Maximum is 30720 bytes.
-//Global variables use 1256 bytes (61%) of dynamic memory, leaving 792 bytes for local variables. Maximum is 2048 bytes.
-
 
 #define MAX_ANALOG 1024
 #define MAX_PWM 255
@@ -131,6 +117,9 @@
 #error Unsupported board selection.
 
 #endif
+
+// Stepper lib is 3122 bytes
+#define WANT_STEPPER 1
 
 
 //The Arduino has 3 timers and 6 PWM output pins. The relation between timers and PWM outputs is:
@@ -222,6 +211,31 @@ void clearCalibrationData();
 #define VERSION_MINOR     1
 #define VERSION_REVISION  5
 
+
+// Motor specific configurations
+
+#define WIPER_SWEEP_SPEED 150 // Ford F150 motor wiper
+#define STEPPER_SWEEP_SPEED 128
+#define BLDC_SWEEP_SPEED   128
+
+// ok, we can have a simple H bridge  HiLetGo BTS7960
+#define MOTOR_HBRIDGE_R_EN    MOTOR_PIN_B   // R_EN: forware drive enable input, high-level enable, low level off  (ACTIVE_HIGH)
+#define MOTOR_HBRIDGE_L_EN    MOTOR_PIN_C   // L_EN: Reverse drive enable input, high-level enable, low level off  (ACTIVE HIGH)
+#define MOTOR_HBRIDGE_PWM     MOTOR_PIN_PWM // PWM: PWM signal, active high, attach to BOTH LPWM and RPWM
+// WARNING: If you enable R_EN and L_EN at the same time, you fry the chip, so always set both to 0 first, then enable delay(1) and then set the direction pin
+
+// We can have a stepper motor - Schmalz easy driver (Does not fry H if used mistakenly)
+#define MOTOR_STEPPER_ENABLE  MOTOR_PIN_A  //  enable input, low-level enable, high level off   (ACTIVE LOW)<-- This is important as BLDC detection pulls this pin HIGH and looks for a pull to zero
+#define MOTOR_STEPPER_DIR     MOTOR_PIN_C
+#define MOTOR_STEPPER_STEP    MOTOR_PIN_PWM
+
+// Same pins as the stepper.   Except that when watching for the FEEDBACK, the pin is high, disabling the stepper
+#define MOTOR_BLDC_FEEDBACK   MOTOR_PIN_A  // Must be IRQ capable
+#define MOTOR_BLDC_DIR        MOTOR_PIN_C
+#define MOTOR_BLDC_PWM        MOTOR_PIN_PWM
+
+
+
 #include "respond.h"
 #include "busdevice.h"
 #include "sensors.h"
@@ -229,5 +243,6 @@ void clearCalibrationData();
 #include "eeprom.h"
 #include "command.h"
 #include "motor.h"
+#include "stepper.h"
 
 #endif

@@ -17,7 +17,6 @@
    Author: Steven.Carr@hammontonmakers.org
 */
 
-// TODO: Manual ADC Control
 // TODO: Better input validation
 // TODO: Failure modes (all of them) need to be accounted for and baked into the system
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
@@ -115,40 +114,39 @@ void timeToPulseWatchdog()
 
 void timeToReadVISP()
 {
-  static float P[4], T[4];
   // Read them all NOW
   if (sensorsFound)
   {
-    for (int x = 0; x < 4; x++)
+    // If any of the sensors fail, stop trying to do others
+    for (int8_t x = 0; x < 4; x++)
     {
-      P[x] = 0;
-      // If any of the sensors fail, stop trying to do others
-      if (!sensors[x].calculate(&sensors[x], &P[x], &T[x]))
-        break;
+      if (!sensors[x].calculate(&sensors[x]))
+        return;
     }
   }
-
   // OK, the cable might have just been unplugged, and the sensors have gone away.
   // Hence the double checks one above, and this one below
   if (sensorsFound)
   {
     if (calibrateInProgress())
-      calibrateSensors(P);
+      calibrateSensors();
     else
     {
-      calibrateApply(P);
+      calibrateApply();
 
       if (visp_eeprom.bodyType == 'P')
-        calculatePitotValues(P);
+        calculatePitotValues();
       else
-        calculateVenturiValues(P);
+        calculateVenturiValues();
       // TidalVolume is the same for both versions
       calculateTidalVolume();
       // Take some time to write to the serial port
-      dataSend(P);
+      dataSend();
     }
   }
 }
+//Sketch uses 29394 bytes (95 % ) of program storage space. Maximum is 30720 bytes.
+//Global variables use 1264 bytes (61 % ) of dynamic memory, leaving 784 bytes for local variables. Maximum is 2048 bytes.
 
 
 unsigned long timeToInhale = 0;

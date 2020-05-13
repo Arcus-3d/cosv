@@ -22,6 +22,6 @@
 
 void commandParser(int cmdByte);
 void sendCurrentSystemHealth();
-void dataSend(float *P);
+void dataSend();
 
 #endif

@@ -139,7 +139,6 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
 // TODO: verify mapping
 bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
 {
-  const int8_t addresses[4] = {0x76, 0x77, 0x74, 0x75};
   // XLATE version has chips at 0x74, 0x75, 0x76, and 0x77
   // So, if we find 0x74... We are good to go
 
@@ -167,25 +166,22 @@ bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
 
 bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk enableCbkA, busDeviceEnableCbk enableCbkB)
 {
-  detectEEPROM(wireA, 0x54);
+  detectEEPROM(wireA, 0x54, 0, NULL, enableCbkA);
   if (!eeprom)
   {
-    detectEEPROM(wireA, 0x54, 0, NULL, enableCbkA);
-    if (!eeprom)
+    detectEEPROM(wireB, 0x54, 0, NULL, enableCbkB);
+    if (eeprom)
     {
-      detectEEPROM(wireA, 0x54, 0, NULL, enableCbkB);
-      if (eeprom)
-      {
-        TwoWire *swap = wireA;
-        wireA = wireB;
-        wireB = swap;
-        //debug(PSTR("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
-      }
-      //else
-      //  debug(PSTR("Failed to detect DUAL I2C VISP"));
-      return false;
+      busDeviceEnableCbk swapE = enableCbkA;
+      TwoWire *swap = wireA;
+      wireA = wireB;
+      wireB = swap;
+      enableCbkA = enableCbkB;
+      enableCbkB = swapE;
+      //debug(PSTR("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
     }
-    //debug(PSTR("Enable pins detected!"));
+    else
+      return false;
   }
 
   // Detect U5, U6

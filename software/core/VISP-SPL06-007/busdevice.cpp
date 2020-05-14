@@ -60,7 +60,7 @@ void busPrint(busDevice_t *bus, const char *function)
   }
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("%S(0x%x I2C: address=0x%x channel=%d refCount=%d)"), function, bus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
+    debug(PSTR("%S(I2C: address=0x%x channel=%d refCount=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
     return;
   }
 

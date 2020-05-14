@@ -159,7 +159,7 @@ void bldcTriggered() // IRQ function (Future finding the perfect home)
 
 void stepperReverseDirection()
 {
-  motorWasGoingForward != motorWasGoingForward;
+  motorWasGoingForward = !motorWasGoingForward;
   stepper_setSpeed((motorWasGoingForward ? motorSpeed : -motorSpeed));
 }
 

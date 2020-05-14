@@ -215,11 +215,15 @@ void timeToCheckPatient()
 // NANO uses NPN switches to enable/disable a bus for DUAL_I2C with a single hardware I2C bus
 void enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
 {
+#ifdef ENABLE_PIN_BUS_A
   digitalWrite(ENABLE_PIN_BUS_A, (enableFlag == true ? HIGH : LOW));
+#endif
 }
 void enableI2cBusB(busDevice_t *busDevice, bool enableFlag)
 {
+#ifdef ENABLE_PIN_BUS_B
   digitalWrite(ENABLE_PIN_BUS_B, (enableFlag == true ? HIGH : LOW));
+#endif
 }
 
 void timeToCheckSensors()
@@ -289,12 +293,22 @@ void homeTriggered() // IRQ function
 
 void setup() {
   // Address select lines for Dual I2C switching using NPN Transistors
+#ifdef ENABLE_PIN_BUS_A
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_A, LOW);
+#endif
+#ifdef ENABLE_PIN_BUS_B
   pinMode(ENABLE_PIN_BUS_B, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_B, LOW);
+#endif
   pinMode(MISSING_PULSE_PIN, OUTPUT);
   digitalWrite(MISSING_PULSE_PIN, LOW);
+
+  if (i2cBus1)
+    i2cBus1->begin();
+
+  if (i2cBus2)
+    i2cBus2->begin();
 
   motorSetup();
 

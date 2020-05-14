@@ -181,8 +181,8 @@ struct settingsEntry_s {
   const uint32_t bitmask;
   const int      validModes;
   const char * const theName;
-  const int16_t theMin;
-  const int16_t theMax;
+  const int theMin;
+  const int theMax;
   const struct dictionary_s  *personalDictionary;
   const verifyCallback  verifyIt;
   const respondCallback respondIt;
@@ -585,34 +585,31 @@ const struct commandEntry_s commands[] PUTINFLASH = {
 void commandParser(int cmdByte)
 {
   static parser_state_e currentState = PARSE_COMMAND;
-  static uint8_t command = 0;
+  static uint8_t theCommandByte = 0;
   static char arg1[16] = "", arg2[16] = "";
   static uint8_t arg1Pos = 0, arg2Pos = 0;
   struct commandEntry_s entry = {0};
 
-  // Any kind of garbage input resets the state machine
   if (!isprint(cmdByte))
     currentState = PARSE_IGNORE_TILL_LF;
 
-  // Ignore DOS CR
-  if (cmdByte == '\r')
-    return;
-
-  // Need to be able to gracefully handle empty lines
-  if (cmdByte == '\n')
+  if (cmdByte == '\n' || cmdByte == '\r')
   {
     int x = 0;
-    // Process the command here
-    currentState = PARSE_COMMAND;
 
+    // Need to be able to gracefully handle empty lines
     do
     {
       // We must copy the struct from flash to access it
       memcpy_P(&entry, & commands[x], sizeof(entry));
-      if (command == entry.cmdByte)
+      if (entry.cmdByte && theCommandByte == entry.cmdByte)
         entry.doIt(arg1, arg2);
       x++;
     } while (entry.cmdByte);
+    
+    // Process the command here
+    currentState = PARSE_COMMAND;
+    theCommandByte = 0;
     return;
   }
 
@@ -623,7 +620,7 @@ void commandParser(int cmdByte)
       else
       {
         // And reset!
-        command = cmdByte;
+        theCommandByte = cmdByte;
         arg1Pos = 0;
         memset(arg1, 0, sizeof(arg1));
         arg2Pos = 0;

@@ -20,7 +20,7 @@
 #ifndef __DISPLAY_H__
 #define __DISPLAY_H__
 
-void displaySetup();
+void displaySetup(TwoWire *wire);
 void displayUpdate();
 
 #endif

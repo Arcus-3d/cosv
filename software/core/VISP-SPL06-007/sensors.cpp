@@ -769,12 +769,12 @@ void detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uin
   if (!device)
     return;
 
-  busPrint(device, PSTR("Discovering sensor type"));
+  // busPrint(device, PSTR("Discovering sensor type"));
   if (!bmp280Detect(baro, device))
     if (!bmp388Detect(baro, device))
       if (!spl06Detect(baro, device))
       {
-        busPrint(device, PSTR("sensor identification failed"));
+        busPrint(device, PSTR("Unknown chip"));
         busDeviceFree(device);
         device = NULL;
       }

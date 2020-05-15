@@ -25,7 +25,7 @@
 #ifdef ARDUINO_TEENSY40
 #include "teensy.h"
 #elif ARDUINO_BLUEPILL_F103C8
-#inlude "bluepill.h"
+#include "bluepill.h"
 #elif ARDUINO_AVR_NANO
 #include "nano.h"
 #elif ARDUINO_AVR_UNO
@@ -73,7 +73,7 @@ void clearCalibrationData();
 
 #define VERSION_MAJOR     0
 #define VERSION_MINOR     1
-#define VERSION_REVISION  5
+#define VERSION_REVISION  6
 
 
 // Motor specific configurations

@@ -19,27 +19,44 @@
 #include "config.h"
 
 #include "SSD1306Ascii.h"
-#include "SSD1306AsciiWire.h"
 
 // One display lives on the VISP, the other on the unit
 // 0X3C+SA0 - 0x3C or 0x3D
 #define I2C_ADDRESS_VISP 0x3C
 #define I2C_ADDRESS_MAIN 0x3D
 
-// Define proper RST_PIN if required.
-#define RST_PIN -1
+class SSD1306AsciiWire : public SSD1306Ascii {
+  public:
+    explicit SSD1306AsciiWire() {}
+    void begin(TwoWire *wire, const DevType* dev, uint8_t i2cAddr) {
+      m_i2cAddr = i2cAddr;
+      // Only if it was found..
+      wire->beginTransmission(m_i2cAddr);
+      m_oledWire = (wire->endTransmission()==0 ? wire : NULL);
+      init(dev);    
+    }
+  protected:
+    void writeDisplay(uint8_t b, uint8_t mode) {
+      if (m_oledWire)
+      {
+        m_oledWire->beginTransmission(m_i2cAddr);
+        m_oledWire->write(mode == SSD1306_MODE_CMD ? 0X00 : 0X40);
+        m_oledWire->write(b);
+        m_oledWire->endTransmission();
+      }
+    }
+  protected:
+    TwoWire *m_oledWire;
+    uint8_t m_i2cAddr;
+};
+
 
 SSD1306AsciiWire oledVISP, oledMain;
 
-void displaySetup()
+void displaySetup(TwoWire *wire)
 {
-#if RST_PIN >= 0
-  oledMain.begin(&Adafruit128x64, I2C_ADDRESS_MAIN, RST_PIN);
-  oledVISP.begin(&Adafruit128x32, I2C_ADDRESS_VISP, RST_PIN);
-#else // RST_PIN >= 0
-  oledMain.begin(&Adafruit128x64, I2C_ADDRESS_MAIN);
-  oledVISP.begin(&Adafruit128x32, I2C_ADDRESS_VISP);
-#endif // RST_PIN >= 0
+  oledMain.begin(wire, &Adafruit128x64, I2C_ADDRESS_MAIN);
+  oledVISP.begin(wire, &Adafruit128x32, I2C_ADDRESS_VISP);
 
   oledMain.setFont(Adafruit5x7);
   oledVISP.setFont(Adafruit5x7);
@@ -50,26 +67,26 @@ void displayToThis(SSD1306AsciiWire *lcd, bool isVISP)
   char modeBuff[16] = {0};
 
   // 4 lines on a VISP, 8 on a Main
-  lcd->setCursor(0,0);
+  lcd->setCursor(0, 0);
   lcd->print((isVISP ? F("VISP:") : F("Boxy:")));
   lcd->print(currentModeStr(modeBuff, sizeof(modeBuff)));
   lcd->clearToEOL();
   lcd->println();
-  
+
   lcd->print(F("IE 1:"));
   lcd->print(visp_eeprom.breath_ratio);
   lcd->print(F("  Rate "));
   lcd->print(visp_eeprom.breath_rate);
   lcd->clearToEOL();
   lcd->println();
-  
+
   lcd->print(F("Pressure "));
   lcd->print(pressure);
   lcd->print('/');
   lcd->print(visp_eeprom.breath_pressure);
   lcd->clearToEOL();
   lcd->println();
-  
+
   lcd->print(F("Volume   "));
   lcd->print(volume);
   lcd->print('/');

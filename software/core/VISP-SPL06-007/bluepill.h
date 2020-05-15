@@ -67,25 +67,39 @@
 #define ADC_PRESSURE A1 // How much pressure when in PC-CMV mode
 #define ADC_RATIO    A2 // How much time to push, scaled to the MIN_BREATH_RATIO to MAX_BREATH_RATIO
 #define ADC_RATE     A3 // Breaths Per Minute (Scaled to MIN_BREATH_RATE and MAX_BREATH_RATE)
-#define ADC_SDA      A4 // Used by I2C
-#define ADC_SCL      A5 // Used by I2C
-#define ADC_MODE     A6 // Crude mode selection divided down into 3 'modes', 'display-controlled', 'forced-pc-cmv', 'forced-vc-cmv'
-#define ADC_BATTERY  A7 // Battery monitoring of portable unit
+#define SPI1_CS     PA4 // 3v3 only
+#define SPI1_SCK    PA5 // 3v3 only
+#define SPI1_MISO   PA6 // 3v3 only
+#define SPI1_MOSI   PA7 // 3v3 only
+#define ADC_MODE     A8 // Crude mode selection divided down into 3 'modes', 'display-controlled', 'forced-pc-cmv', 'forced-vc-cmv'
+#define ADC_BATTERY  A9 // Battery monitoring of portable unit
 
-#define HOME_SENSOR  2 // IRQ on low.
+#define SPI_DCRS PB5
 
+#define SCL1 PB6
+#define SDA1 PB7
+#define SCL2 PB10
+#define SDA2 PB11
 
 // All motors use these 4 signals.
-#define MOTOR_PIN_A    3 // MUST BE IRQ CAPABLE!  (STEPPER_ENABLE, BLDC_FEEDBACK)  
-#define MOTOR_PIN_B    4 // (MOTOR_HBRIDGE_R_EN)
-#define MOTOR_PIN_C    5 // (MOTOR_HBRIDGE_L_EN, MOTOR_STEPPER_DIR, MOTOR_BLDC_DIR)
-#define MOTOR_PIN_PWM  6 // HARDWARE PWM Capable output required (MOTOR_HBRIDGE_PWM, MOTOR_STEPPER_STEP, MOTOR_BLDC_PWM)
+#define MOTOR_PIN_A    PB8 // MUST BE IRQ CAPABLE!  (STEPPER_ENABLE, BLDC_FEEDBACK)  
+#define MOTOR_PIN_B    PB3 // (MOTOR_HBRIDGE_R_EN)
+#define MOTOR_PIN_C    PB4 // (MOTOR_HBRIDGE_L_EN, MOTOR_STEPPER_DIR, MOTOR_BLDC_DIR)
+#define MOTOR_PIN_PWM  PB9 // HARDWARE PWM Capable output required (MOTOR_HBRIDGE_PWM, MOTOR_STEPPER_STEP, MOTOR_BLDC_PWM)
 
-// Pins D4 and D5 are enable pins for NANO's NPN SCL enable pins
-#define ENABLE_PIN_BUS_A 7 // Future: this toggles HIGH=busA, LOW=busB  NOTE: also is SPI 2.8" display DC/RS 
-#define ENABLE_PIN_BUS_B 8
+// Serial1 is PA9 and PA10
+#define SERIAL_TX    PA9
+#define SERIAL_RX    PA10
 
-#define LINE_POWER_DETECTION 8 // Future: need to detect line power
-#define MISSING_PULSE_PIN  9   // Output a pulse every time we check the sensors.
+#define USB_DMINUS   PA11
+#define USB_DPLUS    PA12
+
+#define HOME_SENSOR  PA15 // IRQ on low.
+
+#define LINE_POWER_DETECTION PA8 // Future: need to detect line power
+#define MISSING_PULSE_PIN  PB12   // If outside circuitry doens't get pulses within a second, then error
+
+// Extra pins PB12 PB14 and PB15
+// PC13 has a board level LED on it
 
 #endif

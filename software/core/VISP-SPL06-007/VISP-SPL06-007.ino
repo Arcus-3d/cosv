@@ -20,17 +20,16 @@
 // TODO: Better input validation
 // TODO: Failure modes (all of them) need to be accounted for and baked into the system
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
-// TODO: Get a (very tiny code wise) I2C LCD working for basic text output.
 
 #include "config.h"
 
 #ifdef ARDUINO_TEENSY40
-TwoWire *i2cBus1 = &Wire1;
-TwoWire *i2cBus2 = &Wire2;
+TwoWire *i2cBus1 = &Wire;
+TwoWire *i2cBus2 = &Wire1;
 #elif ARDUINO_BLUEPILL_F103C8
 TwoWire *i2cBus1 = &Wire;
 TwoWire Wire2(PB11, PB10);
-TwoWire *i2cBus2 = &Wire2;
+TwoWire *i2cBus2 = &Wire1;
 #elif ARDUINO_AVR_NANO
 TwoWire *i2cBus1 = &Wire;
 TwoWire *i2cBus2 = NULL;
@@ -145,8 +144,6 @@ void timeToReadVISP()
     }
   }
 }
-//Sketch uses 29394 bytes (95 % ) of program storage space. Maximum is 30720 bytes.
-//Global variables use 1264 bytes (61 % ) of dynamic memory, leaving 784 bytes for local variables. Maximum is 2048 bytes.
 
 
 unsigned long timeToInhale = 0;
@@ -171,6 +168,7 @@ void timeToCheckPatient()
     timeToInhale = nextBreathCycle;
     timeToStopInhale = (nextBreathCycle / visp_eeprom.breath_ratio);
 
+    // This info is 200 bytes long...
     info(PSTR("brate=%d  bratio=%d nextBreathCycle=%l timeToStopInhale=%l millis"), visp_eeprom.breath_rate, visp_eeprom.breath_ratio, nextBreathCycle, timeToStopInhale);
 
     timeToInhale += theMillis;
@@ -234,7 +232,7 @@ void timeToCheckSensors()
   {
     detectVISP(i2cBus1, i2cBus2, enableI2cBusA, enableI2cBusB);
     if (sensorsFound)
-      displaySetup(); // Need to setup the VISP I2C OLED that just attached
+      displaySetup(i2cBus1); // Need to setup the VISP I2C OLED that just attached
   }
 
   // Save some flash code space and do this every half second in this function
@@ -244,14 +242,15 @@ void timeToCheckSensors()
 // Scales the analog input to a range.
 static int scaleAnalog(int analogIn, int minValue, int maxValue)
 {
-  float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
-  return minValue + (maxValue * percentage);
+  //float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
+  //return minValue + (maxValue * percentage);
+  return minValue + ((maxValue * analogIn) / MAX_ANALOG);
 }
 
 // 344 bytes
 void timeToCheckADC()
 {
-  int analogMode = scaleAnalog(analogRead(ADC_MODE), 0, 3);
+  int8_t analogMode = scaleAnalog(analogRead(ADC_MODE), 0, 3);
 
   // if analogMode==0 then 100% software control from the rPi
   if (analogMode)
@@ -294,8 +293,37 @@ void homeTriggered() // IRQ function
   motorStop();
 }
 
+void scanI2C(TwoWire *wire)
+{
+  int error;
+  if (wire)
+  {
+    for (uint8_t x = 0; x < 128; x++)
+    {
+      wire->beginTransmission(x);
+      error = wire->endTransmission();
+      if (error == 0)
+        info(PSTR("Detected 0x%x on bus 0x%x"), x, wire);
+    }
+  }
+}
+void initI2C(TwoWire *wire)
+{
+  if (wire)
+  {
+    wire->begin();
+    wire->setClock(400000); // Typical 400KHz
+  }
+}
 
-void setup() {
+void setup()
+{
+  hwSerial.begin(SERIAL_BAUD);
+  respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+
+  initI2C(i2cBus1);
+  initI2C(i2cBus2);
+
   // Address select lines for Dual I2C switching using NPN Transistors
 #ifdef ENABLE_PIN_BUS_A
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
@@ -308,27 +336,15 @@ void setup() {
   pinMode(MISSING_PULSE_PIN, OUTPUT);
   digitalWrite(MISSING_PULSE_PIN, LOW);
 
-  if (i2cBus1)
-    i2cBus1->begin();
-
-  if (i2cBus2)
-    i2cBus2->begin();
-
   motorSetup();
 
   // Setup the home sensor as an interrupt
   pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
   attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
 
-  hwSerial.begin(SERIAL_BAUD);
-  respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
-
   busDeviceInit();
 
   vispInit();
-
-  i2cBus1->begin();
-  i2cBus1->setClock(400000); // Typical
 
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
@@ -337,7 +353,10 @@ void setup() {
   // Start the VISP calibration process
   calibrateClear();
 
-  displaySetup();
+  displaySetup(i2cBus1);
+
+  //scanI2C(i2cBus1);
+  //scanI2C(i2cBus2);
 }
 
 

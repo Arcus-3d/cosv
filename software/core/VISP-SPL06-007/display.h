@@ -17,13 +17,10 @@
    Author: Steven.Carr@hammontonmakers.org
 */
 
-#ifndef __COMMANDS_H__
-#define __COMMANDS_H__
+#ifndef __DISPLAY_H__
+#define __DISPLAY_H__
 
-void commandParser(int cmdByte);
-void sendCurrentSystemHealth();
-void dataSend();
-
-char *currentModeStr(char *buff, int buffSize); // Used by the displayUpdate()
+void displaySetup();
+void displayUpdate();
 
 #endif

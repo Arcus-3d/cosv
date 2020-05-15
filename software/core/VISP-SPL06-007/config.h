@@ -30,6 +30,7 @@
 #include "nano.h"
 #elif ARDUINO_AVR_UNO
 #include "nano.h"
+#define WANT_BMP388 1 // 1858 bytes and 112bytes of ram, fits on the UNO but not the Nano right now
 #else
 #error Unsupported board selection.
 #endif
@@ -107,5 +108,6 @@ void clearCalibrationData();
 #include "command.h"
 #include "motor.h"
 #include "stepper.h"
+#include "display.h"
 
 #endif

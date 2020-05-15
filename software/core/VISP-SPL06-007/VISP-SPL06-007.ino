@@ -232,6 +232,9 @@ void timeToCheckSensors()
   // Do it every half second (or longer)
   if (!sensorsFound)
     detectVISP(i2cBus1, i2cBus2, enableI2cBusA, enableI2cBusB);
+
+  // Save some flash code space and do this every half second in this function
+  displayUpdate();
 }
 
 // Scales the analog input to a range.
@@ -288,9 +291,6 @@ void homeTriggered() // IRQ function
 }
 
 
-
-
-
 void setup() {
   // Address select lines for Dual I2C switching using NPN Transistors
 #ifdef ENABLE_PIN_BUS_A
@@ -332,6 +332,8 @@ void setup() {
 
   // Start the VISP calibration process
   calibrateClear();
+
+  displaySetup();
 }
 
 

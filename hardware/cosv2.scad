@@ -6,9 +6,10 @@
 // Hardware license: 		https://ohwr.org/cern_ohl_s_v2.txt
 // Software license: 		http://www.gnu.org/licenses/gpl-3.0.html
 // Hardware license note: 	Defensive patents for the relevant novel hardware elements of this project have been filed.  
-//				Kindly follow our Open Source Hardware licensing requirements. Thank you.
+//				Kindly follow our Open Source Hardware licensing requirements, or we do have the legal right to spank you.
+//				Thank you.
 
-// Project version: 		0.20
+// Project version: 		0.19
 // Version note: 		The *vast* majority of files which have been recently generated target equal height/multiple millimeter based layer construction.
 //				In other words, if you are not laser cutting this from sheet stock around 3mm thick for all but paddle() and flow_sensor_venturi_for_pcb()
 //				you may have issues.
@@ -142,7 +143,7 @@ if (PART == "cam") {
 //laser_base_front_pi(layer=0); // base front
 
 //laser_base_front(); // base front
-//laser_base_front_pi(layer=0); // base front
+laser_base_front_pi(layer=0); // base front
 //laser_base_front_pi(layer=1); // base front
 //laser_base_front_pi(layer=2); // base front
 //laser_base_back_wiper(); // base back
@@ -154,8 +155,7 @@ if (PART == "cam") {
 //laser_bearing_bushing(r=6/2); // parts used within the other FFF parts
 //laser_base_top();
 //laser_base_right();
-laser_cam_encoder();
-//laser_paddle(layer=0,h=material_t*3); // paddle for the arms.  Need 2
+//laser_cam_encoder();
 
 //cam(); // cam top/bottom.  Need 2.
 //paddle(); // paddle for the arms.  Need 2
@@ -235,7 +235,7 @@ comp_rot=90;
 // paddle dimensions.  Low infill part.
 paddle_x=bvm_r/2;
 paddle_y=bvm_r/4;
-paddle_t=bvm_c*1.25;
+paddle_t=bvm_r/12;
 
 // how far the arm rotates with a full comp_rot
 arm_rot=30; 
@@ -362,9 +362,6 @@ module laser_cam_end_plate_t() {
 module laser_cam_center_b() {
 	projection(cut=true) cam_center();
 }
-module laser_cam_encoder() {
-	projection(cut=true) cam_encoder();
-}
 module laser_cam_center_t() {
 	projection(cut=true) cam_center(motor_shaft_r=6/2,d_shaft=0);
 }
@@ -381,8 +378,9 @@ module laser_arm($fm=90,path_step=1) {
 module laser_arm_end_support($fm=90,path_step=1) {
 	projection(cut=true) arm_end_support($fn=$fn,path_step=path_step);
 }
-module laser_paddle(layer=0,h=material_t*3) {
-	projection(cut=true) translate([0,0,-layer*material_t]) paddle(laser=1,h=h);
+module laser_paddle() {
+	
+	projection(cut=true) paddle(laser=1,h=arm_w);
 }
 module laser_bearing_bushing(r=cam_bolt_r) {
 	projection(cut=true) bearing_bushing(r=r);
@@ -1156,11 +1154,11 @@ module paddle(laser=0,h=material_t*3) {
 	difference() {
 		hull() for (y=[-1,1]) for (x=[-1,1]) intersection() {
 			translate([x*paddle_x,y*paddle_y,-paddle_y+paddle_t]) sphere(r=paddle_y,center=true);
-			translate([x*paddle_x,y*paddle_y,paddle_t]) cylinder(r=paddle_y/2+paddle_t/4,h=paddle_t*2,center=true);
+			translate([x*paddle_x,y*paddle_y,paddle_t]) cylinder(r=paddle_y*0.8,h=paddle_t*2,center=true);
 		}
-		#hull() {
-			rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/8-kerf,h=h+clearance/4,center=true);
-			translate([0,0,bvm_c*0.75]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/8-kerf,h=h+clearance/8,center=true);
+		hull() {
+			rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/8,h=h+clearance/4,center=true);
+			translate([0,0,bvm_c*0.75]) rotate([0,90,0]) cylinder(r=bvm_c*1.5+clearance/8,h=h+clearance/4,center=true);
 		}
 	}
 }
@@ -1310,15 +1308,19 @@ module cam_holes(d_shaft=d_shaft,motor_shaft_r=motor_shaft_r) {
 }
 // first shot at an optical encoder.  Sucks for FFF as nozzle_size is used for subtraction, not addition... so... gaps.
 module cam_encoder(h=material_t/3,r=cam_l/2+bvm_c*2) {
-	slot_l=3;
-	edge_t=nozzle_r*4+kerf;
-	slot_w=1.2-kerf;
+	slot_l=2;
+	edge_t=nozzle_r*4;
 	translate([0,0,h/2]) difference() {
-		cylinder(r=r,h=h,center=true,$fn=120);
-		if (1) for (a=[0:3.6:359]) rotate([0,0,a]) translate([r-slot_l/2-edge_t,3,0]) cube([slot_l,slot_w-kerf*2,h+extra],center=true);
-		if (1) for (a=[0:180:359])  rotate([0,0,a]) translate([r-slot_l*1.5-edge_t,-3,0]) cube([slot_l,slot_w-kerf*2,h+extra],center=true);
+		cylinder(r=r,h=h,center=true);
+		for (a=[0:3.6:179]) for (b=[1,-1]) hull() {
+			rotate([0,0,a]) translate([(r-slot_l-edge_t)*b,0,0]) cube([slot_l,extra,h+extra],center=true);
+			#rotate([0,0,a+3.6/2]) translate([(r-slot_l-edge_t)*b,0,0]) cube([slot_l,extra,h+extra],center=true);
+		}
+		for (a=[0:3.6:3]) for (b=[1,-1]) hull() {
+			rotate([0,0,a]) translate([(r-slot_l*2-edge_t)*b,0,0]) cube([slot_l,extra,h+extra],center=true);
+			#rotate([0,0,a+3.6/2]) translate([(r-slot_l*2-edge_t)*b,0,0]) cube([slot_l,extra,h+extra],center=true);
+		}
 		cylinder(r=motor_bolt_r,h=h+extra,center=true);
-		for(y=[-1,1]) translate([0,cam_bearing_offset*y,cam_h/4]) cylinder(r=cam_bolt_r,h=cam_h,center=true);
 	}
 } 	
 
@@ -1348,10 +1350,10 @@ module pi_touchscreen(h=material_t,over=0) {
 	pi_bolt_offset_y=(32-35)/2;
 	pi_bolt_offset_x=(23.5-22.5)/2;
 	corner_r=3;
-	hull () for (x=[-1,1]) for (y=[-1,1]) translate([(30-24)/2+x*(58.75/2-corner_r/1.44),(-67.5+34.5)/2+y*(91/2-corner_r/1.44),-18/2+material_t]) cylinder($fn=16,r=corner_r+over/2,h=18+extra,center=true);
-	for (x=[-1,1]) for (y=[-1,1]) translate([x*pi_bolt_x+pi_bolt_offset_x,y*pi_bolt_y+pi_bolt_offset_y,h/2]) cube([9,13.25-kerf*2,h+extra],center=true);
-	hull() for (x=[0,-1]) for (y=[-1,1]) translate([x*50-corner_r/1.44,y*46/2-corner_r/1.44+2,h/2]) cylinder(r=corner_r,h=h+extra,center=true);
-	hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*60/2-corner_r/1.44+6,y*70/2-corner_r/1.44-(-61.5+73.5)/2,h/2]) cylinder(r=corner_r,h=h+extra,center=true);
+	hull () for (x=[-1,1]) for (y=[-1,1]) translate([(29.5-24.5)/2+x*(58.75/2-corner_r/1.44),(-67.5+34.5)/2+y*(91/2-corner_r/1.44),-18/2+material_t]) cylinder($fn=16,r=corner_r+over/2,h=18+extra,center=true);
+	for (x=[-1,1]) for (y=[-1,1]) translate([x*pi_bolt_x+pi_bolt_offset_x,y*pi_bolt_y+pi_bolt_offset_y,h/2]) cube([8,13.25-kerf*2,h+extra],center=true);
+	hull() for (x=[0,-1]) for (y=[-1,1]) translate([x*56-corner_r/1.44,y*48/2-corner_r/1.44,h/2]) cylinder(r=corner_r,h=h+extra,center=true);
+	hull() for (x=[-1,1]) for (y=[-1,1]) translate([x*67/2-corner_r/1.44-(-25+26.5)/2,y*67/2-corner_r/1.44-(-61.5+73.5)/2,h/2]) cylinder(r=corner_r,h=h+extra,center=true);
 }
 	
 module h_bridge(h=material_t) {

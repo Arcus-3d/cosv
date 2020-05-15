@@ -17,7 +17,6 @@
    Author: Steven.Carr@hammontonmakers.org
 */
 
-// TODO: Manual ADC Control
 // TODO: Better input validation
 // TODO: Failure modes (all of them) need to be accounted for and baked into the system
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
@@ -30,7 +29,7 @@ TwoWire *i2cBus1 = &Wire1;
 TwoWire *i2cBus2 = &Wire2;
 #elif ARDUINO_BLUEPILL_F103C8
 TwoWire *i2cBus1 = &Wire;
-TwoWire Wire2(PB11,PB10);
+TwoWire Wire2(PB11, PB10);
 TwoWire *i2cBus2 = &Wire2;
 #elif ARDUINO_AVR_NANO
 TwoWire *i2cBus1 = &Wire;
@@ -115,40 +114,39 @@ void timeToPulseWatchdog()
 
 void timeToReadVISP()
 {
-  static float P[4], T[4];
   // Read them all NOW
   if (sensorsFound)
   {
-    for (int x = 0; x < 4; x++)
+    // If any of the sensors fail, stop trying to do others
+    for (int8_t x = 0; x < 4; x++)
     {
-      P[x] = 0;
-      // If any of the sensors fail, stop trying to do others
-      if (!sensors[x].calculate(&sensors[x], &P[x], &T[x]))
-        break;
+      if (!sensors[x].calculate(&sensors[x]))
+        return;
     }
   }
-
   // OK, the cable might have just been unplugged, and the sensors have gone away.
   // Hence the double checks one above, and this one below
   if (sensorsFound)
   {
     if (calibrateInProgress())
-      calibrateSensors(P);
+      calibrateSensors();
     else
     {
-      calibrateApply(P);
+      calibrateApply();
 
       if (visp_eeprom.bodyType == 'P')
-        calculatePitotValues(P);
+        calculatePitotValues();
       else
-        calculateVenturiValues(P);
+        calculateVenturiValues();
       // TidalVolume is the same for both versions
       calculateTidalVolume();
       // Take some time to write to the serial port
-      dataSend(P);
+      dataSend();
     }
   }
 }
+//Sketch uses 29394 bytes (95 % ) of program storage space. Maximum is 30720 bytes.
+//Global variables use 1264 bytes (61 % ) of dynamic memory, leaving 784 bytes for local variables. Maximum is 2048 bytes.
 
 
 unsigned long timeToInhale = 0;
@@ -214,40 +212,48 @@ void timeToCheckPatient()
   }
 }
 
+// NANO uses NPN switches to enable/disable a bus for DUAL_I2C with a single hardware I2C bus
+void enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
+{
+#ifdef ENABLE_PIN_BUS_A
+  digitalWrite(ENABLE_PIN_BUS_A, (enableFlag == true ? HIGH : LOW));
+#endif
+}
+void enableI2cBusB(busDevice_t *busDevice, bool enableFlag)
+{
+#ifdef ENABLE_PIN_BUS_B
+  digitalWrite(ENABLE_PIN_BUS_B, (enableFlag == true ? HIGH : LOW));
+#endif
+}
+
 void timeToCheckSensors()
 {
   // If debug is on, and a VISP is NOT connected, we flood the system with sensor scans.
   // Do it every half second (or longer)
   if (!sensorsFound)
-    detectVISP(i2cBus1, i2cBus2, ENABLE_PIN_BUS_A, ENABLE_PIN_BUS_B);
+    detectVISP(i2cBus1, i2cBus2, enableI2cBusA, enableI2cBusB);
 }
 
-int scaleAnalog(int analogIn, int minValue, int maxValue)
+// Scales the analog input to a range.
+static int scaleAnalog(int analogIn, int minValue, int maxValue)
 {
-  float percentage = (float)analogIn/(float)MAX_ANALOG; // THis is CPU dependent, 1024 on Nano, 4096 on STM32
-  return minValue+(maxValue * percentage);
+  float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
+  return minValue + (maxValue * percentage);
 }
 
-
+// 344 bytes
 void timeToCheckADC()
 {
   int analogMode = scaleAnalog(analogRead(ADC_MODE), 0, 3);
-  switch (analogMode) {
-    case 0:
-      break;
-    case 1:
-       currentMode = MODE_MANUAL_PCCMV;
-       visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
-       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
-       break;      
-    break;
-    case 2:
-       currentMode = MODE_MANUAL_VCCMV;
-       visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
-       visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-       visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
-       break;
+
+  // if analogMode==0 then 100% software control from the rPi
+  if (analogMode)
+  {
+    currentMode = (analogMode == 1 ? MODE_MANUAL_PCCMV : MODE_MANUAL_VCCMV);
+    visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
+    visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
+    visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+    visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
   }
 }
 
@@ -264,7 +270,7 @@ t tasks[] = {
   {0, 20, timeToReadVISP},
   {0, 50,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
-// {0, 200, timeToCheckADC}, disabled for now
+  //  {0, 200, timeToCheckADC}, // disabled for now
   {0, 500, timeToCheckSensors},
   {0, 3000, timeToSendHealthStatus},
   {0, 0, NULL} // End of list
@@ -287,12 +293,22 @@ void homeTriggered() // IRQ function
 
 void setup() {
   // Address select lines for Dual I2C switching using NPN Transistors
+#ifdef ENABLE_PIN_BUS_A
   pinMode(ENABLE_PIN_BUS_A, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_A, LOW);
+#endif
+#ifdef ENABLE_PIN_BUS_B
   pinMode(ENABLE_PIN_BUS_B, OUTPUT);
   digitalWrite(ENABLE_PIN_BUS_B, LOW);
+#endif
   pinMode(MISSING_PULSE_PIN, OUTPUT);
   digitalWrite(MISSING_PULSE_PIN, LOW);
+
+  if (i2cBus1)
+    i2cBus1->begin();
+
+  if (i2cBus2)
+    i2cBus2->begin();
 
   motorSetup();
 

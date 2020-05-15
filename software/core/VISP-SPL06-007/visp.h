@@ -85,7 +85,7 @@ typedef struct sensor_mapping_s {
 // WARNING: Must be a multiple of the eeprom's write page.   Assume 8-byte multiples
 // This is at address 0 in the eeprom
 typedef struct visp_eeprom_s {
-  char VISP[4];  // LETTERS VISP
+  uint32_t VISP;  // LETTERS VISP
   uint8_t busType;  // Character type "M"=mux "X"=XLate, "D"=Dual "S"=SPI
   uint8_t bodyType; // "V"=Venturi "P"=Pitot "H"=Hybrid
   uint8_t bodyVersion; // printable character
@@ -123,21 +123,21 @@ extern bool sensorsFound ;
 void vispInit();
 
 void handleSensorFailure();
-void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDevice_t *muxDevice = NULL, int8_t enablePin = -1);
-bool detectMuxedSensors(TwoWire *wire, int enablePin=-1);
-bool detectXLateSensors(TwoWire * wire, int enablePin=-1);
-bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, int enablePinA=-1, int enablePinB=-1);
+void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDevice_t *muxDevice = NULL, busDeviceEnableCbk enableCbk = noEnableCbk);
+bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk = noEnableCbk);
+bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk = noEnableCbk);
+bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk enableCbkA = noEnableCbk, busDeviceEnableCbk enableCbkB = noEnableCbk);
 void sanitizeVispData();
-void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA=-1, int enablePinB=-1);
+void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableCbkA = noEnableCbk, busDeviceEnableCbk enableCbkB = noEnableCbk);
 void saveParametersToVISP();
 
 void calibrateClear();
 bool calibrateInProgress();
-void calibrateSensors(float * P);
-void calibrateApply(float * P);
+void calibrateSensors();
+void calibrateApply();
 
-void calculatePitotValues(float * P);
-void calculateVenturiValues(float * P);
+void calculatePitotValues();
+void calculateVenturiValues();
 void calculateTidalVolume();
 
 #endif

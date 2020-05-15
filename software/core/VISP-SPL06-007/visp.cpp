@@ -19,7 +19,7 @@
 
 #include "config.h"
 
-
+#define VISP_SIGNATURE ((uint32_t)'V'<<24 | (uint32_t)'I'<<16 | (uint32_t)'S'<<8 | (uint32_t)'P')
 
 // Do your venturi mapping here
 #define VENTURI0 0
@@ -58,10 +58,7 @@ void formatVisp(busDevice_t *busDev, struct visp_eeprom_s *data, uint8_t busType
 {
   memset(data, 0, sizeof(visp_eeprom));
 
-  data->VISP[0] = 'V';
-  data->VISP[1] = 'I';
-  data->VISP[2] = 'S';
-  data->VISP[3] = 'p';
+  data->VISP = VISP_SIGNATURE;
   data->busType = busType;
   data->bodyType = bodyType;
   data->bodyVersion = '0';
@@ -94,9 +91,9 @@ void handleSensorFailure()
   critical(PSTR("Sensor communication failure"));
 }
 
-void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel, busDevice_t *muxDevice, int8_t enablePin)
+void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel, busDevice_t *muxDevice, busDeviceEnableCbk enableCbk)
 {
-  busDevice_t *thisDevice = busDeviceInitI2C(wire, address, muxChannel, muxDevice, enablePin);
+  busDevice_t *thisDevice = busDeviceInitI2C(wire, address, muxChannel, muxDevice, enableCbk);
   if (busDeviceDetect(thisDevice))
   {
     thisDevice->hwType = HWTYPE_EEPROM;
@@ -107,12 +104,12 @@ void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel, busDevice
 }
 
 
-bool detectMuxedSensors(TwoWire *wire, int enablePin)
+bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
 {
   // MUX has a switching chip that can have different adresses (including ones on our devices)
   // Could be 2 paths with 2 sensors each or 4 paths with 1 on each.
 
-  busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enablePin);
+  busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enableCbk);
   if (!busDeviceDetect(muxDevice))
   {
     //debug(PSTR("Failed to find MUX on I2C, detecting enable pin"));
@@ -123,15 +120,15 @@ bool detectMuxedSensors(TwoWire *wire, int enablePin)
   // Assign the device it's correct type
   muxDevice->hwType = HWTYPE_MUX;
 
-  detectEEPROM(wire, 0x54, 1, muxDevice, enablePin);
+  detectEEPROM(wire, 0x54, 1, muxDevice, enableCbk);
 
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enablePin);
-  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 1, muxDevice, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enableCbk);
+  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 1, muxDevice, enableCbk);
   // Detect U7, U8
-  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x76, 2, muxDevice, enablePin);
-  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x77, 2, muxDevice, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x76, 2, muxDevice, enableCbk);
+  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x77, 2, muxDevice, enableCbk);
 
   detectedVispType = VISP_BUS_TYPE_MUX;
 
@@ -140,79 +137,77 @@ bool detectMuxedSensors(TwoWire *wire, int enablePin)
 }
 
 // TODO: verify mapping
-bool detectXLateSensors(TwoWire * wire, int enablePin)
+bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
 {
   // XLATE version has chips at 0x74, 0x75, 0x76, and 0x77
   // So, if we find 0x74... We are good to go
 
-  busDevice_t *seventyFour = busDeviceInitI2C(wire, 0x74, 0, NULL, enablePin);
+  busDevice_t *seventyFour = busDeviceInitI2C(wire, 0x74, 0, NULL, enableCbk);
   if (!busDeviceDetect(seventyFour))
   {
     busDeviceFree(seventyFour);
     return false;
   }
 
-  detectEEPROM(wire, 0x54, 0, NULL, enablePin);
+  detectEEPROM(wire, 0x54, 0, NULL, enableCbk);
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 0, NULL, enablePin);
-  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 0, NULL, enableCbk);
+  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 0, NULL, enableCbk);
 
   // Detect U7, U8
-  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x74, 0, NULL, enablePin);
-  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x75, 0, NULL, enablePin);
+  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x74, 0, NULL, enableCbk);
+  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x75, 0, NULL, enableCbk);
 
   detectedVispType = VISP_BUS_TYPE_XLATE;
 
   return true;
 }
 
-bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, int enablePinA, int enablePinB)
+bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk enableCbkA, busDeviceEnableCbk enableCbkB)
 {
-  detectEEPROM(wireA, 0x54);
+  detectEEPROM(wireA, 0x54, 0, NULL, enableCbkA);
   if (!eeprom)
   {
-    detectEEPROM(wireA, 0x54, 0, NULL, enablePinA);
-    if (!eeprom)
+    detectEEPROM(wireB, 0x54, 0, NULL, enableCbkB);
+    if (eeprom)
     {
-      detectEEPROM(wireA, 0x54, 0, NULL, enablePinB);
-      if (eeprom)
-      {
-        TwoWire *swap = wireA;
-        wireA = wireB;
-        wireB = swap;
-        //debug(PSTR("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
-      }
-      //else
-      //  debug(PSTR("Failed to detect DUAL I2C VISP"));
-      return false;
+      busDeviceEnableCbk swapE = enableCbkA;
+      TwoWire *swap = wireA;
+      wireA = wireB;
+      wireB = swap;
+      enableCbkA = enableCbkB;
+      enableCbkB = swapE;
+      //debug(PSTR("PORTS SWAPPED!  EEPROM DETECTED ON BUS B"));
     }
-    //debug(PSTR("Enable pins detected!"));
+    else
+      return false;
   }
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wireA, 0x76, 0, NULL, enablePinA);
-  detectIndividualSensor(&sensors[SENSOR_U6], wireA, 0x77, 0, NULL, enablePinA);
+  detectIndividualSensor(&sensors[SENSOR_U5], wireA, 0x76, 0, NULL, enableCbkA);
+  detectIndividualSensor(&sensors[SENSOR_U6], wireA, 0x77, 0, NULL, enableCbkA);
 
   // TEENSY has dual i2c busses, NANO does not.
   // Detect U7, U8
   if (wireB)
   {
     //debug(PSTR("TEENSY second I2C bus"));
-    detectIndividualSensor(&sensors[SENSOR_U7], wireB, 0x76, 0, NULL, enablePinB);
-    detectIndividualSensor(&sensors[SENSOR_U8], wireB, 0x77, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[SENSOR_U7], wireB, 0x76, 0, NULL, enableCbkB);
+    detectIndividualSensor(&sensors[SENSOR_U8], wireB, 0x77, 0, NULL, enableCbkB);
   }
   else
   {
     //debug(PSTR("No second HW I2C, using Primary I2C bus with enable pin"));
-    detectIndividualSensor(&sensors[SENSOR_U7], wireA, 0x76, 0, NULL, enablePinB);
-    detectIndividualSensor(&sensors[SENSOR_U8], wireA, 0x77, 0, NULL, enablePinB);
+    detectIndividualSensor(&sensors[SENSOR_U7], wireA, 0x76, 0, NULL, enableCbkB);
+    detectIndividualSensor(&sensors[SENSOR_U8], wireA, 0x77, 0, NULL, enableCbkB);
   }
 
   detectedVispType = VISP_BUS_TYPE_I2C;
 
   return true;
 }
+
 
 void sanitizeVispData()
 {
@@ -232,7 +227,7 @@ void sanitizeVispData()
 
 const char strBasedType[] PUTINFLASH = " Based VISP Detected"; // Save some bytes in flash
 // FUTURE: read EEPROM and determine what type of VISP it is.
-void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enablePinB)
+void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableCbkA, busDeviceEnableCbk enableCbkB)
 {
   bool format = false;
   uint8_t missing;
@@ -240,11 +235,11 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
 
   debug(PSTR("Detecting sensors"));
 
-  if (!detectMuxedSensors(i2cBusA, enablePinA))
-    if (!detectMuxedSensors(i2cBusA, enablePinB))
-      if (!detectXLateSensors(i2cBusA, enablePinA))
-        if (!detectXLateSensors(i2cBusA, enablePinB))
-          if (!detectDualI2CSensors(i2cBusA, i2cBusB, enablePinA, enablePinB))
+  if (!detectMuxedSensors(i2cBusA, enableCbkA))
+    if (!detectMuxedSensors(i2cBusA, enableCbkB))
+      if (!detectXLateSensors(i2cBusA, enableCbkA))
+        if (!detectXLateSensors(i2cBusA, enableCbkB))
+          if (!detectDualI2CSensors(i2cBusA, i2cBusB, enableCbkA, enableCbkB))
             return;
 
   // Make sure they are all there
@@ -268,10 +263,7 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, int enablePinA, int enable
     //debug(PSTR("Reading VISP EEPROM"));
     readEEPROM(eeprom, 0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
 
-    if (visp_eeprom.VISP[0] != 'V'
-        ||  visp_eeprom.VISP[1] != 'I'
-        ||  visp_eeprom.VISP[2] != 'S'
-        ||  visp_eeprom.VISP[3] != 'p')
+    if (visp_eeprom.VISP != VISP_SIGNATURE)
     {
       // ok, unformatted VISP
       format = true;
@@ -304,13 +296,13 @@ void calibrateClear()
 }
 
 
-void calibrateApply(float * P)
+void calibrateApply()
 {
   for (int x = 0; x < 4; x++)
-    P[x] += calibrationOffsets[x];
+    sensors[x].pressure += calibrationOffsets[x];
 }
 
-void calibrateSensors(float * P)
+void calibrateSensors()
 {
   int x;
 
@@ -320,7 +312,7 @@ void calibrateSensors(float * P)
     if (calibrationSampleCounter == 1)
       respond('C', PSTR("0,Starting Calibration"));
     for (x = 0; x < 4; x++)
-      calibrationOffsets[x] += P[x];
+      calibrationOffsets[x] += sensors[x].pressure;
     calibrationSampleCounter++;
     if (calibrationSampleCounter == CALIBRATION_FINISHED) {
       float average = 0.0;
@@ -342,21 +334,21 @@ bool calibrateInProgress()
 
 
 
-// Use these definitions to map sensors output P[SENSOR_Ux] to their usage
+// Use these definitions to map sensors output sensor[SENSOR_Ux] to their usage
 #define THROAT_PRESSURE  SENSOR_U5
 #define AMBIANT_PRESSURE SENSOR_U6
 #define PITOT1           SENSOR_U7
 #define PITOT2           SENSOR_U8
 
-void calculatePitotValues(float * P)
+void calculatePitotValues()
 {
   const float paTocmH2O = 0.0101972;
   float  airflow, roughVolume, pitot_diff, pitot1, pitot2;
 
-  pitot1 = P[PITOT1];
-  pitot2 = P[PITOT2];
-  ambientPressure = P[AMBIANT_PRESSURE];
-  throatPressure = P[THROAT_PRESSURE];
+  pitot1 = sensors[PITOT1].pressure;
+  pitot2 = sensors[PITOT2].pressure;
+  ambientPressure = sensors[AMBIANT_PRESSURE].pressure;
+  throatPressure = sensors[THROAT_PRESSURE].pressure;
   pressure = (throatPressure - ambientPressure) * paTocmH2O;
 
   pitot_diff = (pitot1 - pitot2) / 100.0; // pascals to hPa
@@ -373,13 +365,13 @@ void calculatePitotValues(float * P)
 }
 
 
-// Use these definitions to map sensors output P[SENSOR_Ux] to their usage
+// Use these definitions to map sensors output sensors[SENSOR_Ux] to their usage
 //U7 is input tube, U8 is output tube, U5 is venturi, U6 is ambient
 #define VENTURI_SENSOR  SENSOR_U5
 #define VENTURI_AMBIANT SENSOR_U6
 #define VENTURI_INPUT   SENSOR_U7
 #define VENTURI_OUTPUT  SENSOR_U8
-void calculateVenturiValues(float * P)
+void calculateVenturiValues()
 {
   const float paTocmH2O = 0.0101972;
   // venturi calculations
@@ -389,11 +381,11 @@ void calculateVenturiValues(float * P)
   float roughVolume, inletPressure, outletPressure;
 
   //    static float paTocmH2O = 0.00501972;
-  ambientPressure = P[VENTURI_AMBIANT];
-  inletPressure = P[VENTURI_INPUT];
-  outletPressure = P[VENTURI_OUTPUT];
-  // patientPressure = P[VENTURI_SENSOR];   // This is not used?
-  throatPressure = P[VENTURI_SENSOR];
+  ambientPressure = sensors[VENTURI_AMBIANT].pressure;
+  inletPressure = sensors[VENTURI_INPUT].pressure;
+  outletPressure = sensors[VENTURI_OUTPUT].pressure;
+  // patientPressure = sensors[VENTURI_SENSOR].pressure;   // This is not used?
+  throatPressure = sensors[VENTURI_SENSOR].pressure;
   pressure = ((inletPressure + outletPressure) / 2.0 - ambientPressure) * paTocmH2O;
 
   //float h= ( inletPressure-throatPressure )/(9.81*998); //pressure head difference in m

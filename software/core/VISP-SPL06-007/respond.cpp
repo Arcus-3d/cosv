@@ -70,7 +70,7 @@ void respond(char command, PGM_P fmt, ...)
         hwSerial.print(s);
       } else if (c == 'f') {
         double f = va_arg(va, double);
-        hwSerial.print(f,2);
+        hwSerial.print(f, 2);
       } else if (c == 0) {
         va_end(va);
         return;

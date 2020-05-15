@@ -231,7 +231,11 @@ void timeToCheckSensors()
   // If debug is on, and a VISP is NOT connected, we flood the system with sensor scans.
   // Do it every half second (or longer)
   if (!sensorsFound)
+  {
     detectVISP(i2cBus1, i2cBus2, enableI2cBusA, enableI2cBusB);
+    if (sensorsFound)
+      displaySetup(); // Need to setup the VISP I2C OLED that just attached
+  }
 
   // Save some flash code space and do this every half second in this function
   displayUpdate();

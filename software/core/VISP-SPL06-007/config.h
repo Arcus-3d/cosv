@@ -25,11 +25,12 @@
 #ifdef ARDUINO_TEENSY40
 #include "teensy.h"
 #elif ARDUINO_BLUEPILL_F103C8
-#inlude "bluepill.h"
+#include "bluepill.h"
 #elif ARDUINO_AVR_NANO
 #include "nano.h"
 #elif ARDUINO_AVR_UNO
 #include "nano.h"
+#define WANT_BMP388 1 // 1858 bytes and 112bytes of ram, fits on the UNO but not the Nano right now
 #else
 #error Unsupported board selection.
 #endif
@@ -72,7 +73,7 @@ void clearCalibrationData();
 
 #define VERSION_MAJOR     0
 #define VERSION_MINOR     1
-#define VERSION_REVISION  5
+#define VERSION_REVISION  6
 
 
 // Motor specific configurations
@@ -107,5 +108,6 @@ void clearCalibrationData();
 #include "command.h"
 #include "motor.h"
 #include "stepper.h"
+#include "display.h"
 
 #endif

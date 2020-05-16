@@ -10,7 +10,7 @@
 
 #define PUTINFLASH PROGMEM
 
-#define WANT_BMP388 1 // 1858 bytes and 112bytes of ram
+//#define WANT_BMP388 1 // 1858 bytes and 112bytes of ram
 #define WANT_BMP280 1 // 2306 bytes
 #define WANT_SPL06  1 // 1350 bytes
 

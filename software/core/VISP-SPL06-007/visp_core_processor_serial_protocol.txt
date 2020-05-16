@@ -56,22 +56,29 @@ E,<t>,<address>,<b0>,<b1>,<b2>...
 Settings.  There are many settings available, use 'Q' to query them all
 S
 Core replies with all settings (no limits or dictionaries)
-S,5003,mode,Unknown
-S,5004,debug,Disable
-S,5006,bodytype,Unknown
-S,5008,volume,0
-S,5009,rate,0
-S,5010,breath_interval,0
-S,5013,breath_threshold,0
-S,5015,motor_speed,0
-S,5017,calib0,   0.00
-S,5019,calib1,   0.00
-S,5020,calib2,   0.00
-S,5022,calib3,   0.00
-S,5024,sensor0,Unknown
-S,5026,sensor1,Unknown
-S,5028,sensor2,Unknown
-S,5030,sensor3,Unknown
+
+Example S output
+S,381828,mode,OFF
+S,381828,rate,5
+S,381829,ie,1:2
+S,381829,volume,0
+S,381830,pressure,0
+S,381831,breathThreshold,0
+S,381833,bodytype,Venturi
+S,381835,calib0,-38014.39
+S,381837,calib1,-38093.00
+S,381840,calib2,-37926.89
+S,381842,calib3,114034.27
+S,381844,sensor0,BMP280
+S,381846,sensor1,BMP280
+S,381848,sensor2,BMP388
+S,381850,sensor3,BMP388
+S,381852,motorType,Unknown
+S,381855,motorSpeed,0
+S,381857,motorMinSpeed,150
+S,381859,motorHomingSpeed,0
+S,381861,motorStepsPerRev,200
+S,381864,debug,Disable
 
 Settings Query 1 setting command
 S,mode
@@ -80,19 +87,51 @@ S,mode,Unknown
 
 Settings set command
 S,mode,PC-CMV
-Core replies with the current setting
+Core replies with the current setting with a list of *_display Enabled/Disabled for the settings relavent to this mode
 S,mode,PC-CMV
+
+Example "S,mode,PC-CMV" output
+S,478969,mode,PC-CMV
+S,478970,mode_display,Enabled
+S,478970,rate_display,Enabled
+S,478971,ie_display,Enabled
+S,478973,volume_display,Disabled
+S,478977,pressure_display,Enabled
+S,478980,breathThreshold_display,Disabled
+S,478984,bodytype_display,Disabled
+S,478987,calib0_display,Disabled
+S,478989,calib1_display,Disabled
+S,478992,calib2_display,Disabled
+S,478995,calib3_display,Disabled
+S,478998,sensor0_display,Disabled
+S,479001,sensor1_display,Disabled
+S,479004,sensor2_display,Disabled
+S,479007,sensor3_display,Disabled
+S,479009,motorType_display,Enabled
+S,479012,motorSpeed_display,Enabled
+S,479016,motorMinSpeed_display,Enabled
+S,479020,motorHomingSpeed_display,Enabled
+S,479023,motorStepsPerRev_display,Enabled
+S,479027,debug_display,Enabled
+
 
 
 mode sets the operational mode using "PC-CMV" or "VC-CMV)
-volume controls the volume in mL of breaths (tidal volume)
 rate controls the rate in which the breath is delivered
-breath_interval controls the time period between breaths in milliseconds. (Continuous Mandatory Ventilation)
+volume controls the volume in mL of breaths (tidal volume)
+pressure controls the pressure used in PC-CMV
+ie is the inhale:exhale ratio
+breathInterval controls the time period between breaths in milliseconds. (Continuous Mandatory Ventilation)
 debug enable or disable the internal debugging output
-motor_speed Internal testing, turns motor on at a specific speed
+motorSpeed Internal testing, turns motor on at a specific speed
 bodytype Switches the algorithm used for the core
 calib0-3 Current calibration settings for each sensor
 sensor0-3 Current sensor detected.  Sensor0=U5, Sensor1=U6, Sensor2=U7, Sensor3=U8
+motorType Used to set the type of motor attached 
+motorSpeed Used to set the current speed of the motor
+motorMinSpeed Minimum speed for the motor to use for initial starting of a breath cycle
+motorHomingSpeed Homing speed of the motor
+motorStepsPerRev For steppers, how many steps per rev (200, 400, etc)
 
 
 
@@ -102,48 +141,79 @@ The Core will respond with 'H', and 'S' responses for all settings and limits/di
 
 Example Q output
 H,25882,bad
-S,25882,mode_dict,OFF,Offline,PC-CMV,Pressure Controlled,VC-CMV,Volume Controlled
-S,25885,mode,OFF
-S,25886,debug_dict,Disable,Disabled,Enable,Enabled
-S,25891,debug,Disable
-S,25893,bodytype_dict,Unknown,Unknown,Pitot,Pitot body style,Venturi,Venturi body style
-S,25901,bodytype,Unknown
-S,25903,volume_min,0
-S,25905,volume_max,1000
-S,25907,volume,0
-S,25909,rate_min,10
-S,25910,rate_max,30
-S,25912,rate,10
-S,25913,pressure_min,0
-S,25915,pressure_max,100
-S,25918,pressure,0
-S,25919,ie_dict,1:2,50% duty cyce,1:3,33% duty cyce,1:4,25% duty cyce,1:5,20% duty cyce
-S,25927,ie,1:2
-S,25928,breath_threshold_min,0
-S,25931,breath_threshold_max,1000
-S,25934,breath_threshold,0
-S,25936,calib0_min,-1000
-S,25938,calib0_max,1000
-S,25940,calib0,   0.00
-S,25943,calib1_min,-1000
-S,25945,calib1_max,1000
-S,25947,calib1,   0.00
-S,25949,calib2_min,-1000
-S,25951,calib2_max,1000
-S,25954,calib2,   0.00
-S,25956,calib3_min,-1000
-S,25958,calib3_max,1000
-S,25960,calib3,   0.00
-S,25962,sensor0_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,25968,sensor0,Unknown
-S,25970,sensor1_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,25977,sensor1,Unknown
-S,25979,sensor2_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,25986,sensor2,Unknown
-S,25988,sensor3_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
-S,25995,sensor3,Unknown
-Q,25997,Finished
-
-
-
-
+S,4041,mode_dict,OFF,Offline,PC-CMV,Pressure Controlled CMV,VC-CMV,Volume Controlled CMV,Manual,Manual mode - Controlled by analog dials on the unit
+S,4049,mode_display,Enabled
+S,4051,mode,OFF
+S,4054,rate_min,5
+S,4055,rate_max,20
+S,4057,rate_display,Enabled
+S,4059,rate,5
+S,4061,ie_dict,1:2,50% duty cycle,1:3,33% duty cycle,1:4,25% duty cycle,1:5,20% duty cycle
+S,4068,ie_display,Enabled
+S,4070,ie,1:2
+S,4072,volume_min,0
+S,4073,volume_max,1000
+S,4075,volume_display,Enabled
+S,4078,volume,0
+S,4079,pressure_min,0
+S,4081,pressure_max,100
+S,4083,pressure_display,Enabled
+S,4086,pressure,0
+S,4088,breathThreshold_min,0
+S,4090,breathThreshold_max,1000
+S,4093,breathThreshold_display,Disabled
+S,4097,breathThreshold,0
+S,4100,bodytype_dict,Unknown,Unknown,Pitot,Pitot body style,Venturi,Venturi body style
+S,4107,bodytype_display,Disabled
+S,4110,bodytype,Venturi
+S,4112,calib0_min,-1000
+S,4114,calib0_max,1000
+S,4116,calib0_display,Disabled
+S,4118,calib0,-38014.39
+S,4121,calib1_min,-1000
+S,4123,calib1_max,1000
+S,4125,calib1_display,Disabled
+S,4127,calib1,-38093.00
+S,4129,calib2_min,-1000
+S,4131,calib2_max,1000
+S,4133,calib2_display,Disabled
+S,4136,calib2,-37926.89
+S,4139,calib3_min,-1000
+S,4141,calib3_max,1000
+S,4143,calib3_display,Disabled
+S,4146,calib3,114034.27
+S,4148,sensor0_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,4154,sensor0_display,Disabled
+S,4157,sensor0,BMP280
+S,4159,sensor1_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,4165,sensor1_display,Disabled
+S,4168,sensor1,BMP280
+S,4170,sensor2_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,4176,sensor2_display,Disabled
+S,4179,sensor2,BMP388
+S,4182,sensor3_dict,Unknown,Unknown,BMP388,BMP388,BMP280,BMP280,SPL06,SPL06
+S,4188,sensor3_display,Disabled
+S,4191,sensor3,BMP388
+S,4193,motorType_dict,Unknown,Unknown,AutoDetect,Start Motor Autodetection,BLDC,BLDC,Stepper,Stepper,Wiper,Wiper
+S,4203,motorType_display,Enabled
+S,4205,motorType,Unknown
+S,4208,motorSpeed_min,0
+S,4210,motorSpeed_max,255
+S,4212,motorSpeed_display,Enabled
+S,4215,motorSpeed,0
+S,4216,motorMinSpeed_min,0
+S,4219,motorMinSpeed_max,255
+S,4221,motorMinSpeed_display,Enabled
+S,4225,motorMinSpeed,150
+S,4228,motorHomingSpeed_min,0
+S,4230,motorHomingSpeed_max,255
+S,4233,motorHomingSpeed_display,Enabled
+S,4236,motorHomingSpeed,0
+S,4239,motorStepsPerRev_min,0
+S,4241,motorStepsPerRev_max,1600
+S,4244,motorStepsPerRev_display,Enabled
+S,4247,motorStepsPerRev,200
+S,4250,debug_dict,Disable,Disabled,Enable,Enabled
+S,4254,debug_display,Enabled
+S,4256,debug,Disable
+Q,4258,Finished

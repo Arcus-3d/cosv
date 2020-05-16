@@ -112,7 +112,6 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
   busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enableCbk);
   if (!busDeviceDetect(muxDevice))
   {
-    //debug(PSTR("Failed to find MUX on I2C, detecting enable pin"));
     busDeviceFree(muxDevice);
     return false;
   }
@@ -121,7 +120,6 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
   muxDevice->hwType = HWTYPE_MUX;
 
   detectEEPROM(wire, 0x54, 1, muxDevice, enableCbk);
-
 
   // Detect U5, U6
   detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enableCbk);
@@ -250,6 +248,9 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
   if (missing)
   {
     warning(PSTR("Sensors missing 0x%x"), missing);
+    sensorsFound = 0;
+    for (int x = 0; x < 4; x++)
+      busDeviceFree(sensors[x].busDev);
     return;
   }
 

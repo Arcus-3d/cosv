@@ -29,19 +29,18 @@ void busDeviceInit()
   memset(&devices, 0, sizeof(devices));
 }
 
+// Channel is the channel value for the mux chip
 static uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
 {
-  if (busDev && channel > 0 && channel < 5)
+  if (busDev && channel)
   {
     if (busDev->currentChannel != channel)
     {
       uint8_t error;
-
       busDev->busdev.i2c.i2cBus->beginTransmission(busDev->busdev.i2c.address);
-      busDev->busdev.i2c.i2cBus->write(1 << (channel - 1));
+      busDev->busdev.i2c.i2cBus->write(channel);
       error = busDev->busdev.i2c.i2cBus->endTransmission();
       busDev->currentChannel = channel;
-      // delay(1);
       return error;
     }
     return 0;
@@ -60,7 +59,7 @@ void busPrint(busDevice_t *bus, const char *function)
   }
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("%S(I2C: address=0x%x channel=%d refCount=%d)"), function, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
+    debug(PSTR("%S(I2C: bus=0x%x address=0x%x channel=%d refCount=%d)"), function, bus->busdev.i2c.i2cBus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
     return;
   }
 
@@ -94,12 +93,8 @@ busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, b
       dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
       dev->busdev.i2c.channelDev = channelDev;
       dev->refCount = 1;
-      busPrint(dev, PSTR("busDeviceInitI2C()"));
       if (channelDev)
-      {
         channelDev->refCount++;
-        busPrint(dev, PSTR("   busDeviceInitI2C() SUPPORTING MUX="));
-      }
       return dev;
     }
   }
@@ -153,8 +148,6 @@ bool busDeviceDetect(busDevice_t *busDev)
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    busPrint(busDev, PSTR("Detecting if present"));
-
     // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
     busDev->enableCbk(busDev, true);
     muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
@@ -162,11 +155,13 @@ bool busDeviceDetect(busDevice_t *busDev)
     wire->beginTransmission(address);
     error = wire->endTransmission();
 
+    busDev->enableCbk(busDev, false);
+
     if (error == 0)
       busPrint(busDev, PSTR("DETECTED!!!"));
     else
       busPrint(busDev, PSTR("MISSING..."));
-    busDev->enableCbk(busDev, false);
+
     return (error == 0);
   }
   else

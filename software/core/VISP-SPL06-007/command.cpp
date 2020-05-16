@@ -19,6 +19,8 @@
 
 #include "config.h"
 
+#define MAX_ARG_LENGTH 20
+
 typedef enum parser_state_e {
   PARSE_COMMAND,
   PARSE_IGNORE_TILL_LF,
@@ -80,7 +82,7 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
 
 struct dictionary_s {
   int theAssociatedValue; // -1 is END OF LIST marker
-  const char * PUTINFLASH theWord;
+  const char * PUTINFLASH theWord; // LIMIT OF 15 CHAR SIZE (see parser argument static character array definition) Do not use ',' or '_' in the words
   const char * PUTINFLASH theDescription;
 } ;
 
@@ -154,6 +156,25 @@ const struct dictionary_s motorTypeDict[] PUTINFLASH = {
 };
 
 
+char *currentModeStr(char *buff, int buffSize)
+{
+  struct dictionary_s dict = {0};
+  uint8_t d = 0;
+
+  do
+  {
+    // Must copy from flash to access it
+    memcpy_P(&dict, &modeDict[d], sizeof(dict));
+    d++;
+    if (dict.theWord)
+    {
+      if (dict.theAssociatedValue == currentMode)
+        strncpy_P(buff, dict.theWord, buffSize);
+    }
+  } while (dict.theWord);
+  return buff;
+}
+
 
 const char strBreathRatio2 [] PUTINFLASH = "1:2";
 const char strBreathRatio3 [] PUTINFLASH = "1:3";
@@ -190,6 +211,7 @@ struct settingsEntry_s {
   void * const data;
 };
 
+// So not use ',' or '_' in the names
 const char strMode [] PUTINFLASH = "mode";
 const char strDebug [] PUTINFLASH = "debug";
 const char strBodyType [] PUTINFLASH = "bodytype";
@@ -197,16 +219,16 @@ const char strBreathVolume [] PUTINFLASH = "volume";
 const char strBreathPressure [] PUTINFLASH = "pressure";
 const char strBreathRate [] PUTINFLASH = "rate";
 const char strBreathRatio [] PUTINFLASH = "ie"; // Inhale/exhale ratio
-const char strBreathThreshold [] PUTINFLASH = "breath_threshold";
+const char strBreathThreshold [] PUTINFLASH = "breathThreshold";
 const char strCalib0 [] PUTINFLASH = "calib0";
 const char strCalib1 [] PUTINFLASH = "calib1";
 const char strCalib2 [] PUTINFLASH = "calib2";
 const char strCalib3 [] PUTINFLASH = "calib3";
-const char strMotorType [] PUTINFLASH = "motor_type";
-const char strMotorMinSpeed[] PUTINFLASH = "motor_min_speed";
-const char strMotorHomingSpeed[] PUTINFLASH = "motor_homing_speed";
-const char strMotorSpeed[] PUTINFLASH = "motor_speed";
-const char strMotorStepsPerRev[] PUTINFLASH = "motor_steps_per_rev";
+const char strMotorType [] PUTINFLASH = "motorType";
+const char strMotorMinSpeed[] PUTINFLASH = "motorMinSpeed";
+const char strMotorHomingSpeed[] PUTINFLASH = "motorHomingSpeed";
+const char strMotorSpeed[] PUTINFLASH = "motorSpeed";
+const char strMotorStepsPerRev[] PUTINFLASH = "motorStepsPerRev";
 
 bool noSet(struct settingsEntry_s * entry, const char *arg);
 bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg);
@@ -586,7 +608,7 @@ void commandParser(int cmdByte)
 {
   static parser_state_e currentState = PARSE_COMMAND;
   static uint8_t theCommandByte = 0;
-  static char arg1[16] = "", arg2[16] = "";
+  static char arg1[MAX_ARG_LENGTH] = "", arg2[MAX_ARG_LENGTH] = ""; // MAX ARG LENGTH
   static uint8_t arg1Pos = 0, arg2Pos = 0;
   struct commandEntry_s entry = {0};
 
@@ -612,6 +634,10 @@ void commandParser(int cmdByte)
     theCommandByte = 0;
     return;
   }
+
+  // Ignore whitespace
+  if (isspace(cmdByte))
+    return;
 
   switch (currentState) {
     case PARSE_COMMAND:

@@ -238,7 +238,7 @@ const char strMotorMinSpeed[] PUTINFLASH = "motorMinSpeed";
 const char strMotorHomingSpeed[] PUTINFLASH = "motorHomingSpeed";
 const char strMotorSpeed[] PUTINFLASH = "motorSpeed";
 const char strMotorStepsPerRev[] PUTINFLASH = "motorStepsPerRev";
-
+const char strBPM[] PUTINFLASH = "bpm";
 const char strML[] PUTINFLASH = "mL";
 const char strCMH2O[] PUTINFLASH = "cmH2O";
 const char strPascals[] PUTINFLASH = "pascals";
@@ -275,20 +275,20 @@ void handleMotorSpeed(struct settingsEntry_s * entry)
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
-  {RESPOND_BREATH_RATE,         (MODE_ALL ^ MODE_MANUAL), strBreathRate, NULL, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
+  {RESPOND_BREATH_RATE,         (MODE_ALL ^ MODE_MANUAL), strBreathRate, strBPM, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
   {RESPOND_BREATH_RATIO,        (MODE_ALL ^ MODE_MANUAL), strBreathRatio, NULL, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
   {RESPOND_BREATH_VOLUME,       MODE_VCCMV | MODE_OFF, strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
   {RESPOND_BREATH_PRESSURE,     MODE_PCCMV | MODE_OFF, strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
   {RESPOND_BREATH_THRESHOLD,    MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
-  {RESPOND_BODYTYPE,            MODE_NONE, strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.bodyType},
+  {RESPOND_BODYTYPE,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.bodyType},
   {RESPOND_CALIB0,              MODE_NONE, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[0]},
   {RESPOND_CALIB1,              MODE_NONE, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[1]},
   {RESPOND_CALIB2,              MODE_NONE, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[2]},
   {RESPOND_CALIB3,              MODE_NONE, strCalib3, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[3]},
-  {RESPOND_SENSOR0,             MODE_NONE, strSensor0, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[0].sensorType},
-  {RESPOND_SENSOR1,             MODE_NONE, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
-  {RESPOND_SENSOR2,             MODE_NONE, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
-  {RESPOND_SENSOR3,             MODE_NONE, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
+  {RESPOND_SENSOR0,             MODE_ALL, strSensor0, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[0].sensorType},
+  {RESPOND_SENSOR1,             MODE_ALL, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
+  {RESPOND_SENSOR2,             MODE_ALL, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
+  {RESPOND_SENSOR3,             MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
   {RESPOND_MOTOR_TYPE,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, &motorType},
   {RESPOND_MOTOR_SPEED,         (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,       0, 100, NULL, verifyLimitsToInt8, respondInt8,    handleMotorSpeed, &motorSpeed},
   {RESPOND_MOTOR_MIN_SPEED,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,    0, 100, NULL, verifyLimitsToInt8, respondInt8, NULL, &motorMinSpeed},

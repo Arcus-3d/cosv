@@ -240,7 +240,7 @@ void timeToCheckSensors()
 }
 
 // Scales the analog input to a range.
-static int scaleAnalog(int analogIn, int minValue, int maxValue)
+int scaleAnalog(int analogIn, int minValue, int maxValue)
 {
   //float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
   //return minValue + (maxValue * percentage);

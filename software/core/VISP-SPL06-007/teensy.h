@@ -4,7 +4,8 @@
 #include <Wire.h>
 #include <SPI.h>
 
-#define hwSerial Serial1
+//#define hwSerial Serial1
+#define hwSerial Serial
 
 #include <IntervalTimer.h>
 

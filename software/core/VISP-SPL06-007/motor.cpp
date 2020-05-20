@@ -22,18 +22,20 @@
 
 // fyi: mystepper adds 3674 bytes of code and 94 bytes of ram, integrating the code saves us ~1K bytes of flash and 45 bytes of ram.
 // Flexibility has it's price...
+int scaleAnalog(int analogIn, int minValue, int maxValue);
 
 
 volatile bool motorFound = false;
 
 static bool motorWasGoingForward = false;
-int motorSpeed = 0;
+int8_t motorSpeed = 0; // 0->100 as a percentage
 static int8_t motorState = 0;
 
 int8_t motorType = -1;
-int motorHomingSpeed = 150;
-int motorMinSpeed = 150;
-int motorStepsPerRev = 200;
+int8_t motorHomingSpeed = 75; // 0->100 as a percentage
+int8_t motorMinSpeed = 60; // 0->100 as a percentage
+int16_t motorStepsPerRev = 200;
+int16_t STEPPER_MAX_SPEED = motorStepsPerRev*3;
 
 void hbridgeGo()
 {
@@ -72,17 +74,17 @@ void hbridgeStop()
   digitalWrite(MOTOR_HBRIDGE_R_EN, 0);
 
   motorSpeed = 0;
-  analogWrite(MOTOR_HBRIDGE_PWM, motorSpeed);
+  analogWrite(MOTOR_HBRIDGE_PWM, 0);
 }
 
 void hbridgeSpeedUp()
 {
-  if (motorSpeed < MAX_PWM)
+  if (motorSpeed < 100)
   {
     motorSpeed++;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    analogWrite(MOTOR_HBRIDGE_PWM, motorSpeed);
+    analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
   }
 }
 
@@ -93,7 +95,7 @@ void hbridgeSlowDown()
     motorSpeed--;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    analogWrite(MOTOR_HBRIDGE_PWM, motorSpeed);
+    analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
   }
 }
 
@@ -112,28 +114,28 @@ void bldcReverseDirection()
     delay(10);
 
   digitalWrite(MOTOR_BLDC_DIR, (motorWasGoingForward ? LOW : HIGH));
-  analogWrite(MOTOR_BLDC_PWM, motorSpeed);
+  analogWrite(MOTOR_BLDC_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
 }
 
 void bldcStop()
 {
   motorSpeed = 0;
-  analogWrite(MOTOR_BLDC_PWM, motorSpeed);
+  analogWrite(MOTOR_BLDC_PWM, 0);
 }
 
 void bldcGo()
 {
-  analogWrite(MOTOR_BLDC_PWM, motorSpeed);
+  analogWrite(MOTOR_BLDC_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
 }
 
 void bldcSpeedUp()
 {
-  if (motorSpeed < MAX_PWM)
+  if (motorSpeed <= 100)
   {
     motorSpeed++;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    analogWrite(MOTOR_BLDC_PWM, motorSpeed);
+    analogWrite(MOTOR_BLDC_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
   }
 }
 
@@ -144,7 +146,7 @@ void bldcSlowDown()
     motorSpeed--;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    analogWrite(MOTOR_BLDC_PWM, motorSpeed);
+    analogWrite(MOTOR_BLDC_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
   }
 }
 
@@ -177,17 +179,19 @@ void stepperRun()
 
 void stepperGo()
 {
-  stepper_setSpeed((motorWasGoingForward ? motorSpeed : -motorSpeed));
+  int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
+  stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
 }
 
 void stepperSpeedUp()
 {
-  if (motorSpeed < MAX_PWM)
+  if (motorSpeed <= 100)
   {
     motorSpeed++;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    stepper_setSpeed((motorWasGoingForward ? motorSpeed : -motorSpeed));
+    int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
+    stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
   }
 }
 
@@ -198,7 +202,8 @@ void stepperSlowDown()
     motorSpeed--;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    stepper_setSpeed((motorWasGoingForward ? motorSpeed : -motorSpeed));
+    int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
+    stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
   }
 }
 
@@ -366,7 +371,7 @@ void motorSetup()
   digitalWrite(MOTOR_PIN_PWM, LOW);
 
   stepper_setAcceleration(2000);
-  stepper_setMaxSpeed(motorStepsPerRev * 3);
+  stepper_setMaxSpeed(STEPPER_MAX_SPEED);
   stepper_setSpeed(0);
   stepper_disableOutputs();
 

@@ -78,9 +78,10 @@ void clearCalibrationData();
 
 // Motor specific configurations
 
-#define WIPER_SWEEP_SPEED 150 // Ford F150 motor wiper
-#define STEPPER_SWEEP_SPEED 128
-#define BLDC_SWEEP_SPEED   128
+// percentage as 0->100 of MAX_PWM
+#define WIPER_SWEEP_SPEED   65 // Ford F150 motor wiper
+#define STEPPER_SWEEP_SPEED 50
+#define BLDC_SWEEP_SPEED    50
 
 // ok, we can have a simple H bridge  HiLetGo BTS7960
 #define MOTOR_HBRIDGE_R_EN    MOTOR_PIN_B   // R_EN: forware drive enable input, high-level enable, low level off  (ACTIVE_HIGH)

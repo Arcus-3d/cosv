@@ -46,9 +46,9 @@ extern motorFunction motorRun; // call in loop()
 
 
 extern int8_t motorType;
-extern int motorHomingSpeed;
-extern int motorMinSpeed;
-extern int motorStepsPerRev;
-extern int motorSpeed;
+extern int8_t motorHomingSpeed; // 0->100 as a percentage
+extern int8_t motorMinSpeed;    // 0->100 as a percentage
+extern int8_t motorSpeed;       // 0->100 as a percentage
+extern int16_t motorStepsPerRev;
 
 #endif

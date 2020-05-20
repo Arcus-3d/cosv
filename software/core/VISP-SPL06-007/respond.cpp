@@ -53,6 +53,9 @@ void respond(char command, PGM_P fmt, ...)
       // I don't know why, but the switch statement was not working for me
       if (c == '%') {
         hwSerial.print(c);
+      } else if (c == 'c') {
+        const char ch = va_arg(va, int);
+        hwSerial.print(ch);
       } else if (c == 'd') {
         const int d = va_arg(va, int);
         hwSerial.print(d);
@@ -66,7 +69,7 @@ void respond(char command, PGM_P fmt, ...)
         const char *S = va_arg(va, const char *);
         printp(S);
       } else if (c == 's') {
-        const char *s = va_arg(va, const char *);
+        char *s = va_arg(va, char *);
         hwSerial.print(s);
       } else if (c == 'f') {
         double f = va_arg(va, double);

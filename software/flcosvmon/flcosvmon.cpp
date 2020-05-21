@@ -18,6 +18,11 @@
 */
 
 
+// TODO: timer to go bad if we stop hearing from the core
+// TODO: reconnect to serial if it goes away
+// TODO: adjustable amount of time on the charts?  Currently fixed at 15 seconds
+// TODO: critical alerts need to be displayed somewhere (titlebar?)
+
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Double_Window.H>
@@ -48,7 +53,7 @@
 
 
 #define MAX_CHARTS 3
-#define MAX_CHART_SIZE 40*60 /* 1 minute on the display */
+#define MAX_CHART_TIME 20000 /* 20 seconds on the display */
 
 #define BUTTON_WIDTH 100
 #define BUTTON_HEIGHT 60
@@ -251,6 +256,30 @@ Fl_Color lookupColor(const char *name)
 }     
 
 
+// 'X' overlay the whole window if the core is missing or reports being 'bad'
+class My_Double_Window : public Fl_Double_Window {
+public:
+    bool isBad;
+    My_Double_Window(int X, int Y, int W, int H, const char*L=0) : Fl_Double_Window(X,Y,W,H,L) {
+      isBad=true;
+    }
+    void setBad() { isBad=true; redraw(); }
+    void setGood() { isBad=false; redraw(); }
+    
+    void draw() {
+        Fl_Double_Window::draw();
+        if (isBad)
+        {
+          // DRAW RED 'X'
+          fl_color(FL_RED);
+          int x1 = 0,       y1 = 0;
+          int x2 = w()-1, y2 = h()-1;
+          fl_line(x1, y1, x2, y2);
+          fl_line(x1, y2, x2, y1);
+        }
+    }
+};
+
 
 class FL_EXPORT My_Button : public Fl_Button {
 protected:
@@ -427,6 +456,7 @@ typedef struct core_s {
     int sentQ;
     dynamic_button_t *button_list;
 
+    My_Double_Window *win;
     Fl_Pack *packedButtons;
     Fl_Pack *packedStatusItems;
 
@@ -453,9 +483,10 @@ void bufferAppend(buffer_t *buffer, char ch)
        buffer->data[buffer->size] = 0;
 }
 
-void setHealth(int isGood)
+void setHealth(core_t *core, int isGood)
 {
   // if !isGood, big red X on screen, or red banner, whatever
+  if (isGood) core->win->setGood(); else core->win->setBad();
 }
 
 dynamic_button_t *buttonLookup(core_t *core, char *settingName)
@@ -782,7 +813,7 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   {
   case 'H': // Health check ("good" or "bad")
       if (currentArgIndex==1)
-          setHealth(strncasecmp(argBuffer->data, "good", argBuffer->size)==0);
+          setHealth(core, strncasecmp(argBuffer->data, "good", argBuffer->size)==0);
 
       // Let's request everything in a batch
       if (core->sentQ==0)
@@ -937,8 +968,7 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     Fl::reload_scheme();
     Fl::set_color(FL_SELECTION_COLOR, 200, 200, 200); // the default selection/highlight color
 
-
-    Fl_Double_Window *win = new Fl_Double_Window(w, h, label);
+    core->win = new My_Double_Window((Fl::w() - w)/2, (Fl::h() - h)/2, w, h, label);
     Fl_Pack   *packedAll = new Fl_Pack(0,0,w,h);
     Fl_Pack   *packedTop = new Fl_Pack(0,0,w,(h-1)-BUTTON_HEIGHT);
     Fl_Group  *groupedCharts = new Fl_Group(0,0,w-BUTTON_WIDTH,h-BUTTON_HEIGHT);
@@ -949,7 +979,7 @@ void makeWindow(core_t *core, int w, int h, const char *label)
         core->flCharts[x]->bounds(charts[x].minRange, charts[x].maxRange);
         core->flCharts[x]->threshold(charts[x].waterLevel);
         core->flCharts[x]->thresholdcolor(FL_RED);
-        core->flCharts[x]->maxtime(15000); // In milliseconds
+        core->flCharts[x]->maxtime(MAX_CHART_TIME); // In milliseconds
         core->flCharts[x]->align(FL_ALIGN_CENTER|FL_ALIGN_TOP|FL_ALIGN_INSIDE);
         core->flCharts[x]->labelsize(16);
     }
@@ -982,9 +1012,8 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     packedAll->add(packedTop);
     packedAll->add(scrollButtons);
     packedAll->resizable(packedTop);
-    win->resizable(packedAll);
-    win->position((Fl::w() - w)/2, (Fl::h() - h)/2);
-    win->show();
+    core->win->resizable(packedAll);
+    core->win->show();
 }
 
 void HandleFD(int fd, void *data)
@@ -1026,6 +1055,8 @@ int main(int argc, char **argv) {
         openSerial(&core,"/dev/ttyACM0");
     if (core.fd==-1)
         openSerial(&core,"/dev/ttyUSB0");
+
+    Fl::visual(FL_DOUBLE|FL_INDEX); // dbe support
 
     makeWindow(&core, 800,480, core.title);
 

@@ -414,9 +414,9 @@ void sliderChanged(Fl_Widget *w, void *data)
 // Simple slider bar set to current strtoul(b->textValue); with ninRange/maxRange values
 void popupRangeSelection(core_t *core, dynamic_button_t *b)
 {
-  MyPopupWindow *popup = new MyPopupWindow(0,0,300, 80, b->name);
+  MyPopupWindow *popup = new MyPopupWindow(0,0,300, BUTTON_HEIGHT, b->name);
 
-  Fl_Value_Slider *slider = new Fl_Value_Slider(0,0,300,80);
+  Fl_Value_Slider *slider = new Fl_Value_Slider(0,0,300,BUTTON_HEIGHT);
   slider->bounds(b->minRange, b->maxRange);
   slider->type(FL_HOR_NICE_SLIDER);
   slider->value(atoi(b->textValue));
@@ -454,8 +454,8 @@ void popupDictionarySelection(core_t *core, dynamic_button_t *b)
 
   if (count)
   {
-    MyPopupWindow *popup = new MyPopupWindow(0,0,300, count*80, b->name);
-    Fl_Pack *packer = new Fl_Pack(0,0,300, count*80);
+    MyPopupWindow *popup = new MyPopupWindow(0,0,300, count*BUTTON_HEIGHT, b->name);
+    Fl_Pack *packer = new Fl_Pack(0,0,300, count*BUTTON_HEIGHT);
     packer->type(Fl_Pack::VERTICAL);
     for (dictionary_t *d=b->dictionary; d; d=d->next)
     {

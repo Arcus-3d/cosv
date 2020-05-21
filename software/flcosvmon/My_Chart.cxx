@@ -40,15 +40,23 @@ static void draw_timechart(int x,int y,int w,int h,
   int i;
   double lh = fl_height();
   double incr;
+  int W=0, H=0;
+
+  fl_measure("9999", W, H, 0);
+  x+=W; // Shift over to make room for the left labels
+  w-=W;
+
   if (max == min) incr = h-2.0*lh;
   else incr = (h-2.0*lh)/ (max-min);
   int zeroh = (int)rint(y+h-lh+min * incr);
   int thresholdh =  zeroh - (int)rint(threshold * incr);
   double pixelsPerMilli = (double)w/(double)(maxtime);
+  char str[16];
 
-  /* Draw base line */
-  fl_color(textcolor);
-  fl_line(x,zeroh,x+w,zeroh);
+
+  // /* Draw base line */
+  // fl_color(textcolor);
+  // fl_line(x,zeroh,x+w,zeroh);
 
   /* Draw the threshold */
   if ((threshold>min && threshold<max) && (thresholdh!=zeroh))
@@ -57,9 +65,24 @@ static void draw_timechart(int x,int y,int w,int h,
     fl_line_style(FL_DASH); // Because of how line styles are implemented on WIN32 systems, you must set the line style after setting the drawing color.
     fl_line(x,thresholdh,x+w,thresholdh);
     fl_line_style(FL_SOLID);
+    snprintf(str,sizeof(str), "%.0f", threshold);
+    fl_draw(str, x, thresholdh ,0,0,  FL_ALIGN_CENTER|FL_ALIGN_RIGHT);
   }
 
   /* Draw the left scale */
+  // Draw min, max, and zero if it is not min or max
+  
+  fl_color(textcolor);
+  snprintf(str,sizeof(str), "%.0f", min);
+  fl_draw(str, x,  zeroh - (int)rint(min*incr),0,0,  FL_ALIGN_CENTER|FL_ALIGN_RIGHT);
+  snprintf(str,sizeof(str), "%.0f", max);
+  fl_draw(str, x,  zeroh - (int)rint(max*incr),0,0,  FL_ALIGN_CENTER|FL_ALIGN_RIGHT);
+  if (min!=0.0)
+  {
+    snprintf(str,sizeof(str), "0");
+    fl_draw(str, x,  zeroh,0,0,  FL_ALIGN_CENTER|FL_ALIGN_RIGHT);
+  }
+
 
   /* Draw the bottom scale */
   // ok, we are going to work backwards in time
@@ -70,7 +93,6 @@ static void draw_timechart(int x,int y,int w,int h,
   fl_color(textcolor);
   for (i=(maxtime-1000); i>0; i-=1000)
   {
-      char str[16];
       unsigned theTime = maxtime-i;
       snprintf(str,sizeof(str),"-%d",i/1000);
       fl_draw(str,
@@ -84,17 +106,14 @@ static void draw_timechart(int x,int y,int w,int h,
   if (numb)
   {
     unsigned latestMillis = entries[numb-1].millis;
-    for (i=0; i<numb; i++) {
-      int x0 = x + (i ? (int)rint((maxtime-(latestMillis-entries[i-1].millis))*pixelsPerMilli) : 0);
+    for (i=1; i<numb; i++) {
+      int x0 = x + (int)rint((maxtime-(latestMillis-entries[i-1].millis))*pixelsPerMilli);
       int x1 = x + (int)rint((maxtime-(latestMillis-entries[i].millis))*pixelsPerMilli);
-      int yy0 = i ? zeroh - (int)rint(entries[i-1].val*incr) : 0;
+      int yy0 = zeroh - (int)rint(entries[i-1].val*incr);
       int yy1 = zeroh - (int)rint(entries[i].val*incr);
 
-      if (i)
-      {
-        fl_color((Fl_Color)entries[i-1].col);
-        fl_line(x0,yy0,x1,yy1);
-      }
+      fl_color((Fl_Color)entries[i-1].col);
+      fl_line(x0,yy0,x1,yy1);
     }
   }
 
@@ -103,7 +122,7 @@ static void draw_timechart(int x,int y,int w,int h,
   if (numb)
   {
     unsigned latestMillis = entries[numb-1].millis;
-    for (i=0; i<numb; i++)
+    for (i=1; i<numb; i++)
       if (entries[i].str)
         fl_draw(entries[i].str,
                 x + (int)rint((maxtime-(latestMillis-entries[i].millis))*pixelsPerMilli),
@@ -206,7 +225,7 @@ void My_Chart::add(unsigned millis, double val, const char *str, unsigned col) {
   }
 
   // Shift entries as needed (we have a max time for this chart)
-  while (numb && ((entries[0].millis)+(maxtime_)) < entries[numb-1].millis) {
+  while (numb && ((entries[0].millis)+(maxtime_)) <= millis) {
     if (entries[0].str)
       free(entries[0].str);
     memmove(entries, entries + 1, sizeof(FL_CHART_ENTRY) * (numb - 1));

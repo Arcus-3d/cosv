@@ -428,6 +428,7 @@ typedef struct dynamic_button_s {
     char *name;
     int isButton; // one of 2 groups we can be, "status" or "button"
     int enabled;  // Input is enabled or disabled
+    int isBad;    // Individual buttons can be good/bad (like unknown motor, or too much volume)
     dictionary_t *dictionary; // For dictionary types
     char *textValue; // For dictionary types
     char *units;     // Units told to us by the core
@@ -694,8 +695,6 @@ void refreshIcons(core_t *core)
 
             b->flButton->box(FL_RFLAT_BOX);    // buttons won't have 'edges'
             // If a color is sent from the core, and it is not 'empty', use the core defined color, else, our own
-            b->flButton->color(b->bgcolor && *b->bgcolor ? lookupColor(b->bgcolor) : lookupColor("Gray"));
-            b->flButton->labelcolor(b->fgcolor && *b->fgcolor ? lookupColor(b->fgcolor) : lookupColor("SkyBlue"));
             b->flButton->labelsize(24);
             if (b->isButton)
             {
@@ -712,6 +711,8 @@ void refreshIcons(core_t *core)
         b->flButton->name(b->name);
         b->flButton->label(b->textValue);
         b->flButton->units(b->units);
+        b->flButton->color(b->bgcolor && *b->bgcolor ? lookupColor(b->bgcolor) : (b->isBad ? lookupColor("DarkRed") :  lookupColor("Gray")));
+        b->flButton->labelcolor(b->fgcolor && *b->fgcolor ? lookupColor(b->fgcolor) : (b->isBad ? lookupColor("White") : lookupColor("SkyBlue")));
 
         if (b->enabled)
            b->flButton->show();
@@ -731,17 +732,17 @@ void refreshIcons(core_t *core)
 }
 
 
-#define SETTING_UNKNOWN 0
-#define SETTING_VALUE   1
-#define SETTING_MIN     2
-#define SETTING_MAX     3
-#define SETTING_DICT    4
-#define SETTING_GROUP   5
-#define SETTING_ENABLED 6
-#define SETTING_UNITS   7
-#define SETTING_BGCOLOR 8
-#define SETTING_FGCOLOR 9
-
+#define SETTING_UNKNOWN  0
+#define SETTING_VALUE    1
+#define SETTING_MIN      2
+#define SETTING_MAX      3
+#define SETTING_DICT     4
+#define SETTING_GROUP    5
+#define SETTING_ENABLED  6
+#define SETTING_UNITS    7
+#define SETTING_BGCOLOR  8
+#define SETTING_FGCOLOR  9
+#define SETTING_STATUS  10
 void processSetting(core_t *core, char *settingName, int argIndex, buffer_t *arg)
 {
     int len=strlen(settingName);
@@ -795,6 +796,10 @@ void processSetting(core_t *core, char *settingName, int argIndex, buffer_t *arg
         if (button->fgcolor)
             free(button->fgcolor);
         button->fgcolor=strdup(arg->data);
+        refreshIcons(core);
+        break;
+    case SETTING_STATUS:
+        button->isBad = (strcasecmp(arg->data,"good")!=0);
         refreshIcons(core);
         break;
     }
@@ -877,6 +882,8 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
                core->settingType = SETTING_BGCOLOR;
            else if (strcasecmp(argBuffer->data,"fgcolor")==0)
                core->settingType = SETTING_FGCOLOR;
+           else if (strcasecmp(argBuffer->data,"status")==0) // Individual buttons can be good/bad
+               core->settingType = SETTING_STATUS;
           else
               core->settingType = SETTING_UNKNOWN;
            break;

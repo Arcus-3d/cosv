@@ -396,10 +396,14 @@ void respondInt16(struct settingsEntry_s * entry)
 }
 void respondFloat(struct settingsEntry_s * entry)
 {
-  char buff[32];
-  *buff = 0;
-  dtostrf(*(float*)entry->data, 7, 2, buff);
-  respond('S', PSTR("%S,value,%s"), entry->theName, buff);
+  hwSerial.print('S');
+  hwSerial.print(',');
+  hwSerial.print(millis());
+  hwSerial.print(',');
+  printp(entry->theName);
+  printp(PSTR(",value,"));
+  hwSerial.print(*(float*)entry->data, 4);
+  hwSerial.println();
 }
 
 void respondInt8ToDict(struct settingsEntry_s * entry)

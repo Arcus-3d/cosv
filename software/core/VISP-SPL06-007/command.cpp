@@ -113,8 +113,7 @@ const char strBMP280 [] PUTINFLASH = "BMP280";
 const char strSPL06 [] PUTINFLASH = "SPL06";
 const char strOff [] PUTINFLASH = "OFF";
 const char strModeOffDesc [] PUTINFLASH = "Offline";
-const char strBldc [] PUTINFLASH = "BLDC";
-const char strWiper [] PUTINFLASH = "Wiper";
+const char strHBridge [] PUTINFLASH = "HBridge";
 const char strStepper [] PUTINFLASH = "Stepper";
 const char strAutoDetect [] PUTINFLASH = "AutoDetect";
 const char strAutoDetectDesc [] PUTINFLASH = "Start Motor Autodetection";
@@ -131,7 +130,7 @@ const struct dictionary_s modeDict[] PUTINFLASH = {
   {MODE_OFF,     strOff,     strModeOffDesc},
   {MODE_PCCMV,   strPCCMV,   strPCCMVdesc},
   {MODE_VCCMV,   strVCCMV,   strVCCMVdesc},
-//  {MODE_MANUAL,  strManual,  strManualdesc},  // No manual mode setting from the interface
+  //  {MODE_MANUAL,  strManual,  strManualdesc},  // No manual mode setting from the interface
   { -1, NULL, NULL}
 };
 
@@ -157,9 +156,8 @@ const struct dictionary_s bodyDict[] PUTINFLASH = {
 const struct dictionary_s motorTypeDict[] PUTINFLASH = {
   {MOTOR_UNKNOWN, strUnknown, strUnknown},
   {MOTOR_AUTODETECT, strAutoDetect,   strAutoDetectDesc},
-  {MOTOR_BLDC,     strBldc,   strBldc},
+  {MOTOR_HBRIDGE,    strHBridge,   strHBridge},
   {MOTOR_STEPPER, strStepper, strStepper},
-  {MOTOR_WIPER,   strWiper,   strWiper},
   { -1, NULL, NULL}
 };
 
@@ -217,6 +215,7 @@ struct settingsEntry_s {
   const verifyCallback  verifyIt;
   const respondCallback respondIt;
   const respondCallback actionIt;
+  const respondCallback handleGood;
   void * const data;
 };
 
@@ -271,30 +270,40 @@ void handleMotorSpeed(struct settingsEntry_s * entry)
   motorGo();
 }
 
+// Buttons can now be good/bad to reflect what is wrong with the core
+void handleMotorGood(struct settingsEntry_s * entry)
+{
+    respond('S', PSTR("%S,status,%S"), entry->theName, motorFound ? PSTR("good") : PSTR("bad"));
+}
 
+// Buttons can now be good/bad to reflect what is wrong with the core
+void handleSensorGood(struct settingsEntry_s * entry)
+{
+    respond('S', PSTR("%S,status,%S"), entry->theName, sensorsFound ? PSTR("good") : PSTR("bad"));
+}
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
-  {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, &currentMode},
-  {RESPOND_BREATH_RATE,         (MODE_ALL ^ MODE_MANUAL), strBreathRate, strBPM, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, &visp_eeprom.breath_rate},
-  {RESPOND_BREATH_RATIO,        (MODE_ALL ^ MODE_MANUAL), strBreathRatio, NULL, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.breath_ratio},
-  {RESPOND_BREATH_VOLUME,       MODE_VCCMV | MODE_OFF, strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, &visp_eeprom.breath_volume},
-  {RESPOND_BREATH_PRESSURE,     MODE_PCCMV | MODE_OFF, strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_pressure},
-  {RESPOND_BREATH_THRESHOLD,    MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, &visp_eeprom.breath_threshold},
-  {RESPOND_BODYTYPE,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &visp_eeprom.bodyType},
-  {RESPOND_CALIB0,              MODE_NONE, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[0]},
-  {RESPOND_CALIB1,              MODE_NONE, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[1]},
-  {RESPOND_CALIB2,              MODE_NONE, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[2]},
-  {RESPOND_CALIB3,              MODE_NONE, strCalib3, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, &calibrationOffsets[3]},
-  {RESPOND_SENSOR0,             MODE_ALL, strSensor0, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[0].sensorType},
-  {RESPOND_SENSOR1,             MODE_ALL, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[1].sensorType},
-  {RESPOND_SENSOR2,             MODE_ALL, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[2].sensorType},
-  {RESPOND_SENSOR3,             MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, &sensors[3].sensorType},
-  {RESPOND_MOTOR_TYPE,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, &motorType},
-  {RESPOND_MOTOR_SPEED,         (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,       0, 100, NULL, verifyLimitsToInt8, respondInt8,    handleMotorSpeed, &motorSpeed},
-  {RESPOND_MOTOR_MIN_SPEED,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,    0, 100, NULL, verifyLimitsToInt8, respondInt8, NULL, &motorMinSpeed},
-  {RESPOND_MOTOR_HOMING_SPEED,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed,strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, NULL, &motorHomingSpeed},
-  {RESPOND_MOTOR_STEPS_PER_REV, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, handleMotorChange, &motorStepsPerRev},
-  {RESPOND_DEBUG,               (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, &debug},
+  {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, NULL, &currentMode},
+  {RESPOND_BREATH_RATE,         (MODE_ALL ^ MODE_MANUAL), strBreathRate, strBPM, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &visp_eeprom.breath_rate},
+  {RESPOND_BREATH_RATIO,        (MODE_ALL ^ MODE_MANUAL), strBreathRatio, NULL, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &visp_eeprom.breath_ratio},
+  {RESPOND_BREATH_VOLUME,       MODE_VCCMV | MODE_OFF, strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, NULL, &visp_eeprom.breath_volume},
+  {RESPOND_BREATH_PRESSURE,     MODE_PCCMV | MODE_OFF, strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &visp_eeprom.breath_pressure},
+  {RESPOND_BREATH_THRESHOLD,    MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &visp_eeprom.breath_threshold},
+  {RESPOND_BODYTYPE,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &visp_eeprom.bodyType},
+  {RESPOND_CALIB0,              MODE_NONE, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[0]},
+  {RESPOND_CALIB1,              MODE_NONE, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[1]},
+  {RESPOND_CALIB2,              MODE_NONE, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[2]},
+  {RESPOND_CALIB3,              MODE_NONE, strCalib3, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[3]},
+  {RESPOND_SENSOR0,             MODE_ALL, strSensor0, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[0].sensorType},
+  {RESPOND_SENSOR1,             MODE_ALL, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[1].sensorType},
+  {RESPOND_SENSOR2,             MODE_ALL, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[2].sensorType},
+  {RESPOND_SENSOR3,             MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[3].sensorType},
+  {RESPOND_MOTOR_TYPE,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, handleMotorGood, &motorType},
+  {RESPOND_MOTOR_SPEED,         (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,       0, 100, NULL, verifyLimitsToInt8, respondInt8,    handleMotorSpeed, NULL, &motorSpeed},
+  {RESPOND_MOTOR_MIN_SPEED,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,    0, 100, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &motorMinSpeed},
+  {RESPOND_MOTOR_HOMING_SPEED,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &motorHomingSpeed},
+  {RESPOND_MOTOR_STEPS_PER_REV, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, handleMotorChange, NULL, &motorStepsPerRev},
+  {RESPOND_DEBUG,               (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &debug},
   {0, MODE_NONE,  NULL, NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
 
@@ -450,7 +459,11 @@ void respondSettingLimits(struct settingsEntry_s * entry)
 
   // Any special units we need to display in the button?
   if (entry->theUnits)
-      respond('S', PSTR("%S,units,%S"), entry->theName, entry->theUnits);
+    respond('S', PSTR("%S,units,%S"), entry->theName, entry->theUnits);
+
+  if (entry->handleGood)
+    entry->handleGood(entry);
+
 }
 
 void respondEnabled(struct settingsEntry_s * entry)
@@ -532,6 +545,8 @@ void handleSettingCommand(const char *arg1, const char *arg2)
           // Maybe enable a motor or something?
           if (entry.actionIt)
             entry.actionIt(&entry);
+          if (entry.handleGood)
+            entry.handleGood(&entry);
           return;
         }
         else

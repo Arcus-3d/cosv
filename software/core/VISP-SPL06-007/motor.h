@@ -22,9 +22,8 @@
 
 #define MOTOR_UNKNOWN    -1
 #define MOTOR_AUTODETECT  0
-#define MOTOR_BLDC        1
+#define MOTOR_HBRIDGE     1
 #define MOTOR_STEPPER     2
-#define MOTOR_WIPER       3
 
 
 extern volatile bool motorFound;

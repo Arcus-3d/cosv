@@ -379,8 +379,10 @@ void    stepper_disableOutputs()
 void    stepper_enableOutputs()
 {
   pinMode(MOTOR_STEPPER_STEP, OUTPUT);
+  
   pinMode(MOTOR_STEPPER_DIR, OUTPUT);
-
+  digitalWrite(MOTOR_STEPPER_DIR, LOW); // We do this, for motor detection, so we don't fry the HBridge
+  
   pinMode(MOTOR_STEPPER_ENABLE, OUTPUT);
   digitalWrite(MOTOR_STEPPER_ENABLE, LOW);
 }

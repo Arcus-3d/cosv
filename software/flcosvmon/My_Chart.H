@@ -27,13 +27,13 @@
 #endif
 
 #define FL_CHART_MAX		128	/**< max entries per chart */
-#define FL_CHART_LABEL_MAX	18	/**< max label length for entry */
 
 /** For internal use only */
 struct FL_CHART_ENTRY {
+   unsigned millis;                     /**< for internal use only. */
    float val;				/**< For internal use only. */
    unsigned col;			/**< For internal use only. */
-   char str[FL_CHART_LABEL_MAX+1];	/**< For internal use only. */
+   char *str;				/**< For internal use only. */
 };
 
 /**
@@ -46,14 +46,15 @@ struct FL_CHART_ENTRY {
  */
 class FL_EXPORT My_Chart : public Fl_Widget {
     int numb;
-    int maxnumb;
+    unsigned maxtime_;
     int sizenumb;
     FL_CHART_ENTRY *entries;
     double min,max;
-    uchar autosize_;
+    double threshold_;
     Fl_Font textfont_;
     Fl_Fontsize textsize_;
     Fl_Color textcolor_;
+    Fl_Color thresholdcolor_;
 protected:
     void draw();
 public:
@@ -63,19 +64,16 @@ public:
 
     void clear();
 
-    void add(double val, const char *str = 0, unsigned col = 0);
-
-    void insert(int ind, double val, const char *str = 0, unsigned col = 0);
-
-    void replace(int ind, double val, const char *str = 0, unsigned col = 0);
+    void add(unsigned millis, double val, const char *str = 0, unsigned col = 0);
 
     /**
       Gets the lower and upper bounds of the chart values.
       \param[out] a, b are set to lower, upper
      */
     void bounds(double *a,double *b) const {*a = min; *b = max;}
-
     void bounds(double a,double b);
+    void threshold(double *a) {*a = threshold_;}
+    void threshold(double a) {threshold_=a; redraw();}
 
     /**
       Returns the number of data values in the chart.
@@ -85,11 +83,10 @@ public:
     void size(int W, int H) { Fl_Widget::size(W, H); }
 
     /**
-      Gets the maximum number of data values for a chart.
+      Gets the maximum amount of time for a chart.
      */
-    int maxsize() const {return maxnumb;}
-
-    void maxsize(int m);
+    unsigned maxtime() const {return maxtime_;}
+    void maxtime(unsigned m) {maxtime_ = m; redraw(); }
 
     /** Gets the chart's text font */
     Fl_Font textfont() const {return textfont_;}
@@ -106,17 +103,12 @@ public:
     /** gets the chart's text color to \p n. */
     void textcolor(Fl_Color n) {textcolor_ = n;}
 
-    /**
-      Get whether the chart will automatically adjust the bounds of the chart.
-      \returns non-zero if auto-sizing is enabled and zero if disabled.
-     */
-    uchar autosize() const {return autosize_;}
 
-    /**
-      Set whether the chart will automatically adjust the bounds of the chart.
-      \param[in] n non-zero to enable automatic resizing, zero to disable.
-     */
-    void autosize(uchar n) {autosize_ = n;}
+    /** Gets the chart's threshold color */
+    Fl_Color thresholdcolor() const {return thresholdcolor_;}
+    /** gets the chart's text color to \p n. */
+    void thresholdcolor(Fl_Color n) {thresholdcolor_ = n;}
+
 };
 
 #endif

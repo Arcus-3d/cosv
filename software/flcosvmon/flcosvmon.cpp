@@ -223,7 +223,7 @@ typedef struct chart_s {
 } chart_t;
 
 chart_t charts[MAX_CHARTS] = {
-{"Pressure", -10, 40, 40, FL_RED},
+{"Pressure", -10, 40, 40, FL_YELLOW},
 {"Volume", -80, 80, 80, FL_GREEN},
 {"Tidal Volume", 0, 800, 600, FL_BLUE}
 };
@@ -258,6 +258,7 @@ typedef struct core_s {
     const char *title; // title of this patient/stream
     buffer_t streamData;
     int cmdTime; // 32-bit millis() since the core started
+    int lastCmdTime; // 32-bit millis() since the core started
     char *settingName; // For use in command processing strdup()'ed
     int settingType;
     int sentQ;
@@ -625,12 +626,16 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'g': // debug log output
       break;
   case 'd': // data
+      if (core->sentQ)
       switch(currentArgIndex)
       {
       case 1: // Pressure
       case 2: // Volume
       case 3: // Tidal Volume
-          core->flCharts[currentArgIndex-1]->add(atof(argBuffer->data), NULL, charts[currentArgIndex-1].color);
+          // Detect milli wrap or core reboot (clear array when millis go back in time)
+          if (core->lastCmdTime > core->cmdTime)
+              core->flCharts[currentArgIndex-1]->clear();
+          core->flCharts[currentArgIndex-1]->add(core->cmdTime, atof(argBuffer->data), NULL, charts[currentArgIndex-1].color);
           break;
       default: // Debug output follows
           break;
@@ -719,6 +724,7 @@ void processCommand(core_t *core)
 
     // Clear the input buffer
     core->streamData.size=0;
+    core->lastCmdTime = core->cmdTime;
 }
 
 void processSerialInput(core_t *core, char ch)
@@ -759,16 +765,11 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     {
         core->flCharts[x] = new My_Chart(0, ((h-BUTTON_HEIGHT)/3)*x, w-BUTTON_WIDTH, ((h-BUTTON_HEIGHT)/3), charts[x].name);
         core->flCharts[x]->bounds(charts[x].minRange, charts[x].maxRange);
-        core->flCharts[x]->maxsize(MAX_CHART_SIZE);
+        core->flCharts[x]->threshold(charts[x].waterLevel);
+        core->flCharts[x]->thresholdcolor(FL_RED);
+        core->flCharts[x]->maxtime(15000); // In milliseconds
         core->flCharts[x]->align(FL_ALIGN_CENTER|FL_ALIGN_TOP|FL_ALIGN_INSIDE);
         core->flCharts[x]->labelsize(16);
-        
-        if (charts[x].minRange<=0 && charts[x].maxRange>=0)
-           for (int y=0; y<MAX_CHART_SIZE; y++)
-               core->flCharts[x]->add(0, NULL, charts[x].color);
-        else
-           for (int y=0; y<MAX_CHART_SIZE; y++)
-               core->flCharts[x]->add(charts[x].minRange, NULL, charts[x].color);
     }
 
     Fl_Scroll *scrollButtons = new Fl_Scroll(0,(h-1)-BUTTON_HEIGHT, w, BUTTON_HEIGHT+1);

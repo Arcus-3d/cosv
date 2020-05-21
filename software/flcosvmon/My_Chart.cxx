@@ -30,10 +30,10 @@ void fl_rectbound(int x,int y,int w,int h, Fl_Color color);
 /* Widget specific information */
 
 
-static void draw_linechart(int x,int y,int w,int h,
+static void draw_timechart(int x,int y,int w,int h,
 			   int numb, FL_CHART_ENTRY entries[],
-			   double min, double max, int autosize, int maxnumb,
-			   Fl_Color textcolor)
+			   double min, double max, double threshold, unsigned maxtime,
+			   Fl_Color textcolor, Fl_Color thresholdcolor)
 /* Draws a line chart. x,y,w,h is the bounding box, entries the array of
    numb entries and min and max the boundaries. */
 {
@@ -43,26 +43,75 @@ static void draw_linechart(int x,int y,int w,int h,
   if (max == min) incr = h-2.0*lh;
   else incr = (h-2.0*lh)/ (max-min);
   int zeroh = (int)rint(y+h-lh+min * incr);
-  double bwidth = w/double(autosize?numb:maxnumb);
+  int thresholdh =  zeroh - (int)rint(threshold * incr);
+  double pixelsPerMilli = (double)w/(double)(maxtime);
+
+  /* Draw base line */
+  fl_color(textcolor);
+  fl_line(x,zeroh,x+w,zeroh);
+
+  /* Draw the threshold */
+  if ((threshold>min && threshold<max) && (thresholdh!=zeroh))
+  {
+    fl_color(thresholdcolor);
+    fl_line_style(FL_DASH); // Because of how line styles are implemented on WIN32 systems, you must set the line style after setting the drawing color.
+    fl_line(x,thresholdh,x+w,thresholdh);
+    fl_line_style(FL_SOLID);
+  }
+
+  /* Draw the left scale */
+
+  /* Draw the bottom scale */
+  // ok, we are going to work backwards in time
+  // -15 on the left, and 0 on the right.  
+  // The issue, is that the elements are inserted in a list, and are not
+  // exactly equal in time apart.  
+
+  fl_color(textcolor);
+  for (i=(maxtime-1000); i>0; i-=1000)
+  {
+      char str[16];
+      unsigned theTime = maxtime-i;
+      snprintf(str,sizeof(str),"-%d",i/1000);
+      fl_draw(str,
+              x + (int)rint((theTime)*pixelsPerMilli),
+              (y+h),
+              0,0, FL_ALIGN_BOTTOM);
+    
+  }
+
   /* Draw the values */
-  for (i=0; i<numb; i++) {
-      int x0 = x + (int)rint((i-.5)*bwidth);
-      int x1 = x + (int)rint((i+.5)*bwidth);
+  if (numb)
+  {
+    unsigned latestMillis = entries[numb-1].millis;
+    for (i=0; i<numb; i++) {
+      int x0 = x + (i ? (int)rint((maxtime-(latestMillis-entries[i-1].millis))*pixelsPerMilli) : 0);
+      int x1 = x + (int)rint((maxtime-(latestMillis-entries[i].millis))*pixelsPerMilli);
       int yy0 = i ? zeroh - (int)rint(entries[i-1].val*incr) : 0;
       int yy1 = zeroh - (int)rint(entries[i].val*incr);
 
-      fl_color((Fl_Color)entries[i-1].col);
-      fl_line(x0,yy0,x1,yy1);
+      if (i)
+      {
+        fl_color((Fl_Color)entries[i-1].col);
+        fl_line(x0,yy0,x1,yy1);
+      }
+    }
   }
-//  /* Draw base line */
-//  fl_color(textcolor);
-//  fl_line(x,zeroh,x+w,zeroh);
 
   /* Draw the labels */
-  for (i=0; i<numb; i++)
-      fl_draw(entries[i].str,
-	      x+(int)rint((i+.5)*bwidth), zeroh - (int)rint(entries[i].val*incr),0,0,
-	      entries[i].val>=0 ? FL_ALIGN_BOTTOM : FL_ALIGN_TOP);  
+  fl_color(textcolor);
+  if (numb)
+  {
+    unsigned latestMillis = entries[numb-1].millis;
+    for (i=0; i<numb; i++)
+      if (entries[i].str)
+        fl_draw(entries[i].str,
+                x + (int)rint((maxtime-(latestMillis-entries[i].millis))*pixelsPerMilli),
+  	        zeroh - (int)rint(entries[i].val*incr),0,0,
+	        entries[i].val>=0 ? FL_ALIGN_BOTTOM : FL_ALIGN_TOP);
+  }
+
+  fl_color(FL_MAGENTA);
 
 }
 
@@ -87,12 +136,12 @@ void My_Chart::draw() {
     }
 
     fl_font(textfont(),textsize());
-
-      draw_linechart(xx,yy,ww,hh, numb, entries, min, max,
-                      autosize(), maxnumb, textcolor());
-
-
     draw_label();
+
+    draw_timechart(xx,yy,ww,hh, numb, entries, min, max, threshold_,
+                   maxtime_, textcolor(), thresholdcolor());
+
+
     fl_pop_clip();
 }
 
@@ -114,13 +163,14 @@ Fl_Widget(X,Y,W,H,L) {
   box(FL_BORDER_BOX);
   align(FL_ALIGN_BOTTOM);
   numb       = 0;
-  maxnumb    = 0;
+  maxtime_   = 15000; // in milliseconds
   sizenumb   = FL_CHART_MAX;
-  autosize_  = 1;
   min = max  = 0;
+  threshold_ = 0;
   textfont_  = FL_HELVETICA;
   textsize_  = 10;
   textcolor_ = FL_FOREGROUND_COLOR;
+  thresholdcolor_ = FL_FOREGROUND_COLOR;
   entries    = (FL_CHART_ENTRY *)calloc(sizeof(FL_CHART_ENTRY), FL_CHART_MAX + 1);
 }
 
@@ -143,79 +193,30 @@ void My_Chart::clear() {
 /**
   Add the data value \p val with optional label \p str and color \p col
   to the chart.
+  \param[in] millis milliseconds since core startup
   \param[in] val data value
   \param[in] str optional data label
   \param[in] col optional data color
  */
-void My_Chart::add(double val, const char *str, unsigned col) {
+void My_Chart::add(unsigned millis, double val, const char *str, unsigned col) {
   /* Allocate more entries if required */
   if (numb >= sizenumb) {
     sizenumb += FL_CHART_MAX;
     entries = (FL_CHART_ENTRY *)realloc(entries, sizeof(FL_CHART_ENTRY) * (sizenumb + 1));
   }
-  // Shift entries as needed
-  if (numb >= maxnumb && maxnumb > 0) {
+
+  // Shift entries as needed (we have a max time for this chart)
+  while (numb && ((entries[0].millis)+(maxtime_)) < entries[numb-1].millis) {
+    if (entries[0].str)
+      free(entries[0].str);
     memmove(entries, entries + 1, sizeof(FL_CHART_ENTRY) * (numb - 1));
     numb --;
   }
+  entries[numb].millis = millis;
   entries[numb].val = float(val);
   entries[numb].col = col;
-    if (str) {
-	strncpy(entries[numb].str,str,FL_CHART_LABEL_MAX + 1);
-    } else {
-	entries[numb].str[0] = 0;
-    }
+  entries[numb].str = (str ? strdup(str) : NULL);
   numb++;
-  redraw();
-}
-
-/**
-  Inserts a data value \p val at the given position \p ind.
-  Position 1 is the first data value.
-  \param[in] ind insertion position
-  \param[in] val data value
-  \param[in] str optional data label
-  \param[in] col optional data color
- */
-void My_Chart::insert(int ind, double val, const char *str, unsigned col) {
-  int i;
-  if (ind < 1 || ind > numb+1) return;
-  /* Allocate more entries if required */
-  if (numb >= sizenumb) {
-    sizenumb += FL_CHART_MAX;
-    entries = (FL_CHART_ENTRY *)realloc(entries, sizeof(FL_CHART_ENTRY) * (sizenumb + 1));
-  }
-  // Shift entries as needed
-  for (i=numb; i >= ind; i--) entries[i] = entries[i-1];
-  if (numb < maxnumb || maxnumb == 0) numb++;
-  /* Fill in the new entry */
-  entries[ind-1].val = float(val);
-  entries[ind-1].col = col;
-  if (str) {
-      strncpy(entries[ind-1].str,str,FL_CHART_LABEL_MAX+1);
-  } else {
-      entries[ind-1].str[0] = 0;
-  }
-  redraw();
-}
-
-/**
-  Replace a data value \p val at the given position \p ind.
-  Position 1 is the first data value.
-  \param[in] ind insertion position
-  \param[in] val data value
-  \param[in] str optional data label
-  \param[in] col optional data color
- */
-void My_Chart::replace(int ind,double val, const char *str, unsigned col) {
-  if (ind < 1 || ind > numb) return;
-  entries[ind-1].val = float(val);
-  entries[ind-1].col = col;
-  if (str) {
-      strncpy(entries[ind-1].str,str,FL_CHART_LABEL_MAX+1);
-  } else {
-      entries[ind-1].str[0] = 0;
-  }
   redraw();
 }
 
@@ -229,25 +230,6 @@ void My_Chart::bounds(double a, double b) {
   redraw();
 }
 
-/**
-  Set the maximum number of data values for a chart.
-  If you do not call this method then the chart will be allowed to grow
-  to any size depending on available memory.
-  \param[in] m maximum number of data values allowed.
- */
-void My_Chart::maxsize(int m) {
-  int i;
-  /* Fill in the new number */
-  if (m < 0) return;
-  maxnumb = m;
-  /* Shift entries if required */
-  if (numb > maxnumb) {
-      for (i = 0; i<maxnumb; i++)
-	  entries[i] = entries[i+numb-maxnumb];
-      numb = maxnumb;
-      redraw();
-  }
-}
 
 //
 // End of "$Id$".

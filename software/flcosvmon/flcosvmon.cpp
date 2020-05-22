@@ -20,7 +20,7 @@
 
 // TODO: timer to go bad if we stop hearing from the core
 // TODO: reconnect to serial if it goes away
-// TODO: adjustable amount of time on the charts?  Currently fixed at 15 seconds
+// TODO: adjustable amount of time on the charts?  Currently fixed at 20 seconds
 // TODO: critical alerts need to be displayed somewhere (titlebar?)
 
 #include <FL/Fl.H>
@@ -452,6 +452,7 @@ typedef struct core_s {
     buffer_t streamData;
     int cmdTime; // 32-bit millis() since the core started
     int lastCmdTime; // 32-bit millis() since the core started
+    int adjustedMillis; // What we use to stuff into the chart.  adjustedMillis += ((cmdTime-lastCmdTime)>0 ? (cmdTime-lastCmdTime) : 0);
     char *settingName; // For use in command processing strdup()'ed
     int settingType;
     int sentQ;
@@ -690,22 +691,21 @@ void refreshIcons(core_t *core)
     for (dynamic_button_t *b=core->button_list; b; b=b->next)
     {
         if (b->flButton==NULL)
-        {
             b->flButton = new My_Button(0,0,BUTTON_WIDTH,BUTTON_HEIGHT);
+        
 
-            b->flButton->box(FL_RFLAT_BOX);    // buttons won't have 'edges'
-            // If a color is sent from the core, and it is not 'empty', use the core defined color, else, our own
-            b->flButton->labelsize(24);
-            if (b->isButton)
-            {
-                b->flButton->callback(buttonPushed, (void *)core);
-                core->packedButtons->add(b->flButton);
-            }
-            else
-            {
-                // No action for status outputs
-                core->packedStatusItems->add(b->flButton);
-            }
+        b->flButton->box(FL_RFLAT_BOX);    // buttons won't have 'edges'
+        // If a color is sent from the core, and it is not 'empty', use the core defined color, else, our own
+        b->flButton->labelsize(24);
+        if (b->isButton)
+        {
+            b->flButton->callback(buttonPushed, (void *)core);
+            core->packedButtons->add(b->flButton);
+        }
+        else
+        {
+            // No action for status outputs
+            core->packedStatusItems->add(b->flButton);
         }
 
         b->flButton->name(b->name);
@@ -773,6 +773,7 @@ void processSetting(core_t *core, char *settingName, int argIndex, buffer_t *arg
         break;
     case SETTING_GROUP:
         button->isButton = (strcasecmp(arg->data,"button")==0); // Is it in the button group?
+        refreshIcons(core);
         break;
     case SETTING_VALUE:
         if (button->textValue)
@@ -807,6 +808,7 @@ void processSetting(core_t *core, char *settingName, int argIndex, buffer_t *arg
 
 void processCommandArgument(core_t *core, char commandByte, int currentArgIndex, buffer_t *argBuffer)
 {
+  int dTime;
   // Everything comes prefixed with a timestamp, which is arg# 0
   if (currentArgIndex==0)
   {
@@ -847,9 +849,9 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
       case 2: // Volume
       case 3: // Tidal Volume
           // Detect milli wrap or core reboot (clear array when millis go back in time)
-          if (core->lastCmdTime > core->cmdTime)
-              core->flCharts[currentArgIndex-1]->clear();
-          core->flCharts[currentArgIndex-1]->add(core->cmdTime, atof(argBuffer->data), NULL, charts[currentArgIndex-1].color);
+          dTime = core->cmdTime - core->lastCmdTime;
+          core->adjustedMillis += ((dTime>0) ? dTime : 0); // Handle milli wrapping or core restarting gracefully
+          core->flCharts[currentArgIndex-1]->add(core->adjustedMillis, atof(argBuffer->data), NULL, charts[currentArgIndex-1].color);
           break;
       default: // Debug output follows
           break;
@@ -906,8 +908,8 @@ void processCommand(core_t *core)
     int argumentCount=0;
     buffer_t argumentBuffer;
 
-    // debug output (ignore data samples for now)
-    if (core->streamData.size && *core->streamData.data!='d')
+    // debug output (ignore data samples and Health checks)
+    if (core->streamData.size && (*core->streamData.data!='d' && *core->streamData.data!='H'))
         printf(">%.*s\n", core->streamData.size, core->streamData.data);
 
     memset(&argumentBuffer, 0, sizeof(argumentBuffer));

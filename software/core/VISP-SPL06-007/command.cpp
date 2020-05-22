@@ -24,7 +24,6 @@
 
 bool LOADING_SETTINGS = false;
 
-
 typedef enum parser_state_e {
   PARSE_COMMAND,
   PARSE_IGNORE_TILL_LF,
@@ -61,23 +60,24 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
 #define RESPOND_ALL           0xFFFFFFFFL
 #define RESPOND_LIMITS             1UL<<0 // Special
 #define SAVE_THIS                  1UL<<1 // Special
-#define RESPOND_DEBUG              1UL<<2
-#define RESPOND_MODE               1UL<<3
-#define RESPOND_BREATH_VOLUME      1UL<<4
-#define RESPOND_BREATH_PRESSURE    1UL<<5
-#define RESPOND_BREATH_RATE        1UL<<6
-#define RESPOND_BREATH_RATIO       1UL<<7
-#define RESPOND_BREATH_THRESHOLD   1UL<<8
-#define RESPOND_BODYTYPE           1UL<<9
+#define EXPERT                     1UL<<2 // Special
+#define RESPOND_DEBUG              1UL<<3
+#define RESPOND_MODE               1UL<<4
+#define RESPOND_BREATH_VOLUME      1UL<<5
+#define RESPOND_BREATH_PRESSURE    1UL<<6
+#define RESPOND_BREATH_RATE        1UL<<7
+#define RESPOND_BREATH_RATIO       1UL<<8
+#define RESPOND_BREATH_THRESHOLD   1UL<<9
+#define RESPOND_BODYTYPE           1UL<<10
 
-#define RESPOND_CALIB0             1UL<<10
-#define RESPOND_CALIB1             1UL<<11
-#define RESPOND_CALIB2             1UL<<12
-#define RESPOND_CALIB3             1UL<<13
-#define RESPOND_SENSOR0            1UL<<14
-#define RESPOND_SENSOR1            1UL<<15
-#define RESPOND_SENSOR2            1UL<<16
-#define RESPOND_SENSOR3            1UL<<17
+#define RESPOND_CALIB0             1UL<<11
+#define RESPOND_CALIB1             1UL<<12
+#define RESPOND_CALIB2             1UL<<13
+#define RESPOND_CALIB3             1UL<<14
+#define RESPOND_SENSOR0            1UL<<15
+#define RESPOND_SENSOR1            1UL<<16
+#define RESPOND_SENSOR2            1UL<<17
+#define RESPOND_SENSOR3            1UL<<18
 
 #define RESPOND_MOTOR_TYPE          1UL<<20
 #define RESPOND_MOTOR_SPEED         1UL<<21
@@ -268,17 +268,18 @@ void handleNewVolume(struct settingsEntry_s * entry)
 }
 
 void actionModeChanged(struct settingsEntry_s *);
-void handleMotorChange(struct settingsEntry_s * entry)
+void actionMotorChange(struct settingsEntry_s * entry)
 {
   motorSetup();
 }
 
+// See motor.cpp
 void updateMotorSpeed()
 {
   respond('S', PSTR("%S,value,%d"), strMotorSpeed, motorSpeed);
   respond('S', PSTR("%S,units,%S"), strMotorSpeed, motorIsHoming ? PSTR("Homing") : strPercentage);
 }
-void handleMotorSpeed(struct settingsEntry_s * entry)
+void actionMotorSpeed(struct settingsEntry_s * entry)
 {
   motorGo();
 }
@@ -300,6 +301,12 @@ void handleVispSaveSettings(struct settingsEntry_s * entry)
   saveParametersToVISP();
 }
 
+void handleQueryCommand(const char *arg1, const char *arg2);
+void actionQueryCommand(struct settingsEntry_s * entry)
+{
+  handleQueryCommand(NULL,NULL);
+}
+
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionModeChanged, NULL, &currentMode},
@@ -308,21 +315,21 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_BREATH_VOLUME    | SAVE_THIS, (MODE_VCCMV | MODE_OFF), strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, NULL, &breathVolume},
   {RESPOND_BREATH_PRESSURE  | SAVE_THIS, (MODE_PCCMV | MODE_OFF), strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathPressure},
   {RESPOND_BREATH_THRESHOLD | SAVE_THIS, MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathThreshold},
-  {RESPOND_BODYTYPE,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, handleVispSaveSettings, &visp_eeprom.bodyType},
-  {RESPOND_CALIB0,              MODE_NONE, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[0]},
-  {RESPOND_CALIB1,              MODE_NONE, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[1]},
-  {RESPOND_CALIB2,              MODE_NONE, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[2]},
-  {RESPOND_CALIB3,              MODE_NONE, strCalib3, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[3]},
+  {RESPOND_BODYTYPE|EXPERT,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, handleVispSaveSettings, &visp_eeprom.bodyType},
+  {RESPOND_CALIB0|EXPERT,              MODE_ALL, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[0]},
+  {RESPOND_CALIB1|EXPERT,              MODE_ALL, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[1]},
+  {RESPOND_CALIB2|EXPERT,              MODE_ALL, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[2]},
+  {RESPOND_CALIB3|EXPERT,              MODE_ALL, strCalib3, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[3]},
   {RESPOND_SENSOR0,             MODE_ALL, strSensor0, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[0].sensorType},
   {RESPOND_SENSOR1,             MODE_ALL, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[1].sensorType},
   {RESPOND_SENSOR2,             MODE_ALL, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[2].sensorType},
   {RESPOND_SENSOR3,             MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[3].sensorType},
-  {RESPOND_MOTOR_TYPE | SAVE_THIS,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, handleMotorGood, &motorType},
-  {RESPOND_MOTOR_SPEED,                     (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,        0, 100, NULL, verifyLimitsToInt8, respondInt8, handleMotorSpeed, NULL, &motorSpeed},
-  {RESPOND_MOTOR_MIN_SPEED | SAVE_THIS,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,     0, 100, NULL, verifyLimitsToInt8, respondInt8, handleMotorChange, NULL, &motorMinSpeed},
-  {RESPOND_MOTOR_HOMING_SPEED | SAVE_THIS,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, handleMotorChange, NULL, &motorHomingSpeed},
-  {RESPOND_MOTOR_STEPS_PER_REV | SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, handleMotorChange, NULL, &motorStepsPerRev},
-  {RESPOND_DEBUG,               (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &debug},
+  {RESPOND_MOTOR_TYPE |EXPERT| SAVE_THIS,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, actionMotorChange, handleMotorGood, &motorType},
+  {RESPOND_MOTOR_SPEED |EXPERT,                     (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,        0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorSpeed, NULL, &motorSpeed},
+  {RESPOND_MOTOR_MIN_SPEED |EXPERT| SAVE_THIS,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,     0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorMinSpeed},
+  {RESPOND_MOTOR_HOMING_SPEED |EXPERT| SAVE_THIS,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorHomingSpeed},
+  {RESPOND_MOTOR_STEPS_PER_REV |EXPERT| SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, actionMotorChange, NULL, &motorStepsPerRev},
+  {RESPOND_DEBUG,               (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, actionQueryCommand, NULL, &debug},
   {0, MODE_NONE,  NULL, NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
 
@@ -493,8 +500,11 @@ void respondSettingLimits(struct settingsEntry_s * entry)
 
 void respondEnabled(struct settingsEntry_s * entry)
 {
-  respond('S', PSTR("%S,enabled,%S"), entry->theName,
-          ((entry->validModes & currentMode) == 0 ? strFalse : strTrue));
+  bool showThis = ((entry->validModes & currentMode) ? true : false);
+  if ((entry->bitmask & EXPERT) && debug==DEBUG_DISABLED)
+      showThis = false;
+
+  respond('S', PSTR("%S,enabled,%S"), entry->theName, (showThis ? strTrue : strFalse));
 }
 
 // Called when mode changes (Hijacked by motor change to update motor settings on the display)
@@ -660,6 +670,7 @@ void handleBatteryCommand(const char *arg1, const char *arg2)
   // TODO: calculate runtime based on voltage
   respond('B', PSTR("%d"), b, b);
 }
+
 
 typedef void (*commandCallback)(const char *arg1, const char *arg2);
 
@@ -912,7 +923,7 @@ int coreSaveValue(int i, int value)
 /* There are 2 different EEPROMS.. One on the VISP PCB, the other in the Core */
 /* We treat the core's EEPROM as a command string! */
 #define SAVE_SETTINGS 1
-int32_t  CORE_SAVE_SETTINGS_TIMEOUT = 0;
+uint32_t  CORE_SAVE_SETTINGS_TIMEOUT = 0;
 
 bool coreSaveSettings()
 {
@@ -923,6 +934,7 @@ bool coreSaveSettings()
   // This waits for them to settle down before saving at one shot
   // Reduces wear on the EEPROM
   CORE_SAVE_SETTINGS_TIMEOUT = millis() + 5000; // In 5 seconds, save to the core...
+  return true;
 }
 
 // Break the writes up into smaller segments so that it is spread out over time

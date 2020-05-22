@@ -467,6 +467,11 @@ typedef struct core_s {
 
 } core_t;
 
+void bufferClear(buffer_t *buffer)
+{
+    memset(buffer->data, 0, buffer->size);
+    buffer->size=0;
+}
 
 void bufferAppend(buffer_t *buffer, char ch)
 {
@@ -916,13 +921,14 @@ void processCommand(core_t *core)
     int state=0;
     char commandByte=0;
     int argumentCount=0;
-    buffer_t argumentBuffer;
+
+ static buffer_t argumentBuffer;
 
     // debug output (ignore data samples and Health checks)
     if (core->streamData.size && (*core->streamData.data!='d' && *core->streamData.data!='H'))
         printf(">%.*s\n", core->streamData.size, core->streamData.data);
 
-    memset(&argumentBuffer, 0, sizeof(argumentBuffer));
+    bufferClear(&argumentBuffer);
 
     // ok, we have a bunch of crap that has encountered a '\n' or '\l'
     // Decode what is in core->buffer

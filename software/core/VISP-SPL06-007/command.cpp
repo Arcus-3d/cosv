@@ -21,6 +21,10 @@
 
 #define MAX_ARG_LENGTH 20
 
+
+bool LOADING_SETTINGS = false;
+
+
 typedef enum parser_state_e {
   PARSE_COMMAND,
   PARSE_IGNORE_TILL_LF,
@@ -55,15 +59,16 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
 }
 
 #define RESPOND_ALL           0xFFFFFFFFL
-#define RESPOND_LIMITS             1UL<<0
-#define RESPOND_DEBUG              1UL<<1
-#define RESPOND_MODE               1UL<<2
-#define RESPOND_BREATH_VOLUME      1UL<<3
-#define RESPOND_BREATH_PRESSURE    1UL<<4
-#define RESPOND_BREATH_RATE        1UL<<5
-#define RESPOND_BREATH_RATIO       1UL<<6
-#define RESPOND_BREATH_THRESHOLD   1UL<<7
-#define RESPOND_BODYTYPE           1UL<<8
+#define RESPOND_LIMITS             1UL<<0 // Special
+#define SAVE_THIS                  1UL<<1 // Special
+#define RESPOND_DEBUG              1UL<<2
+#define RESPOND_MODE               1UL<<3
+#define RESPOND_BREATH_VOLUME      1UL<<4
+#define RESPOND_BREATH_PRESSURE    1UL<<5
+#define RESPOND_BREATH_RATE        1UL<<6
+#define RESPOND_BREATH_RATIO       1UL<<7
+#define RESPOND_BREATH_THRESHOLD   1UL<<8
+#define RESPOND_BODYTYPE           1UL<<9
 
 #define RESPOND_CALIB0             1UL<<10
 #define RESPOND_CALIB1             1UL<<11
@@ -73,12 +78,12 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
 #define RESPOND_SENSOR1            1UL<<15
 #define RESPOND_SENSOR2            1UL<<16
 #define RESPOND_SENSOR3            1UL<<17
-#define RESPOND_MOTOR_TYPE          1UL<<18
-#define RESPOND_MOTOR_SPEED         1UL<<19
-#define RESPOND_MOTOR_MIN_SPEED     1UL<<20
-#define RESPOND_MOTOR_HOMING_SPEED  1UL<<21
-#define RESPOND_MOTOR_STEPS_PER_REV 1UL<<22
 
+#define RESPOND_MOTOR_TYPE          1UL<<20
+#define RESPOND_MOTOR_SPEED         1UL<<21
+#define RESPOND_MOTOR_MIN_SPEED     1UL<<22
+#define RESPOND_MOTOR_HOMING_SPEED  1UL<<23
+#define RESPOND_MOTOR_STEPS_PER_REV 1UL<<24
 
 struct dictionary_s {
   int theAssociatedValue; // -1 is END OF LIST marker
@@ -242,6 +247,8 @@ const char strML[] PUTINFLASH = "mL";
 const char strCMH2O[] PUTINFLASH = "cmH2O";
 const char strPascals[] PUTINFLASH = "pascals";
 const char strPercentage[] PUTINFLASH = "%";
+const char strGood[] PUTINFLASH = "good";
+const char strBad[] PUTINFLASH = "bad";
 
 bool noSet(struct settingsEntry_s * entry, const char *arg);
 bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg);
@@ -252,7 +259,7 @@ void respondFloat(struct settingsEntry_s * entry);
 void respondInt8(struct settingsEntry_s * entry);
 void respondInt16(struct settingsEntry_s * entry);
 void respondInt8ToDict(struct settingsEntry_s * entry);
-void actionUpdateDisplayIcons(struct settingsEntry_s *);
+void actionModeChanged(struct settingsEntry_s *);
 
 
 void handleNewVolume(struct settingsEntry_s * entry)
@@ -260,11 +267,19 @@ void handleNewVolume(struct settingsEntry_s * entry)
   //volumeTimeout=((motorCycleTime/2)*(visp_eeprom.vreath_volume/MAX_VOLUME); // Half way through a cycle is full compression
 }
 
+void actionModeChanged(struct settingsEntry_s *);
 void handleMotorChange(struct settingsEntry_s * entry)
 {
   motorSetup();
+  // motorSetup() monkeys with min/max motor speeds, need to ship them back to the display
+  actionModeChanged(entry);
 }
 
+void updateMotorSpeed()
+{
+  respond('S', PSTR("%S,value,%d"), strMotorSpeed, motorSpeed);
+  respond('S', PSTR("%S,units,%S"), strMotorSpeed, motorIsHoming ? PSTR("Homing") : strPercentage);
+}
 void handleMotorSpeed(struct settingsEntry_s * entry)
 {
   motorGo();
@@ -273,23 +288,29 @@ void handleMotorSpeed(struct settingsEntry_s * entry)
 // Buttons can now be good/bad to reflect what is wrong with the core
 void handleMotorGood(struct settingsEntry_s * entry)
 {
-    respond('S', PSTR("%S,status,%S"), entry->theName, motorFound ? PSTR("good") : PSTR("bad"));
+  respond('S', PSTR("%S,status,%S"), entry->theName, motorFound ? PSTR("good") : PSTR("bad"));
 }
 
 // Buttons can now be good/bad to reflect what is wrong with the core
 void handleSensorGood(struct settingsEntry_s * entry)
 {
-    respond('S', PSTR("%S,status,%S"), entry->theName, sensorsFound ? PSTR("good") : PSTR("bad"));
+  respond('S', PSTR("%S,status,%S"), entry->theName, sensorsFound ? strGood : strBad);
 }
+
+void handleVispSaveSettings(struct settingsEntry_s * entry)
+{
+  saveParametersToVISP();
+}
+
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
-  {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionUpdateDisplayIcons, NULL, &currentMode},
-  {RESPOND_BREATH_RATE,         (MODE_ALL ^ MODE_MANUAL), strBreathRate, strBPM, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &visp_eeprom.breath_rate},
-  {RESPOND_BREATH_RATIO,        (MODE_ALL ^ MODE_MANUAL), strBreathRatio, NULL, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &visp_eeprom.breath_ratio},
-  {RESPOND_BREATH_VOLUME,       MODE_VCCMV | MODE_OFF, strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, NULL, &visp_eeprom.breath_volume},
-  {RESPOND_BREATH_PRESSURE,     MODE_PCCMV | MODE_OFF, strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &visp_eeprom.breath_pressure},
-  {RESPOND_BREATH_THRESHOLD,    MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &visp_eeprom.breath_threshold},
-  {RESPOND_BODYTYPE,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &visp_eeprom.bodyType},
+  {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionModeChanged, NULL, &currentMode},
+  {RESPOND_BREATH_RATE      | SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strBreathRate, strBPM, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &breathRate},
+  {RESPOND_BREATH_RATIO     | SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strBreathRatio, NULL, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &breathRatio},
+  {RESPOND_BREATH_VOLUME    | SAVE_THIS, (MODE_VCCMV | MODE_OFF), strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, NULL, &breathVolume},
+  {RESPOND_BREATH_PRESSURE  | SAVE_THIS, (MODE_PCCMV | MODE_OFF), strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathPressure},
+  {RESPOND_BREATH_THRESHOLD | SAVE_THIS, MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathThreshold},
+  {RESPOND_BODYTYPE,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, handleVispSaveSettings, &visp_eeprom.bodyType},
   {RESPOND_CALIB0,              MODE_NONE, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[0]},
   {RESPOND_CALIB1,              MODE_NONE, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[1]},
   {RESPOND_CALIB2,              MODE_NONE, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[2]},
@@ -298,11 +319,11 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_SENSOR1,             MODE_ALL, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[1].sensorType},
   {RESPOND_SENSOR2,             MODE_ALL, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[2].sensorType},
   {RESPOND_SENSOR3,             MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[3].sensorType},
-  {RESPOND_MOTOR_TYPE,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, handleMotorGood, &motorType},
-  {RESPOND_MOTOR_SPEED,         (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,       0, 100, NULL, verifyLimitsToInt8, respondInt8,    handleMotorSpeed, NULL, &motorSpeed},
-  {RESPOND_MOTOR_MIN_SPEED,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,    0, 100, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &motorMinSpeed},
-  {RESPOND_MOTOR_HOMING_SPEED,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &motorHomingSpeed},
-  {RESPOND_MOTOR_STEPS_PER_REV, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, handleMotorChange, NULL, &motorStepsPerRev},
+  {RESPOND_MOTOR_TYPE | SAVE_THIS,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, handleMotorChange, handleMotorGood, &motorType},
+  {RESPOND_MOTOR_SPEED,                     (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,        0, 100, NULL, verifyLimitsToInt8, respondInt8, handleMotorSpeed, NULL, &motorSpeed},
+  {RESPOND_MOTOR_MIN_SPEED | SAVE_THIS,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,     0, 100, NULL, verifyLimitsToInt8, respondInt8, handleMotorChange, NULL, &motorMinSpeed},
+  {RESPOND_MOTOR_HOMING_SPEED | SAVE_THIS,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, handleMotorChange, NULL, &motorHomingSpeed},
+  {RESPOND_MOTOR_STEPS_PER_REV | SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, handleMotorChange, NULL, &motorStepsPerRev},
   {RESPOND_DEBUG,               (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &debug},
   {0, MODE_NONE,  NULL, NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
@@ -380,7 +401,7 @@ bool verifyLimitsToInt8(struct settingsEntry_s * entry, const char *arg)
   // TODO: other checks on the argument...
   if (value >= entry->theMin && value <= entry->theMax)
   {
-    *(uint16_t *)entry->data = value;
+    *(uint8_t *)entry->data = value;
     return true;
   }
   return false;
@@ -427,6 +448,12 @@ void respondInt8ToDict(struct settingsEntry_s * entry)
   } while (dict.theWord);
 }
 
+void respondStatus(struct settingsEntry_s * entry)
+{
+  if (entry->handleGood)
+    entry->handleGood(entry);
+}
+
 void respondSettingLimits(struct settingsEntry_s * entry)
 {
   struct dictionary_s dict = {0};
@@ -464,10 +491,6 @@ void respondSettingLimits(struct settingsEntry_s * entry)
   // Any special units we need to display in the button?
   if (entry->theUnits)
     respond('S', PSTR("%S,units,%S"), entry->theName, entry->theUnits);
-
-  if (entry->handleGood)
-    entry->handleGood(entry);
-
 }
 
 void respondEnabled(struct settingsEntry_s * entry)
@@ -476,10 +499,14 @@ void respondEnabled(struct settingsEntry_s * entry)
           ((entry->validModes & currentMode) == 0 ? strFalse : strTrue));
 }
 
-void actionUpdateDisplayIcons(struct settingsEntry_s *)
+// Called when mode changes (Hijacked by motor change to update motor settings on the display)
+void actionModeChanged(struct settingsEntry_s *)
 {
   uint8_t x = 0;
   struct settingsEntry_s entry = {0};
+
+  if (LOADING_SETTINGS)
+    return;
 
   do
   {
@@ -487,7 +514,11 @@ void actionUpdateDisplayIcons(struct settingsEntry_s *)
     memcpy_P(&entry, & settings[x], sizeof(entry));
     x++;
     if (entry.bitmask)
+    {
       respondEnabled(&entry);
+      respondStatus(&entry);
+      entry.respondIt(&entry);
+    }
   }
   while (entry.bitmask != 0);
 }
@@ -509,6 +540,7 @@ void respondAppropriately(uint32_t flags)
       {
         respondSettingLimits(&entry);
         respondEnabled(&entry);
+        respondStatus(&entry);
       }
       entry.respondIt(&entry);
     }
@@ -524,7 +556,8 @@ void handleSettingCommand(const char *arg1, const char *arg2)
   if (*arg1 == 0)
   {
     // Same as Q without the Limits
-    respondAppropriately(RESPOND_ALL ^ RESPOND_LIMITS);
+    if (!LOADING_SETTINGS)
+      respondAppropriately(RESPOND_ALL ^ RESPOND_LIMITS);
     return;
   }
 
@@ -544,13 +577,19 @@ void handleSettingCommand(const char *arg1, const char *arg2)
         }
         else if (entry.verifyIt(&entry, arg2))
         {
-          saveParametersToVISP();
-          entry.respondIt(&entry);
+          if (!LOADING_SETTINGS)
+          {
+            // Only perform a save if the setting actually needs to be saved.
+            if (entry.bitmask & SAVE_THIS)
+                coreSaveSettings();
+
+            entry.respondIt(&entry);
+          }
           // Maybe enable a motor or something?
           if (entry.actionIt)
             entry.actionIt(&entry);
-          if (entry.handleGood)
-            entry.handleGood(&entry);
+          if (!LOADING_SETTINGS)
+            respondStatus(&entry);
           return;
         }
         else
@@ -586,7 +625,7 @@ void handleCalibrateCommand(const char *arg1, const char *arg2)
 // Also we have to add motor failure detection to this.
 void sendCurrentSystemHealth()
 {
-  respond('H', (sensorsFound && motorFound ? PSTR("good") : PSTR("bad")));
+  respond('H', (sensorsFound && motorFound ? strGood : strBad));
 }
 
 void handleHealthCommand(const char *arg1, const char *arg2)
@@ -659,7 +698,6 @@ void commandParser(int cmdByte)
     int x = 0;
     if (theCommandByte)
     {
-      //info(PSTR("CMD %c '%s' '%s'"),  theCommandByte, arg1, arg2);
       // Need to be able to gracefully handle empty lines
       do
       {
@@ -696,10 +734,7 @@ void commandParser(int cmdByte)
       break;
     case PARSE_FIRST_ARG:
       if (cmdByte == ',')
-      {
-        // info(PSTR("PARSE_FIRST_ARG (%c)='%s'"), theCommandByte, arg1);
         currentState = PARSE_SECOND_ARG;
-      }
       else
       {
         if (arg1Pos < (sizeof(arg1) - 1))
@@ -752,4 +787,290 @@ void dataSend()
     hwSerial.print(sensors[SENSOR_U8].pressure, 1);
   }
   hwSerial.println();
+}
+
+
+void primeTheFrontEnd()
+{
+  respondAppropriately(RESPOND_ALL);//  ^ RESPOND_LIMITS);
+}
+
+void sanitizeCoreData()
+{
+  if (breathRatio > MAX_BREATH_RATIO)
+    breathRatio = MAX_BREATH_RATIO;
+  if (breathRatio < MIN_BREATH_RATIO)
+    breathRatio = MIN_BREATH_RATIO;
+  if (breathRate > MAX_BREATH_RATE)
+    breathRate = MAX_BREATH_RATE;
+  if (breathRate < MIN_BREATH_RATE)
+    breathRate = MIN_BREATH_RATE;
+  if (breathPressure > MAX_BREATH_PRESSURE)
+    breathPressure = MAX_BREATH_PRESSURE;
+  if (breathPressure < MIN_BREATH_PRESSURE)
+    breathPressure = MIN_BREATH_PRESSURE;
+}
+
+
+#include <EEPROM.h>
+
+unsigned long eeprom_crc(void) {
+
+  const unsigned long crc_table[16] = {
+    0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
+    0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
+    0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
+    0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
+  };
+
+  unsigned long crc = ~0L;
+
+  for (int index = 4 ; index < EEPROM.length() ; ++index) {
+    crc = crc_table[(crc ^ EEPROM[index]) & 0x0f] ^ (crc >> 4);
+    crc = crc_table[(crc ^ (EEPROM[index] >> 4)) & 0x0f] ^ (crc >> 4);
+    crc = ~crc;
+  }
+  return crc;
+}
+
+// TODO: verify we don't go past EEPROM.length()
+int coreSave(int i, const char *name, const struct dictionary_s *dictionary, int value)
+{
+  struct dictionary_s dict = {0};
+  uint8_t d = 0;
+  char arg[16] = {0};
+  char ch;
+
+  EEPROM.write(i++, 'S');
+  EEPROM.write(i++, ',');
+  while ((ch = pgm_read_byte(name++)) != 0x00)
+    EEPROM.write(i++, ch);
+  EEPROM.write(i++, ',');
+
+  if (dictionary)
+  {
+    int d = 0;
+    do
+    {
+      memcpy_P(&dict, &dictionary[d], sizeof(dict));
+      d++;
+      if (dict.theWord && dict.theAssociatedValue == value)
+      {
+        while ((ch = pgm_read_byte(dict.theWord++)) != 0x00)
+          EEPROM.write(i++, ch);
+        break;
+      }
+    } while (dict.theWord);
+  }
+  else
+  {
+    if (value < 10)
+      EEPROM.write(i++, '0' + value);
+    else
+      for (int d = 10000; d > 0; d /= 10)
+      {
+        if (value >= d)
+          EEPROM.write(i++, '0' + ((value / d) % 10));
+      }
+
+  }
+  EEPROM.write(i++, '\n');
+  return i;
+}
+
+int coreSaveName(int i, const char *name)
+{
+  char ch;
+
+  EEPROM.write(i++, 'S');
+  EEPROM.write(i++, ',');
+  while ((ch = pgm_read_byte(name++)) != 0x00)
+    EEPROM.write(i++, ch);
+  EEPROM.write(i++, ',');
+  return i;
+}
+
+int coreSaveDict(int i, const struct dictionary_s *dictionary, int value)
+{
+  struct dictionary_s dict = {0};
+  uint8_t d = 0;
+  char ch;
+  do
+  {
+    memcpy_P(&dict, &dictionary[d], sizeof(dict));
+    d++;
+    if (dict.theWord && dict.theAssociatedValue == value)
+    {
+      while ((ch = pgm_read_byte(dict.theWord++)) != 0x00)
+        EEPROM.write(i++, ch);
+      break;
+    }
+  } while (dict.theWord);
+  EEPROM.write(i++, '\n');
+  return i;
+}
+
+int coreSaveValue(int i, int value)
+{
+  char arg[16] = {0};
+  char ch;
+
+  if (value < 10)
+    EEPROM.write(i++, '0' + value);
+  else
+  {
+    for (int d = 10000; d > 0; d /= 10)
+    {
+      if (value >= d)
+        EEPROM.write(i++, '0' + ((value / d) % 10));
+    }
+  }
+  EEPROM.write(i++, '\n');
+  return i;
+}
+
+
+
+
+/* There are 2 different EEPROMS.. One on the VISP PCB, the other in the Core */
+/* We treat the core's EEPROM as a command string! */
+#define SAVE_SETTINGS 1
+int32_t  CORE_SAVE_SETTINGS_TIMEOUT = 0;
+
+bool coreSaveSettings()
+{
+  if (LOADING_SETTINGS)
+    return false;
+
+  // Every time someone moves a slider, we get a bunch of 'S' events
+  // This waits for them to settle down before saving at one shot
+  // Reduces wear on the EEPROM
+  CORE_SAVE_SETTINGS_TIMEOUT = millis() + 5000; // In 5 seconds, save to the core...
+}
+
+// Break the writes up into smaller segments so that it is spread out over time
+void coreSaveSettingsStateMachine()
+{
+  static int8_t  CORE_SAVE_SETTINGS_STATE = 0;
+  static int i;
+
+  switch (CORE_SAVE_SETTINGS_STATE) {
+    case 0:
+      if (CORE_SAVE_SETTINGS_TIMEOUT != 0 && CORE_SAVE_SETTINGS_TIMEOUT < millis())
+      {
+        CORE_SAVE_SETTINGS_STATE++;
+        CORE_SAVE_SETTINGS_TIMEOUT = 0;
+        info(PSTR("saving"));
+      }
+      return;
+    case 1:
+      i = coreSaveName(4, strMotorType);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 2:
+      i = coreSaveDict(i, motorTypeDict, motorType);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 3:
+      i = coreSaveName(i, strMotorMinSpeed);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 4:
+      i = coreSaveValue(i, motorMinSpeed);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 5:
+      i = coreSaveName(i, strMotorHomingSpeed);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 6:
+      i = coreSaveValue(i, motorHomingSpeed);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 7:
+      i = coreSaveName(i, strMotorStepsPerRev);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 8:
+      i = coreSaveValue(i, motorStepsPerRev);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 9:
+      i = coreSaveName(i, strBreathPressure);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 10:
+      i = coreSaveValue(i, breathPressure);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 11:
+      i = coreSaveName(i, strBreathVolume);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 12:
+      i = coreSaveValue(i, breathVolume);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 13:
+      i = coreSaveName(i, strBreathRate);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 14:
+      i = coreSaveValue(i, breathRate);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 15:
+      i = coreSaveName(i, strBreathRatio);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 16:
+      i = coreSaveDict(i, breathRatioDict, breathRatio);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 17:
+      i = coreSaveName(i, strBreathThreshold);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 18:
+      i = coreSaveValue(i, breathThreshold);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 19:
+      if (i < EEPROM.length())
+        EEPROM.write(i++, 0);
+      else
+        CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 20:
+      EEPROM.put(0, eeprom_crc());
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 21:
+      info(PSTR("saved"));
+      CORE_SAVE_SETTINGS_STATE = 0;
+      break;
+  }
+  return;
+}
+
+bool coreLoadSettings()
+{
+  unsigned long crc;
+
+  LOADING_SETTINGS = true;
+  EEPROM.get(0, crc);
+  if (eeprom_crc() == crc)
+  {
+    int ch;
+    // No idea what junk may have come in from the hwSerial yet
+    commandParser('\n');
+    for (int i = 4; (i < EEPROM.length()) && (ch = EEPROM.read(i)); i++)
+    {
+      // info(PSTR("E[%d]:%c"), i, ch);
+      commandParser(ch);
+    }
+  }
+  LOADING_SETTINGS = false;
+  sanitizeCoreData();
+  return false;
 }

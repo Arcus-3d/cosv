@@ -74,23 +74,23 @@ void displayToThis(SSD1306AsciiWire *lcd, bool isVISP)
   lcd->println();
 
   lcd->print(F("IE 1:"));
-  lcd->print(visp_eeprom.breath_ratio);
+  lcd->print(breathRatio);
   lcd->print(F("  Rate "));
-  lcd->print(visp_eeprom.breath_rate);
+  lcd->print(breathRate);
   lcd->clearToEOL();
   lcd->println();
 
   lcd->print(F("Pressure "));
   lcd->print(pressure);
   lcd->print('/');
-  lcd->print(visp_eeprom.breath_pressure);
+  lcd->print(breathPressure);
   lcd->clearToEOL();
   lcd->println();
 
   lcd->print(F("Volume   "));
   lcd->print(volume);
   lcd->print('/');
-  lcd->print(visp_eeprom.breath_volume);
+  lcd->print(breathVolume);
   lcd->clearToEOL();
   lcd->println();
 }

@@ -85,25 +85,18 @@ typedef struct sensor_mapping_s {
 // WARNING: Must be a multiple of the eeprom's write page.   Assume 8-byte multiples
 // This is at address 0 in the eeprom
 typedef struct visp_eeprom_s {
+  uint32_t checksum; // TODO: future, paranoia about integrity
   uint32_t VISP;  // LETTERS VISP
   uint8_t busType;  // Character type "M"=mux "X"=XLate, "D"=Dual "S"=SPI
   uint8_t bodyType; // "V"=Venturi "P"=Pitot "H"=Hybrid
   uint8_t bodyVersion; // printable character
   uint8_t zero;  // NULL Terminator, so we can Serial.print(*eeprom);
-  uint8_t extra[2];
+  uint8_t extra[4];
   sensor_mapping_t sensorMapping[4]; // 16 bytes for sensor mapping.
-  uint16_t breath_pressure; // For pressure controlled automatic ventilation
-  uint16_t breath_volume;
-  uint8_t breath_rate;
-  uint8_t breath_ratio;
-  uint16_t breath_threshold;
-  uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
-  uint8_t extra2[26];
-  uint16_t checksum; // TODO: future, paranoia about integrity
-
+  // 32-bytes above.. Rest is calibration data (if necessary)
 
   // This is VISP specific (venturi/pitot/etc).
-  uint8_t visp_calibration[64];
+  uint8_t visp_calibration[96];
 
 } visp_eeprom_t; // WARNING: Must be a multiple of the eeprom's write page.   Assume (EEPROM_PAGE_SIZE) multiples
 
@@ -127,7 +120,6 @@ void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel = 0, busDe
 bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk = noEnableCbk);
 bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk = noEnableCbk);
 bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk enableCbkA = noEnableCbk, busDeviceEnableCbk enableCbkB = noEnableCbk);
-void sanitizeVispData();
 void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableCbkA = noEnableCbk, busDeviceEnableCbk enableCbkB = noEnableCbk);
 void saveParametersToVISP();
 

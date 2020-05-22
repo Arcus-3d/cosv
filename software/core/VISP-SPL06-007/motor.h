@@ -20,10 +20,10 @@
 #ifndef __MOTOR_H__
 #define __MOTOR_H__
 
-#define MOTOR_UNKNOWN    -1
-#define MOTOR_AUTODETECT  0
-#define MOTOR_HBRIDGE     1
-#define MOTOR_STEPPER     2
+#define MOTOR_UNKNOWN     0
+#define MOTOR_AUTODETECT  1
+#define MOTOR_HBRIDGE     2
+#define MOTOR_STEPPER     3
 
 
 extern volatile bool motorFound;
@@ -43,6 +43,7 @@ extern motorFunction motorReverseDirection;
 
 extern motorFunction motorRun; // call in loop()
 
+extern bool motorIsHoming; // Potentially send to interface as a button update
 
 extern int8_t motorType;
 extern int8_t motorHomingSpeed; // 0->100 as a percentage

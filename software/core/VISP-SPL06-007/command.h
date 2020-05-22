@@ -20,10 +20,17 @@
 #ifndef __COMMANDS_H__
 #define __COMMANDS_H__
 
+bool coreLoadSettings();
+bool coreSaveSettings();
+void coreSaveSettingsStateMachine();
+
 void commandParser(int cmdByte);
 void sendCurrentSystemHealth();
 void dataSend();
 
 char *currentModeStr(char *buff, int buffSize); // Used by the displayUpdate()
+
+void primeTheFrontEnd();
+void updateMotorSpeed();
 
 #endif

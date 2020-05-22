@@ -25,15 +25,27 @@
 int scaleAnalog(int analogIn, int minValue, int maxValue);
 
 
+// motorState's
+#define DO_NOTHING     0
+#define DETECT_START   1
+#define DETECT_HBRIDGE 2
+#define WAIT_HBRIDGE   3
+#define DETECT_STEPPER 4
+#define WAIT_STEPPER   5
+#define DETECT_TIMEOUT 6
+#define WAIT_TIMEOUT   7
+static int8_t motorState = DO_NOTHING;
+
+
 volatile bool motorFound = false;
 
 static bool motorWasGoingForward = false;
-int8_t motorSpeed = 0; // 0->100 as a percentage
-static int8_t motorState = 0;
+bool motorIsHoming = false;
 
-int8_t motorType = -1;
-int8_t motorHomingSpeed = 75; // 0->100 as a percentage
-int8_t motorMinSpeed = 60; // 0->100 as a percentage
+int8_t motorSpeed = 0; // 0->100 as a percentage
+int8_t motorType = MOTOR_UNKNOWN;
+int8_t motorHomingSpeed = 0; // 0->100 as a percentage
+int8_t motorMinSpeed = 0; // 0->100 as a percentage
 int16_t motorStepsPerRev = 200;
 int16_t STEPPER_MAX_SPEED = motorStepsPerRev*3;
 
@@ -60,6 +72,7 @@ void hbridgeGo()
 
   }
   analogWrite(MOTOR_HBRIDGE_PWM, motorSpeed);
+  updateMotorSpeed();
 }
 
 
@@ -84,6 +97,8 @@ void hbridgeStop()
 
   motorSpeed = 0;
   analogWrite(MOTOR_HBRIDGE_PWM, 0);
+  motorIsHoming=false;
+  updateMotorSpeed();
 }
 
 void hbridgeSpeedUp()
@@ -94,6 +109,7 @@ void hbridgeSpeedUp()
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
     analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
+    updateMotorSpeed();
   }
 }
 
@@ -105,6 +121,7 @@ void hbridgeSlowDown()
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
     analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
+    updateMotorSpeed();
   }
 }
 
@@ -118,6 +135,7 @@ void stepperReverseDirection()
 {
   motorWasGoingForward = !motorWasGoingForward;
   stepper_setSpeed((motorWasGoingForward ? motorSpeed : -motorSpeed));
+  updateMotorSpeed();
 }
 
 void stepperStop()
@@ -125,6 +143,8 @@ void stepperStop()
   motorSpeed = 0;
   stepper_setSpeed(0);
   stepper_stop(); // Stop as fast as possible: sets new target (not runSpeed)
+  motorIsHoming=false;
+  updateMotorSpeed();
 }
 
 void stepperRun()
@@ -136,6 +156,7 @@ void stepperGo()
 {
   int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
   stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
+  updateMotorSpeed();
 }
 
 void stepperSpeedUp()
@@ -147,6 +168,7 @@ void stepperSpeedUp()
       motorSpeed = motorMinSpeed;
     int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
     stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
+  updateMotorSpeed();
   }
 }
 
@@ -159,6 +181,7 @@ void stepperSlowDown()
       motorSpeed = motorMinSpeed;
     int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
     stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
+  updateMotorSpeed();
   }
 }
 
@@ -167,6 +190,8 @@ void motorGoHomeReal()
 {
   if (digitalRead(HOME_SENSOR) == HIGH)
   {
+    motorIsHoming=true;
+
     motorSpeed = motorHomingSpeed;
     motorReverseDirection();
   }
@@ -184,16 +209,8 @@ static void doNothing()
 
 bool motorDetectionInProgress()
 {
-  return motorState > 0;
+  return motorState >= DETECT_START;
 }
-
-#define DETECT_START   0
-#define DETECT_HBRIDGE 1
-#define WAIT_HBRIDGE   2
-#define DETECT_STEPPER 3
-#define WAIT_STEPPER   4
-#define DETECT_TIMEOUT 5
-#define WAIT_TIMEOUT   6
 
 // Will get called repeatedly
 void motorDetect()
@@ -208,7 +225,7 @@ void motorDetect()
   
   switch (motorState)
   {
-    case -1:
+    case DO_NOTHING:
       return;
     case DETECT_START: // Initialize
       motorType = MOTOR_UNKNOWN;
@@ -233,6 +250,8 @@ void motorDetect()
         hbridgeStop();
         motorType = MOTOR_HBRIDGE;
         motorSetup();
+        motorMinSpeed = HBRIDGE_SWEEP_SPEED;
+        motorHomingSpeed = HBRIDGE_SWEEP_SPEED+1;
         info(PSTR("Detected HBRIDGE Motor (%s %d)"), (motorFound ? "Home" : ""), encoderCount);
         return;
       }
@@ -260,6 +279,8 @@ void motorDetect()
         stepper_stop();
         motorType = MOTOR_STEPPER;
         motorSetup();
+        motorMinSpeed = STEPPER_SWEEP_SPEED;
+        motorHomingSpeed = STEPPER_SWEEP_SPEED+1;
         info(PSTR("Detected STEPPER Motor (%s %d)"), (motorFound ? "Home" : ""), encoderCount);
         return;
       }
@@ -279,7 +300,7 @@ void motorDetect()
       break;
     case WAIT_TIMEOUT: // When timed out, go back to state 0 and retry
       if (millis() > timeout)
-        motorState = 0;
+        motorState = DETECT_START;
       break;
   }
 }
@@ -324,9 +345,7 @@ void motorSetup()
       motorReverseDirection = hbridgeReverseDirection;
       motorStop = hbridgeStop;
       motorRun = doNothing; // HBRIDGE does not need to be told to step
-      motorState = -1; // YEA! It's found!
-      motorMinSpeed = HBRIDGE_SWEEP_SPEED;
-      motorHomingSpeed = HBRIDGE_SWEEP_SPEED + 1;
+      motorState = DO_NOTHING; // YEA! It's found!
       motorGo = hbridgeGo;
       break;
     case MOTOR_STEPPER:
@@ -335,25 +354,20 @@ void motorSetup()
       motorReverseDirection = stepperReverseDirection;
       motorStop = stepperStop;
       motorRun = stepperRun;
-      motorState = -1; // YEA! Motor has been found!
-      motorMinSpeed = STEPPER_SWEEP_SPEED;
-      motorHomingSpeed = STEPPER_SWEEP_SPEED + 1;
+      motorState = DO_NOTHING; // YEA! Motor has been found!
       stepper_initialize();
       motorGo = stepperGo;
       break;
     default:
-      motorHomingSpeed = 0;
-      motorSpeed = 0;
       motorSpeedUp = doNothing;
       motorSlowDown = doNothing;
       motorReverseDirection = doNothing;
       motorStop = doNothing;
       motorGo = doNothing;
       motorGoHome = doNothing;
+      motorState = DETECT_START;
       motorRun = (motorType == MOTOR_AUTODETECT ? motorDetect : doNothing);
       motorFound = false;
       break;
   }
-
-  motorGoHome();
 }

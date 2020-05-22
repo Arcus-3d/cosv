@@ -25,8 +25,13 @@ void respond(char command, PGM_P fmt, ...);
 // critical alerts should result in the display indicating such (big red X)
 // Think sensor communication loss or motor not detected (VISP not attached to bag while motor detection is happening?)
 // We also need a way to clear the error.
-
+#ifdef WANT_SLIM
+#define info(...)
+#define debug(...)
+#define warning(...)
+#else
 #define info(...)     respond('i', __VA_ARGS__)
 #define debug(...)    respond('g', __VA_ARGS__)
 #define warning(...)  respond('w', __VA_ARGS__)
+#endif
 #define critical(...) respond('c', __VA_ARGS__)

@@ -53,10 +53,8 @@ static uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
 void busPrint(busDevice_t *bus, const char *function)
 {
   if (bus == NULL)
-  {
-    debug(PSTR("%S(busDev is NULL)"), function);
     return;
-  }
+
   if (bus->busType == BUSTYPE_I2C)
   {
     debug(PSTR("%S(I2C: bus=0x%x address=0x%x channel=%d refCount=%d)"), function, bus->busdev.i2c.i2cBus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);

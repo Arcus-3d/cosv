@@ -65,8 +65,6 @@ void formatVisp(busDevice_t *busDev, struct visp_eeprom_s *data, uint8_t busType
 
   //  // Make *sure* that the calibration data is formatted properly
   //  calibrateClear();
-  //
-  //  sanitizeVispData();
 
   writeEEPROM(busDev, (unsigned short)0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
 }
@@ -207,22 +205,6 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
 }
 
 
-void sanitizeVispData()
-{
-  if (visp_eeprom.breath_ratio > MAX_BREATH_RATIO)
-    visp_eeprom.breath_ratio = MAX_BREATH_RATIO;
-  if (visp_eeprom.breath_ratio < MIN_BREATH_RATIO)
-    visp_eeprom.breath_ratio = MIN_BREATH_RATIO;
-  if (visp_eeprom.breath_rate > MAX_BREATH_RATE)
-    visp_eeprom.breath_rate = MAX_BREATH_RATE;
-  if (visp_eeprom.breath_rate < MIN_BREATH_RATE)
-    visp_eeprom.breath_rate = MIN_BREATH_RATE;
-  if (visp_eeprom.breath_pressure > MAX_BREATH_PRESSURE)
-    visp_eeprom.breath_pressure = MAX_BREATH_PRESSURE;
-  if (visp_eeprom.breath_pressure < MIN_BREATH_PRESSURE)
-    visp_eeprom.breath_pressure = MIN_BREATH_PRESSURE;
-}
-
 const char strBasedType[] PUTINFLASH = " Based VISP Detected"; // Save some bytes in flash
 // FUTURE: read EEPROM and determine what type of VISP it is.
 void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableCbkA, busDeviceEnableCbk enableCbkB)
@@ -231,7 +213,7 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
   uint8_t missing;
   memset(&sensors, 0, sizeof(sensors));
 
-  debug(PSTR("Detecting sensors"));
+  // debug(PSTR("Detecting sensors"));
 
   if (!detectMuxedSensors(i2cBusA, enableCbkA))
     if (!detectMuxedSensors(i2cBusA, enableCbkB))
@@ -254,10 +236,10 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
     return;
   }
 
-  if (detectedVispType == VISP_BUS_TYPE_I2C) debug(PSTR("DUAL I2C%S"), strBasedType);
-  else if (detectedVispType == VISP_BUS_TYPE_XLATE) debug(PSTR("XLate%S"), strBasedType);
-  else if (detectedVispType == VISP_BUS_TYPE_MUX)  debug(PSTR("MUX%S"), strBasedType);
-  else if (detectedVispType == VISP_BUS_TYPE_SPI) debug(PSTR("SPI%S"), strBasedType);
+  //if (detectedVispType == VISP_BUS_TYPE_I2C) debug(PSTR("DUAL I2C%S"), strBasedType);
+  //else if (detectedVispType == VISP_BUS_TYPE_XLATE) debug(PSTR("XLate%S"), strBasedType);
+  //else if (detectedVispType == VISP_BUS_TYPE_MUX)  debug(PSTR("MUX%S"), strBasedType);
+  //else if (detectedVispType == VISP_BUS_TYPE_SPI) debug(PSTR("SPI%S"), strBasedType);
 
   if (eeprom)
   {
@@ -268,25 +250,25 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
     {
       // ok, unformatted VISP
       format = true;
-      warning(PSTR("ERROR eeprom not formatted"));
+      //warning(PSTR("ERROR eeprom not formatted"));
     }
   }
   else
   {
     warning(PSTR("ERROR eeprom not available"));
-    // Actually, just provide soem sane numbers for the system
+    // Just provide some sane numbers for the system
     format = true;
   }
 
   if (format)
     formatVisp(eeprom, &visp_eeprom, detectedVispType, VISP_BODYTYPE_VENTURI);
 
-  sanitizeVispData();
-
   sensorsFound = true;
 
   // Just put it out there, what type we are for the status system to figure out
   info(PSTR("Sensors detected"));
+
+  primeTheFrontEnd(); // Updates all of the buttons...
   sendCurrentSystemHealth();
 }
 

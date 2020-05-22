@@ -20,6 +20,7 @@
 // TODO: Better input validation
 // TODO: Failure modes (all of them) need to be accounted for and baked into the system
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
+// TODO: periodic battery monitoring and reporting to front end (every 15 seconds?)
 
 #include "config.h"
 
@@ -44,6 +45,12 @@ TwoWire *i2cBus2 = NULL;
 uint8_t currentMode = MODE_OFF;
 debugState_e debug = DEBUG_DISABLED;
 
+  uint16_t breathPressure; // For pressure controlled automatic ventilation
+  uint16_t breathVolume;
+  uint8_t breathRate;
+  uint8_t breathRatio;
+  uint16_t breathThreshold;
+  uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
 
 
 
@@ -164,12 +171,12 @@ void timeToCheckPatient()
   // The patenti hasn't tried to breath on their own...
   if (theMillis > timeToInhale)
   {
-    unsigned long nextBreathCycle = ((60.0 / (float)visp_eeprom.breath_rate) * 1000.0);
+    unsigned long nextBreathCycle = ((60.0 / (float)breathRate) * 1000.0);
     timeToInhale = nextBreathCycle;
-    timeToStopInhale = (nextBreathCycle / visp_eeprom.breath_ratio);
+    timeToStopInhale = (nextBreathCycle / breathRatio);
 
     // This info is 200 bytes long...
-    info(PSTR("brate=%d  bratio=%d nextBreathCycle=%l timeToStopInhale=%l millis"), visp_eeprom.breath_rate, visp_eeprom.breath_ratio, nextBreathCycle, timeToStopInhale);
+    info(PSTR("brate=%d  bratio=%d nextBreathCycle=%l timeToStopInhale=%l millis"), breathRate, breathRatio, nextBreathCycle, timeToStopInhale);
 
     timeToInhale += theMillis;
     timeToStopInhale += theMillis;
@@ -194,16 +201,16 @@ void timeToCheckPatient()
     {
       case MODE_MANUAL_PCCMV:
       case MODE_PCCMV:
-        if (pressure < visp_eeprom.breath_pressure)
+        if (pressure < breathPressure)
           motorSpeedUp();
-        if (pressure > visp_eeprom.breath_pressure)
+        if (pressure > breathPressure)
           motorSlowDown();
         break;
       case MODE_MANUAL_VCCMV:
       case MODE_VCCMV:
-        if (volume < visp_eeprom.breath_volume)
+        if (volume < breathVolume)
           motorSpeedUp();
-        if (volume > visp_eeprom.breath_volume)
+        if (volume > breathVolume)
           motorSlowDown();
         break;
     }
@@ -256,10 +263,10 @@ void timeToCheckADC()
   if (analogMode)
   {
     currentMode = (analogMode == 1 ? MODE_MANUAL_PCCMV : MODE_MANUAL_VCCMV);
-    visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
-    visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
-    visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-    visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+    breathPressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
+    breathVolume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
+    breathRate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+    breathRatio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
   }
 }
 
@@ -348,7 +355,6 @@ void setup()
 
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
-  sanitizeVispData(); // Apply defaults
 
   // Start the VISP calibration process
   calibrateClear();
@@ -357,6 +363,11 @@ void setup()
 
   //scanI2C(i2cBus1);
   //scanI2C(i2cBus2);
+
+  coreLoadSettings();
+
+  primeTheFrontEnd();
+  sendCurrentSystemHealth();
 }
 
 
@@ -383,6 +394,10 @@ void loop() {
   startMicros = micros();
   while (hwSerial.available())
     commandParser(hwSerial.read());
+    
+  // Spread out the writing of the EEPROM over time
+  coreSaveSettingsStateMachine();
+  
   currentUtilization += micros() - startMicros;
 
   if (millis() > utilizationTimeout)

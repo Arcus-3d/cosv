@@ -271,8 +271,6 @@ void actionModeChanged(struct settingsEntry_s *);
 void handleMotorChange(struct settingsEntry_s * entry)
 {
   motorSetup();
-  // motorSetup() monkeys with min/max motor speeds, need to ship them back to the display
-  actionModeChanged(entry);
 }
 
 void updateMotorSpeed()
@@ -581,7 +579,7 @@ void handleSettingCommand(const char *arg1, const char *arg2)
           {
             // Only perform a save if the setting actually needs to be saved.
             if (entry.bitmask & SAVE_THIS)
-                coreSaveSettings();
+              coreSaveSettings();
 
             entry.respondIt(&entry);
           }
@@ -613,7 +611,7 @@ void handleQueryCommand(const char *arg1, const char *arg2)
 
 void handleIdentifyCommand(const char *arg1, const char *arg2)
 {
-  respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+  respond('I', PSTR("Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
 }
 
 void handleCalibrateCommand(const char *arg1, const char *arg2)
@@ -814,16 +812,18 @@ void sanitizeCoreData()
 
 #include <EEPROM.h>
 
+const unsigned long crc_table[16] = {
+  0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
+  0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
+  0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
+  0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
+};
+
+static unsigned long crc;
+
 unsigned long eeprom_crc(void) {
 
-  const unsigned long crc_table[16] = {
-    0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
-    0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
-    0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
-    0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
-  };
-
-  unsigned long crc = ~0L;
+  crc = ~0L;
 
   for (int index = 4 ; index < EEPROM.length() ; ++index) {
     crc = crc_table[(crc ^ EEPROM[index]) & 0x0f] ^ (crc >> 4);
@@ -833,50 +833,6 @@ unsigned long eeprom_crc(void) {
   return crc;
 }
 
-// TODO: verify we don't go past EEPROM.length()
-int coreSave(int i, const char *name, const struct dictionary_s *dictionary, int value)
-{
-  struct dictionary_s dict = {0};
-  uint8_t d = 0;
-  char arg[16] = {0};
-  char ch;
-
-  EEPROM.write(i++, 'S');
-  EEPROM.write(i++, ',');
-  while ((ch = pgm_read_byte(name++)) != 0x00)
-    EEPROM.write(i++, ch);
-  EEPROM.write(i++, ',');
-
-  if (dictionary)
-  {
-    int d = 0;
-    do
-    {
-      memcpy_P(&dict, &dictionary[d], sizeof(dict));
-      d++;
-      if (dict.theWord && dict.theAssociatedValue == value)
-      {
-        while ((ch = pgm_read_byte(dict.theWord++)) != 0x00)
-          EEPROM.write(i++, ch);
-        break;
-      }
-    } while (dict.theWord);
-  }
-  else
-  {
-    if (value < 10)
-      EEPROM.write(i++, '0' + value);
-    else
-      for (int d = 10000; d > 0; d /= 10)
-      {
-        if (value >= d)
-          EEPROM.write(i++, '0' + ((value / d) % 10));
-      }
-
-  }
-  EEPROM.write(i++, '\n');
-  return i;
-}
 
 int coreSaveName(int i, const char *name)
 {
@@ -912,19 +868,40 @@ int coreSaveDict(int i, const struct dictionary_s *dictionary, int value)
 
 int coreSaveValue(int i, int value)
 {
-  char arg[16] = {0};
-  char ch;
+  char out[6]; // 65536 is 5 chars long
+  char *c = out;
+  bool isNeg = value < 0;
 
-  if (value < 10)
-    EEPROM.write(i++, '0' + value);
+  if (value == 0)
+    EEPROM.write(i++, '0');
   else
   {
-    for (int d = 10000; d > 0; d /= 10)
+    if (isNeg)
+      value = -value;
+
+    while (value > 0)
     {
-      if (value >= d)
-        EEPROM.write(i++, '0' + ((value / d) % 10));
+      *c = value % 10 + '0';
+      value /= 10;
+      c++;
+    }
+    if (isNeg)
+      EEPROM.write(i++, '-');
+    while (c > out)
+    {
+      c--;
+      EEPROM.write(i++, *c);
     }
   }
+  //for (int d = 10000; d > 0; d /= 10)
+  //{
+  //  if (value >= d)
+  //    EEPROM.write(i++, '0' + ((value / d) % 10));
+  //}
+  //  if (value>=1000) EEPROM.write(i++, '0' + ((value/1000) % 10));
+  ///  if (value>=100) EEPROM.write(i++, '0' + ((value/100) % 10));
+  //  if (value>=10) EEPROM.write(i++, '0' + ((value/10) % 10));
+  //  EEPROM.write(i++, '0' + (value % 10));
   EEPROM.write(i++, '\n');
   return i;
 }
@@ -962,7 +939,7 @@ void coreSaveSettingsStateMachine()
         CORE_SAVE_SETTINGS_TIMEOUT = 0;
         info(PSTR("saving"));
       }
-      return;
+      break;
     case 1:
       i = coreSaveName(4, strMotorType);
       CORE_SAVE_SETTINGS_STATE++;
@@ -1041,16 +1018,38 @@ void coreSaveSettingsStateMachine()
       else
         CORE_SAVE_SETTINGS_STATE++;
       break;
+#ifndef WANT_TRICKLE_EEPROM
     case 20:
       EEPROM.put(0, eeprom_crc());
-      CORE_SAVE_SETTINGS_STATE++;
-      break;
-    case 21:
       info(PSTR("saved"));
       CORE_SAVE_SETTINGS_STATE = 0;
       break;
+#else
+    case 20:
+      crc = ~0L;
+      i = 4;
+      CORE_SAVE_SETTINGS_STATE++;
+    // break; fall through
+    case 21:
+      if (i < EEPROM.length())
+      {
+        crc = crc_table[(crc ^ EEPROM[i]) & 0x0f] ^ (crc >> 4);
+        crc = crc_table[(crc ^ (EEPROM[i++] >> 4)) & 0x0f] ^ (crc >> 4);
+        crc = ~crc;
+      }
+      else
+        CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 22:
+      EEPROM.put(0, crc);
+      CORE_SAVE_SETTINGS_STATE++;
+      break;
+    case 23:
+      info(PSTR("saved"));
+      CORE_SAVE_SETTINGS_STATE = 0;
+      break;
+#endif
   }
-  return;
 }
 
 bool coreLoadSettings()

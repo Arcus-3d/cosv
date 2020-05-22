@@ -250,12 +250,12 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
     {
       // ok, unformatted VISP
       format = true;
-      //warning(PSTR("ERROR eeprom not formatted"));
+      //warning(PSTR("VISP eeprom not formatted"));
     }
   }
   else
   {
-    warning(PSTR("ERROR eeprom not available"));
+    warning(PSTR("VISP eeprom missing"));
     // Just provide some sane numbers for the system
     format = true;
   }

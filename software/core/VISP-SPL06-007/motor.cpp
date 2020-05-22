@@ -370,4 +370,7 @@ void motorSetup()
       motorFound = false;
       break;
   }
+
+  primeTheFrontEnd(); // Updates all of the buttons...
+  sendCurrentSystemHealth();
 }

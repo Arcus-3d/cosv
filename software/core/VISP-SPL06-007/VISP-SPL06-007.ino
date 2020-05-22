@@ -116,6 +116,10 @@ void timeToPulseWatchdog()
     delayMicroseconds(1);
     digitalWrite(MISSING_PULSE_PIN, LOW);
   }
+
+  // Save some flash code space and do this often, the display code prints 1 line per invocation, and has 2 displays to output to.
+  // 8 lines of text being updated, so we need to do this every 100ms or so.
+  displayUpdate();
 }
 
 void timeToReadVISP()
@@ -241,9 +245,6 @@ void timeToCheckSensors()
     if (sensorsFound)
       displaySetup(i2cBus1); // Need to setup the VISP I2C OLED that just attached
   }
-
-  // Save some flash code space and do this every half second in this function
-  displayUpdate();
 }
 
 // Scales the analog input to a range.
@@ -366,7 +367,7 @@ void setup()
 
   coreLoadSettings();
 
-  primeTheFrontEnd();
+  // primeTheFrontEnd();
   sendCurrentSystemHealth();
 }
 

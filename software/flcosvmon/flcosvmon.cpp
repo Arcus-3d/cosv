@@ -454,6 +454,7 @@ typedef struct core_s {
     int lastCmdTime; // 32-bit millis() since the core started
     int adjustedMillis; // What we use to stuff into the chart.  adjustedMillis += ((cmdTime-lastCmdTime)>0 ? (cmdTime-lastCmdTime) : 0);
     char *settingName; // For use in command processing strdup()'ed
+    char *pendingChange; // slider's send us an update for every position while it's moving...
     int settingType;
     int sentQ;
     dynamic_button_t *button_list;
@@ -576,10 +577,19 @@ public:
     MyPopupWindow(int X,int Y,int W,int H, const char* title) : Fl_Double_Window (X, Y, W, H, title) {}
 
     int handle(int e) {
+        core_t *core = (core_t *)user_data();
         switch(e) {
             case FL_FOCUS:
                 break;
             case FL_UNFOCUS:
+                if (core->pendingChange)
+                {
+                  printf("<%s", core->pendingChange);
+                  write(core->fd, core->pendingChange, strlen(core->pendingChange));
+                  fsync(core->fd);      
+                  free(core->pendingChange);
+                  core->pendingChange=NULL;  
+                }
                 if (!hasFocus((Fl_Pack *)this->child(0)))
                   Fl::delete_widget(this);
                 break;
@@ -592,17 +602,15 @@ public:
 
 void sliderChanged(Fl_Widget *w, void *data)
 {
-    core_t *core = (core_t *)data;
-    const char *bname = (const char *)w->parent()->user_data();
+    const char *bname = (const char *)data;
+    core_t *core = (core_t *)w->parent()->user_data();
 
     if (core->fd!=-1)
     {
-      char *buf;
-      int len=asprintf(&buf, "S,%s,%d\n", bname, (int)((Fl_Value_Slider *)w)->value());
-      printf("<%s", buf);
-      write(core->fd, buf, len);
-      fsync(core->fd);      
-      free(buf);  
+      if (core->pendingChange)
+          free(core->pendingChange);
+      core->pendingChange=NULL;
+      asprintf(&core->pendingChange, "S,%s,%d\n", bname, (int)((Fl_Value_Slider *)w)->value());
     }
 }
 
@@ -611,13 +619,13 @@ void sliderChanged(Fl_Widget *w, void *data)
 void popupRangeSelection(core_t *core, dynamic_button_t *b)
 {
   MyPopupWindow *popup = new MyPopupWindow(0,0,300, BUTTON_HEIGHT, b->name);
+  popup->user_data((void *)core);
 
   Fl_Value_Slider *slider = new Fl_Value_Slider(0,0,300,BUTTON_HEIGHT);
   slider->bounds(b->minRange, b->maxRange);
   slider->type(FL_HOR_NICE_SLIDER);
   slider->value(atoi(b->textValue));
-  popup->user_data(b->name);
-  slider->callback(sliderChanged, (void *)core);
+  slider->callback(sliderChanged, (void *)b->name);
   slider->step(1);
   popup->position((Fl::w() - popup->w())/2, (Fl::h() - popup->h())/2);
   popup->show();
@@ -639,6 +647,7 @@ void popupSelected(Fl_Widget *w, void *data)
     free(buf);
     // Tell the window to hide
     w->parent()->parent()->hide();
+    //Fl::delete_widget(w->parent()->parent());
 }
 
 // Generate a popup window that is dictionary based
@@ -653,6 +662,7 @@ void popupDictionarySelection(core_t *core, dynamic_button_t *b)
     MyPopupWindow *popup = new MyPopupWindow(0,0,300, count*BUTTON_HEIGHT, b->name);
     Fl_Pack *packer = new Fl_Pack(0,0,300, count*BUTTON_HEIGHT);
     packer->type(Fl_Pack::VERTICAL);
+    popup->user_data((void *)core);
     for (dictionary_t *d=b->dictionary; d; d=d->next)
     {
       Fl_Button *button = new Fl_Button(0,0,BUTTON_WIDTH, BUTTON_HEIGHT, d->name);

@@ -255,7 +255,6 @@ Fl_Color lookupColor(const char *name)
     return FL_FOREGROUND_COLOR;
 }     
 
-
 // 'X' overlay the whole window if the core is missing or reports being 'bad'
 class My_Double_Window : public Fl_Double_Window {
 public:
@@ -280,6 +279,7 @@ public:
     }
 };
 
+class MyPopupWindow;
 
 class FL_EXPORT My_Button : public Fl_Button {
 protected:
@@ -449,10 +449,12 @@ typedef struct buffer_s {
 typedef struct core_s {
     int fd; // Serial/socket stream
     const char *title; // title of this patient/stream
+    char *criticalText; // Last critical log output (stuff into titlebar)
     buffer_t streamData;
     int cmdTime; // 32-bit millis() since the core started
     int lastCmdTime; // 32-bit millis() since the core started
     int adjustedMillis; // What we use to stuff into the chart.  adjustedMillis += ((cmdTime-lastCmdTime)>0 ? (cmdTime-lastCmdTime) : 0);
+    bool addIcons;      // Only add when we are between 'Q' commands
     char *settingName; // For use in command processing strdup()'ed
     char *pendingChange; // slider's send us an update for every position while it's moving...
     int settingType;
@@ -464,7 +466,7 @@ typedef struct core_s {
     Fl_Pack *packedStatusItems;
 
     My_Chart *flCharts[MAX_CHARTS];
-
+    MyPopupWindow *popup; // So when a 'Q' happens, we can dismiss the active popup
 } core_t;
 
 void bufferClear(buffer_t *buffer)
@@ -491,10 +493,18 @@ void bufferAppend(buffer_t *buffer, char ch)
        buffer->data[buffer->size] = 0;
 }
 
+
+
 void setHealth(core_t *core, int isGood)
 {
   // if !isGood, big red X on screen, or red banner, whatever
   if (isGood) core->win->setGood(); else core->win->setBad();
+  if (isGood && core->criticalText)
+  {
+      free(core->criticalText);
+      core->criticalText=NULL;
+      core->win->label(core->title);
+  }
 }
 
 dynamic_button_t *buttonLookup(core_t *core, char *settingName)
@@ -504,6 +514,9 @@ dynamic_button_t *buttonLookup(core_t *core, char *settingName)
         if (strcasecmp(settingName,ptr->name)==0)
              return ptr;
     }
+    
+    if (!core->addIcons)
+        return NULL;
     
     dynamic_button_t *newPtr = (dynamic_button_t *)calloc(1, sizeof(dynamic_button_t));
     newPtr->name = strdup(settingName);
@@ -577,6 +590,7 @@ int hasFocus(Fl_Group *g)
     return false;
 }
 
+
 class MyPopupWindow : public Fl_Double_Window {
 public:
     MyPopupWindow(int X,int Y,int W,int H, const char* title) : Fl_Double_Window (X, Y, W, H, title) {}
@@ -596,12 +610,16 @@ public:
                   core->pendingChange=NULL;  
                 }
                 if (!hasFocus((Fl_Pack *)this->child(0)))
+                {
+                  core->popup=NULL;
                   Fl::delete_widget(this);
+                }
                 break;
         }
         return(Fl_Double_Window::handle(e));
     }
 };
+
 
 
 
@@ -623,8 +641,8 @@ void sliderChanged(Fl_Widget *w, void *data)
 // Simple slider bar set to current strtoul(b->textValue); with ninRange/maxRange values
 void popupRangeSelection(core_t *core, dynamic_button_t *b)
 {
-  MyPopupWindow *popup = new MyPopupWindow(0,0,300, BUTTON_HEIGHT, b->name);
-  popup->user_data((void *)core);
+  core->popup = new MyPopupWindow(0,0,300, BUTTON_HEIGHT, b->name);
+  core->popup->user_data((void *)core);
 
   Fl_Value_Slider *slider = new Fl_Value_Slider(0,0,300,BUTTON_HEIGHT);
   slider->bounds(b->minRange, b->maxRange);
@@ -632,8 +650,8 @@ void popupRangeSelection(core_t *core, dynamic_button_t *b)
   slider->value(atoi(b->textValue));
   slider->callback(sliderChanged, (void *)b->name);
   slider->step(1);
-  popup->position((Fl::w() - popup->w())/2, (Fl::h() - popup->h())/2);
-  popup->show();
+  core->popup->position((Fl::w() - core->popup->w())/2, (Fl::h() - core->popup->h())/2);
+  core->popup->show();
 }
 
 void popupSelected(Fl_Widget *w, void *data)
@@ -664,10 +682,10 @@ void popupDictionarySelection(core_t *core, dynamic_button_t *b)
 
   if (count)
   {
-    MyPopupWindow *popup = new MyPopupWindow(0,0,300, count*BUTTON_HEIGHT, b->name);
+    core->popup = new MyPopupWindow(0,0,300, count*BUTTON_HEIGHT, b->name);
     Fl_Pack *packer = new Fl_Pack(0,0,300, count*BUTTON_HEIGHT);
     packer->type(Fl_Pack::VERTICAL);
-    popup->user_data((void *)core);
+    core->popup->user_data((void *)core);
     for (dictionary_t *d=b->dictionary; d; d=d->next)
     {
       Fl_Button *button = new Fl_Button(0,0,BUTTON_WIDTH, BUTTON_HEIGHT, d->name);
@@ -675,8 +693,8 @@ void popupDictionarySelection(core_t *core, dynamic_button_t *b)
       packer->user_data(b->name);
       button->callback(popupSelected, (void *)core);
     }
-    popup->position((Fl::w() - popup->w())/2, (Fl::h() - popup->h())/2);
-    popup->show();
+    core->popup->position((Fl::w() - core->popup->w())/2, (Fl::h() - core->popup->h())/2);
+    core->popup->show();
   }
 }
 
@@ -699,7 +717,31 @@ void buttonPushed(Fl_Widget *w, void *data)
   }
 }
 
+void wipeIcon(core_t *core, dynamic_button_t *button)
+{
+    buttonDictionaryClear(button);
+    if (button->textValue)
+        free(button->textValue);
+    if (button->units)
+        free(button->units);
+    if (button->bgcolor)
+        free(button->bgcolor);
+    if (button->fgcolor)
+        free(button->fgcolor);
+}
 
+void wipeIcons(core_t *core)
+{
+  core->packedButtons->clear();
+  core->packedStatusItems->clear();
+  while (core->button_list)
+  {
+      dynamic_button_t *b = core->button_list;
+      core->button_list = b->next;
+      wipeIcon(core, b);
+      free(b);
+  }
+}
 
 void refreshIcons(core_t *core)
 {
@@ -836,7 +878,7 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'H': // Health check ("good" or "bad")
       if (currentArgIndex==1)
           setHealth(core, strncasecmp(argBuffer->data, "good", argBuffer->size)==0);
-
+  
       // Let's request everything in a batch
       if (core->sentQ==0)
       {
@@ -851,6 +893,10 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'c': // critical log output
       // Should go titlebar?
       // and get cleared on "good" health...
+      if (core->criticalText)
+          free(core->criticalText);
+      core->criticalText = strdup(argBuffer->data);
+      core->win->label(core->criticalText);
       break;
   case 'i': // Infor log output
   case 'w': // warning log output
@@ -880,7 +926,7 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
                free(core->settingName);
            core->settingName = strdup(argBuffer->data);
            break;
-      case 2: // type of setting response
+       case 2: // type of setting response
            if (strcasecmp(argBuffer->data,"value")==0)
                core->settingType = SETTING_VALUE;
            else if (strcasecmp(argBuffer->data,"min")==0)
@@ -911,7 +957,14 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
        break;
    case 'Q':
        // End of a "query" command, we need to redraw all of the buttons! (Maybe)
-       refreshIcons(core);
+       // We get a   Q,<t>,Begin
+       // A bunch of S,<t>,....
+       // And a      Q,<t>,End
+       core->addIcons = (strcasecmp(argBuffer->data,"Begin")==0);
+       if (core->addIcons)
+           wipeIcons(core);
+       else
+           refreshIcons(core);
        break;
   }
 }

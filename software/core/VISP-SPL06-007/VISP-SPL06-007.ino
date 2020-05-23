@@ -180,7 +180,7 @@ void timeToCheckPatient()
     timeToStopInhale = (nextBreathCycle / breathRatio);
 
     // This info is 200 bytes long...
-    info(PSTR("brate=%d  bratio=%d nextBreathCycle=%l timeToStopInhale=%l millis"), breathRate, breathRatio, nextBreathCycle, timeToStopInhale);
+    info(PSTR("brate=%d  I:E=1:%d Inhale=%l Exhale=%l millis"), breathRate, breathRatio, timeToStopInhale, nextBreathCycle-timeToStopInhale);
 
     timeToInhale += theMillis;
     timeToStopInhale += theMillis;

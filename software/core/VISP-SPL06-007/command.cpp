@@ -614,9 +614,9 @@ void handleSettingCommand(const char *arg1, const char *arg2)
 
 void handleQueryCommand(const char *arg1, const char *arg2)
 {
-  sendCurrentSystemHealth();
+  respond('Q', PSTR("Begin"));  // Interface should start creating buttons now
   respondAppropriately(RESPOND_ALL);
-  respond('Q', PSTR("Finished"));
+  respond('Q', PSTR("End"));    // Interface should stop creating buttons now
 }
 
 void handleIdentifyCommand(const char *arg1, const char *arg2)

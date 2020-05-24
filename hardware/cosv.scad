@@ -145,7 +145,7 @@ if (PART == "cam") {
 //laser_base_end_right(slots=0,battery=0); // outer end plate with bvm_br sized bag hole
 //laser_base_end_left(slots=0,battery=0); // outer end plate with bvm_tr sized bag hole
 
-//laser_base_end_right(slots=1,battery=0); // inner end plate with bvm_br sized bag hole
+laser_base_end_right(slots=1,battery=0); // inner end plate with bvm_br sized bag hole
 //laser_base_end_left(slots=1,battery=1); // inner end plate with bvm_tr sized bag hole
 
 //laser_base_battery_mount_t(); // battery mounts
@@ -180,7 +180,7 @@ if (PART == "cam") {
 //laser_paddle(layer=0,h=material_t*3); // paddles for the arms.
 //laser_paddle(layer=1,h=material_t*3); // paddles for the arms.
 
-laser_nut_support(); // little glue-on nut holder to eliminate a whole layer otherwise
+//laser_nut_support(); // little glue-on nut holder to eliminate a whole layer otherwise
 
 //////////////////////////////////////////////////////////////////
 // FFF parts, for testing.  May be out of date!

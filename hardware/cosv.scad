@@ -36,7 +36,8 @@ param_complexity=90; // [1:100]
 param_path_step=15; // [1:15]
 
 // Line width for laser cutting.  Affects hole sizes
-param_kerf=0.15; // [0.000:0.005:0.500]
+//param_kerf=0.15; // [0.000:0.005:0.500]
+param_kerf=0.04; // [0.000:0.005:0.500]
 
 // Motor mount selection
 param_motor="wiper"; // [wiper:Ford F150 Wiper Motor,bldc:BLDC Brushless Motor,worm:Worm gear motor,nema23:Nema23 Stepper with 6mm shaft,nema23-635:Nema23 Stepper with 6.35mm shaft]
@@ -139,13 +140,13 @@ if (PART == "cam") {
 //laser_base_mount_right(); // cam/arm mount motor side
 
 //laser_arm(path_step=1,$fn=90); // arm for the bag
-//laser_arm_end_support(path_step=1,$fn=90); // small support triangles for the paddle from the arm
+//laser_arm_end_support(); // small support triangles for the paddle from the arm
 
-//laser_base_end_right(slots=0); // outer end plate with bvm_br sized bag hole
-//laser_base_end_left(slots=0); // outer end plate with bvm_tr sized bag hole
+//laser_base_end_right(slots=0,battery=0); // outer end plate with bvm_br sized bag hole
+//laser_base_end_left(slots=0,battery=0); // outer end plate with bvm_tr sized bag hole
 
 //laser_base_end_right(slots=1,battery=0); // inner end plate with bvm_br sized bag hole
-//laser_base_end_left(slots=1); // inner end plate with bvm_tr sized bag hole
+//laser_base_end_left(slots=1,battery=1); // inner end plate with bvm_tr sized bag hole
 
 //laser_base_battery_mount_t(); // battery mounts
 //laser_base_battery_mount_b(); // battery mounts
@@ -167,7 +168,7 @@ if (PART == "cam") {
 
 //laser_cam_center_b(); // cam center with motor shaft cutout
 //laser_cam_center_t(); // cam center with motor shaft bolt cutout
-laser_bearing_kerf_test();
+//laser_bearing_kerf_test();
 //laser_cam_encoder(); // cam end with encoder slots for optical gate
 
 //laser_base_top(); // top panel with rj45 jack and holes for arms
@@ -179,7 +180,7 @@ laser_bearing_kerf_test();
 //laser_paddle(layer=0,h=material_t*3); // paddles for the arms.
 //laser_paddle(layer=1,h=material_t*3); // paddles for the arms.
 
-//laser_nut_support(); // little glue-on nut holder to eliminate a whole layer otherwise
+laser_nut_support(); // little glue-on nut holder to eliminate a whole layer otherwise
 
 //////////////////////////////////////////////////////////////////
 // FFF parts, for testing.  May be out of date!
@@ -352,7 +353,7 @@ MOTOR=param_motor;
 d_shaft = (param_d_shaft=="zero" ? 0 : 
           (param_d_shaft=="one" ? 1 :
 	  (param_d_shaft=="two" ? 2 :
-	  (param_d_shaft=="auto" ? (MOTOR=="wiper" ? 2 : (MOTOR=="worm" ? 1 : (MOTOR=="nema23" ? 1 : 0))) : 0))));
+	  (param_d_shaft=="auto" ? (MOTOR=="wiper" ? 3 : (MOTOR=="worm" ? 1 : (MOTOR=="nema23" ? 1 : 0))) : 0))));
 motor_tri = (MOTOR=="wiper" ? 1 : 0);
 motor_tri_angle = (MOTOR=="wiper" ? 53 : 60);
 motor_mount_offset = (MOTOR=="wiper" ? 0
@@ -425,10 +426,10 @@ module laser_arm($fm=90,path_step=1) {
 	//arm_model();
 	projection(cut=true) arm_model($fn=$fn,path_step=path_step);
 }
-module laser_arm_end_support(h=material_h) {
-	projection(cut=true) arm_end_support(h=h);
+module laser_arm_end_support(h=material_t) {
+	projection(cut=false) arm_end_support(h=h);
 }
-module laser_arm_end_lock(h=material_h) {
+module laser_arm_end_lock(h=material_t) {
 	projection(cut=true) arm_end_lock(h=h);
 }
 module laser_paddle(layer=0,h=material_t*3) {
@@ -1283,6 +1284,7 @@ module arm_end_support(h=material_t*3) {
 		translate([arm_w,0,0]) cylinder(r=cover_bolt_r,h=h+extra,center=true);
 	}
 }
+
 module arm_end_lock(h=material_t) {
 	arm_end_mount();
 }
@@ -1419,6 +1421,7 @@ module cam_holes(d_shaft=d_shaft,motor_shaft_r=motor_shaft_r) {
 		translate([0,0,cam_h/2]) cylinder(r=motor_shaft_r+clearance/4,h=cam_h+extra,center=true);
 		if (d_shaft > 0 )translate([0,motor_shaft_r/2-motor_shaft_r/4.5,cam_h/2]) cube([motor_shaft_r*2,motor_shaft_r*2,cam_h+extra*4],center=true);
 		if (d_shaft > 1) translate([0,-motor_shaft_r/2+motor_shaft_r/4.5,cam_h/2]) cube([motor_shaft_r*2,motor_shaft_r*2,cam_h+extra*4],center=true);
+		if (d_shaft > 2) translate([-motor_shaft_r/2+motor_shaft_r/4.5,0,cam_h/2]) cube([motor_shaft_r*2,motor_shaft_r*2,cam_h+extra*4],center=true);
 		//%cube([8.25,8.25,8.25],center=true);
 	}
 }

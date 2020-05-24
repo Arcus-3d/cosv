@@ -166,8 +166,8 @@ if (PART == "cam") {
 //laser_cam_end_plate_t(); // cam end plate opposite motor
 
 //laser_cam_center_b(); // cam center with motor shaft cutout
-laser_cam_center_t(); // cam center with motor shaft bolt cutout
-
+//laser_cam_center_t(); // cam center with motor shaft bolt cutout
+laser_bearing_kerf_test();
 //laser_cam_encoder(); // cam end with encoder slots for optical gate
 
 //laser_base_top(); // top panel with rj45 jack and holes for arms
@@ -491,6 +491,16 @@ module laser_bldc_motor_standoff() {
 }
 module laser_nut_support(r1=6.25/2,r2=6) {
 	projection(cut=true) nut_support(r1=r1,r2=r2,h=h);
+}
+module laser_bearing_kerf_test() {
+	bearing_or=22/2;
+	for (x=[0:0.025:0.25]) translate([-bearing_or*20/2+bearing_or/0.025*2.3*x,0]) {
+		difference() {
+			square([bearing_or*2.3+extra,bearing_or*3],center=true);
+			translate([0,-2]) circle(r=22/2-x,center=true);
+			translate([0,bearing_or]) text(text=str(x),size=4,halign="center");
+		}
+	}
 }
 // now a little screwed up since I split the parts into layers
 module cosv_assembly_view(explode=0,cam_angle=0) {

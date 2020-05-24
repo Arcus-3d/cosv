@@ -26,6 +26,8 @@
 				x,y,z=dimensions in x,y,z
 */
 
+
+
 /* [Global] */
 
 /* [COSV Customization] */
@@ -46,14 +48,10 @@ param_motor="wiper"; // [wiper:Ford F150 Wiper Motor,bldc:BLDC Brushless Motor,w
 param_d_shaft = "auto"; // [zero:Circular,one:D-Shaped,two:Double-D shaped (wiper motor),auto:D or DD based on motor type]
 
 // Which one would you like to see?
-param_part = ""; // [cam:cam top/bottom - need 2,paddle:paddle for the arms - need 2,base_mount_right:base plate/motor mount - need 1,base_mount_left:top plate/electronics mount - need 1,bldc_motor_standoff:bldc motor standoff - need 1,arm:Arm,supply_cover:Power Supply cover,chest_bar:Chest bar,flow_sensor_pitot_for_pcb:Flow sensor body for use with a PCB (pitot style),flow_sensor_venturi_for_pcb:Flow sensor body for use with a PCB (venturi style),flow_sensor_cover_oled:Flow sensor cover for use with embedded OLED,flow_sensor_cover:Flow sensor cover,flow_sensor_test:Test apparatus for the flow sensor,bearing_bushing:bearing_busing - used within the other FFF parts,bearing_washer:bearing_washer - used within the other FFF parts,laser_callibration_square_10x10mm:Laser calibration square - A 10x10mm square in case units don't go over with the svg export,laser_arm_mount:Laser arm mount - raised area by arm bearings as a layer,laser_bearing_washer:  washer - if laser cutting it,laser_cam:Laser cam top/bottom - need 2,laser_cam_center:Laser cam center - Stronger - but you need to glue it to top/bottom,laser_bearing_bushing:Laser bearing bushing to make up the difference between bolt_r and bearing_ir - need 2,laser_bldc_motor_standoff:Laser bldc motor has an input shaft that sticks out too far,laser_base_mount_left:Laser base - top plate,laser_base_mount_right:Laser base - bottom plate,laser_paddle:Laser paddle for arm ends - need 2,laser_arm:Laser arms - need 2]
-
+param_part = ""; // REPLACE_ME_PART_TRAP_EM_ECALPER 
 
 /* [Hidden] */
 
-
-// Laser parts
-param_partl="";
 
 // Don't touch $fn, the param_complexity variable is over-ridden in the makefile
 $fn=param_complexity;
@@ -67,64 +65,6 @@ path_step=param_path_step; // [1:15]
 
 PART=param_part;
 
-if (PART == "cam") {
-	cam(); // cam top/bottom.  Need 2.
-} else if (PART == "paddle") {
-	paddle(); // paddle for the arms.  Need 2
-} else if (PART == "base_mount_right") {
-	base_mount_right(); // base plate/motor mount.  Adjust the bolt pattern you need below first.  Need 1.
-} else if (PART == "base_mount_left") {
-	base_mount_left(); // top plate/electronics mount.  Need 1.
-} else if (PART == "bldc_motor_standoff") {
-	bldc_motor_standoff(); // bldc motor has a long pilot on it, which requires a standoff. Need 1.
-} else if (PART == "arm") {
-	arm();
-} else if (PART == "supply_cover") {
-	supply_cover();
-} else if (PART == "flow_sensor_pitot_for_pcb") {
-	flow_sensor_pitot_for_pcb();
-} else if (PART == "flow_sensor_venturi_for_pcb") {
-	flow_sensor_venturi_for_pcb();
-} else if (PART == "flow_sensor_cover_oled") {
-	flow_sensor_cover(oled=0);
-} else if (PART == "flow_sensor_cover") {
-	flow_sensor_cover();
-} else if (PART == "bearing_bushing") {
-	bearing_bushing(); // parts used within the other FFF parts
-} else if (PART == "bearing_washer") {
-	bearing_washer(); // parts used within the other FFF parts
-
-// Laser parts.  Arms at least should have arm_w (below) turned up as acrylic isn't as strong as FFF.
-
-} else if (PART == "laser_callibration_square_10x10mm") {
-	laser_callibration_square(w=10); // A square, 10x10mm in case units don't go over with the svg export.
-} else if (PART == "laser_arm_mount") {
-	laser_arm_mount(); // raised area by arm bearings as a layer
-} else if (PART == "laser_bearing_washer") {
-	laser_bearing_washer(); // washer, if laser cutting it
-} else if (PART == "laser_cam") {
-	laser_cam(); // cam top/bottom
-} else if (PART == "laser_cam_center") {
-	laser_cam_center(); //cam center.  Stronger, but you need to glue it to top/bottom
-} else if (PART == "laser_bearing_bushing") {
-	laser_bearing_bushing(); // bushing to make up the difference between bolt_r and bearing_ir
-} else if (PART == "laser_bldc_motor_standoff") {
-	laser_bldc_motor_standoff(); // bldc motor has an input shaft that sticks out too far
-} else if (PART == "laser_base_mount_left") {
-	laser_base_mount_left(); // base, top plate
-} else if (PART == "laser_base_mount_bottom") {
-	laser_base_mount_right(); // base, top plate
-} else if (PART == "laser_base_end_right") {
-	laser_base_end_right(); // base, top plate
-} else if (PART == "laser_base_end_left") {
-	laser_base_end_left(); // base, top plate
-} else if (PART == "laser_paddle") {
-	laser_paddle(); // paddle for arm ends
-} else if (PART == "laser_arm") {
-	laser_arm(); // The arms (when symetrical).
-} else if (PART == "laser_arm_end_support") {
-	laser_arm_end_support(); // The arm end.
-}
 
 //////////////////////////////////////////////////////////////////
 // Assembly views, for testing
@@ -132,63 +72,62 @@ if (PART == "cam") {
 //cam_assembly_view(explode=0);
 //flow_sensor_assembly_view(rot=360*$t,explode=0.1);
 
-
 //////////////////////////////////////////////////////////////////
 // Laser parts, for testing
 
-//laser_base_mount_left(); // cam/arm mount opposite motor
-//laser_base_mount_right(); // cam/arm mount motor side
+//laser_base_mount_left(); // GROUP Laser DESC "cam/arm mount opposite motor" 
+//laser_base_mount_right(); // GROUP Laser DESC "cam/arm mount motor side"
 
-//laser_arm(path_step=1,$fn=90); // arm for the bag
-//laser_arm_end_support(); // small support triangles for the paddle from the arm
+//laser_arm(path_step=1,$fn=90); // GROUP Laser DESC  "arm for the bag" NAME="laser_arm" QTY 6
+//laser_arm_end_support(); // GROUP Laser DESC "small support triangles for the paddle from the arm" QTY 16
 
-//laser_base_end_right(slots=0,battery=0); // outer end plate with bvm_br sized bag hole
-//laser_base_end_left(slots=0,battery=0); // outer end plate with bvm_tr sized bag hole
+//laser_base_end_right(slots=0,battery=0); // GROUP Laser DESC "outer end plate with bvm_br sized bag hole" NAME="laser_base_end_right"
+//laser_base_end_left(slots=0,battery=0); // GROUP Laser DESC "outer end plate with bvm_tr sized bag hole" NAME="laser_base_end_left"
 
-laser_base_end_right(slots=1,battery=0); // inner end plate with bvm_br sized bag hole
-//laser_base_end_left(slots=1,battery=1); // inner end plate with bvm_tr sized bag hole
+//laser_base_end_right(slots=1,battery=0); // GROUP Laser DESC  "inner end plate with bvm_br sized bag hole" NAME="laser_base_end_right_with_slots"
+//laser_base_end_left(slots=1,battery=1); // GROUP Laser DESC "inner end plate with bvm_tr sized bag hole" NAME="laser_base_end_left_with_slots"
 
-//laser_base_battery_mount_t(); // battery mounts
-//laser_base_battery_mount_b(); // battery mounts
+//laser_base_battery_mount_t(); // GROUP Laser DESC  "battery mounts"
+//laser_base_battery_mount_b(); // GROUP Laser DESC  "battery mounts"
 
-//laser_arm_mount(motor=1); // bushings from cam/arm mount to the arm bearings, with a hole for the motor mount
-//laser_arm_mount(motor=0); // bushings from cam/arm mount to the arm bearings
+//laser_arm_mount(motor=1); //  GROUP Laser DESC "bushings from cam/arm mount to the arm bearings, with a hole for the motor mount" NAME="laser_arm_motor_mount" QTY 3
+//laser_arm_mount(motor=0); //  GROUP Laser DESC "bushings from cam/arm mount to the arm bearings" NAME="laser_arm_mount" QTY 3
 
-//laser_base_front_analog(); // front panel for analog controls and small SPI displaY
-//laser_base_front_pi(layer=0); // front panel for pi touchscreen.  Three layers required.
-//laser_base_front_pi(layer=1); // front panel for pi touchscreen.  Three layers required.
-//laser_base_front_pi(layer=2); // front panel for pi touchscreen.  Three layers required.
+//laser_base_front_analog(); //  GROUP Laser DESC "front panel for analog controls and small SPI display"
+//laser_base_front_pi(layer=0); // GROUP Laser DESC "front panel for pi touchscreen.  Three layers required." NAME="laser_base_front_pi_0"
+//laser_base_front_pi(layer=1); // GROUP Laser DESC "front panel for pi touchscreen.  Three layers required." NAME="laser_base_front_pi_1"
+//laser_base_front_pi(layer=2); // GROUP Laser DESC "front panel for pi touchscreen.  Three layers required." NAME="laser_base_front_pi_2"
 
-//laser_base_front(); // base front inner panel
-//laser_base_back(); // base back inner panel
-//laser_base_back_wiper(); // base back panel for wiper motor, h-bridge, switch, and power plug
+//laser_base_front(); // GROUP Laser DESC "base front inner panel"
+//laser_base_back(); // GROUP Laser DESC "base back inner panel"
+//laser_base_back_wiper(); // GROUP Laser DESC "base back panel for wiper motor, h-bridge, switch, and power plug"
 
-//laser_cam_end_plate_b(); // cam end plate motor side
-//laser_cam_end_plate_t(); // cam end plate opposite motor
+//laser_cam_end_plate_b(); // GROUP Laser DESC "cam end plate motor side" NAME="laser_cam_end_plate_wiper_6mm" QTY 2
+//laser_cam_end_plate_t(); // GROUP Laser DESC "cam end plate opposite motor" NAME="laser_cam_end_plate_wiper_double_d" QTY 2
 
-//laser_cam_center_b(); // cam center with motor shaft cutout
-//laser_cam_center_t(); // cam center with motor shaft bolt cutout
-//laser_bearing_kerf_test();
-//laser_cam_encoder(); // cam end with encoder slots for optical gate
+//laser_cam_center_b(); // GROUP Laser DESC "cam center with motor shaft cutout"
+//laser_cam_center_t(); // GROUP Laser DESC "cam center with motor shaft bolt cutout"
+//laser_bearing_kerf_test(); // GROUP Test DESC "Laser bearing kerf test"
+//laser_cam_encoder(); // GROUP Laser DESC "cam end with encoder slots for optical gate"
 
-//laser_base_top(); // top panel with rj45 jack and holes for arms
-//laser_base_bottom(); // bottom panel
+//laser_base_top(); // GROUP Laser DESC "top panel with rj45 jack and holes for arms"
+//laser_base_bottom(); // GROUP Laser DESC "bottom panel"
 
-//laser_bearing_bushing(ir=4/2,or=8/2); // bushing for cam bearings
-//laser_bearing_bushing(ir=6/2,or=8/2); // bushing for motor shaft bearing
+//laser_bearing_bushing(ir=4/2,or=8/2); // GROUP Laser DESC "bushing for cam bearings" NAME="laser_bearing_bushing_4x8mm" QTY 6
+//laser_bearing_bushing(ir=6/2,or=8/2); // GROUP Laser DESC "bushing for motor shaft bearing" NAME="laser_bearing_bushing_6x8mm" QTY 3
 
-//laser_paddle(layer=0,h=material_t*3); // paddles for the arms.
-//laser_paddle(layer=1,h=material_t*3); // paddles for the arms.
+//laser_paddle(layer=0,h=material_t*3); // GROUP Laser DESC "paddles for the arms." NAME="laser_paddle_0" QTY 4
+//laser_paddle(layer=1,h=material_t*3); // GROUP Laser DESC "paddles for the arms." NAME="laser_paddle_1" QTY 2
 
-//laser_nut_support(); // little glue-on nut holder to eliminate a whole layer otherwise
+laser_nut_support(); // GROUP Laser DESC "little glue-on nut holder to eliminate a whole layer otherwise" QTY 8
 
 //////////////////////////////////////////////////////////////////
 // FFF parts, for testing.  May be out of date!
 
-//flow_sensor_pitot_for_pcb();
-//flow_sensor_venturi_for_pcb();
-//flow_sensor_cover(oled=0);
-//flow_sensor_cover();
+//flow_sensor_pitot_for_pcb(); // GROUP VISP DESC "Flow Sensor Pitot Style"
+//flow_sensor_venturi_for_pcb(); //  GROUP VISP DESC "Flow Sensor Venturi Style"
+//flow_sensor_cover(oled=0); //  GROUP VISP DESC "Flow Sensor Cover With OLED" NAME "flow_sensor_cover_oled"
+//flow_sensor_cover(); // GROUP VISP DESC "Flow Sensor Cover"
 
 //cam(); // cam top/bottom.
 //cam_encoder(h=0.5);

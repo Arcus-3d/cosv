@@ -18,10 +18,7 @@
 */
 
 
-// TODO: timer to go bad if we stop hearing from the core
-// TODO: reconnect to serial if it goes away
 // TODO: adjustable amount of time on the charts?  Currently fixed at 20 seconds
-// TODO: critical alerts need to be displayed somewhere (titlebar?)
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -449,10 +446,12 @@ typedef struct buffer_s {
 typedef struct core_s {
     int fd; // Serial/socket stream
     const char *title; // title of this patient/stream
+    const char *serialPort; // Serial port we have connected to
     char *criticalText; // Last critical log output (stuff into titlebar)
     buffer_t streamData;
     int cmdTime; // 32-bit millis() since the core started
     int lastCmdTime; // 32-bit millis() since the core started
+    int lastCmdTimeChecked; // Just checking to see if it is different...
     int adjustedMillis; // What we use to stuff into the chart.  adjustedMillis += ((cmdTime-lastCmdTime)>0 ? (cmdTime-lastCmdTime) : 0);
     bool addIcons;      // Only add when we are between 'Q' commands
     char *settingName; // For use in command processing strdup()'ed
@@ -591,6 +590,16 @@ int hasFocus(Fl_Group *g)
 }
 
 
+void processSerialFailure(core_t *core)
+{
+  core->sentQ=false;
+  Fl::remove_fd(core->fd);
+  close(core->fd);
+  core->fd = -1;
+  // Yeah, we are bad now...
+  setHealth(core, false);
+}
+
 class MyPopupWindow : public Fl_Double_Window {
 public:
     MyPopupWindow(int X,int Y,int W,int H, const char* title) : Fl_Double_Window (X, Y, W, H, title) {}
@@ -604,10 +613,15 @@ public:
                 if (core->pendingChange)
                 {
                   printf("<%s", core->pendingChange);
-                  write(core->fd, core->pendingChange, strlen(core->pendingChange));
-                  fsync(core->fd);      
+                  if (core->fd!=-1)
+                  {
+                    if (-1==write(core->fd, core->pendingChange, strlen(core->pendingChange)))
+                      processSerialFailure(core);
+                    else
+                      fsync(core->fd);
+                  }
                   free(core->pendingChange);
-                  core->pendingChange=NULL;  
+                  core->pendingChange=NULL; 
                 }
                 if (!hasFocus((Fl_Pack *)this->child(0)))
                 {
@@ -664,8 +678,10 @@ void popupSelected(Fl_Widget *w, void *data)
     if (core->fd!=-1)
     {
       printf("<%s", buf);
-      write(core->fd, buf, strlen(buf));
-      fsync(core->fd);      
+      if (-1==write(core->fd, buf, strlen(buf)))
+        processSerialFailure(core);
+      else
+        fsync(core->fd);      
     }
     free(buf);
     // Tell the window to hide
@@ -880,12 +896,14 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
           setHealth(core, strncasecmp(argBuffer->data, "good", argBuffer->size)==0);
   
       // Let's request everything in a batch
-      if (core->sentQ==0)
+      if (core->fd!=-1 && core->sentQ==0)
       {
           core->sentQ++;
           printf("<Q\n");
-          write(core->fd, "\nQ\n", 3);
-          fsync(core->fd);
+          if (-1==write(core->fd, "\nQ\n", 3))
+            processSerialFailure(core);
+          else
+            fsync(core->fd);
       }
       break;
   case 'I': // Identify with version numbers (should do compatibility info here
@@ -1101,8 +1119,7 @@ void HandleFD(int fd, void *data)
       processSerialInput((core_t *)data, ch);
   else
   {
-      Fl::remove_fd(fd);
-      close(fd);
+      processSerialFailure((core_t *)data);
   }
 }
 
@@ -1113,11 +1130,26 @@ void openSerial(core_t *core, const char *name)
     if (fd!=-1)
     {
         core->fd=fd;
-        core->title = name;
+        core->title = name; // Patient name?  Bed number?
+        core->serialPort = name;
         set_interface_attribs (fd, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
         Fl::add_fd(fd, HandleFD, (void *)core);
     }
 }
+
+static void Timer_CB(void *data) {              // timer callback
+    core_t *core = (core_t *)data;
+    if (core->fd==-1)
+        openSerial(core, core->serialPort);
+    // Looking for *anything* from the core in the past second
+    // Health checks are sent out periodically
+    if (core->lastCmdTimeChecked == core->cmdTime)
+        setHealth(core, false);
+    core->lastCmdTimeChecked = core->cmdTime;
+    
+    Fl::repeat_timeout(2.0, Timer_CB, data);
+}
+
 
 int main(int argc, char **argv) {
     core_t core;
@@ -1125,7 +1157,7 @@ int main(int argc, char **argv) {
     memset(&core, 0, sizeof(core));
     core.fd=-1;
 
-
+    
     // TODO: better CLI argument parser
     for (int x=1; x<argc; x++)
         openSerial(&core, argv[x]);
@@ -1140,6 +1172,8 @@ int main(int argc, char **argv) {
 
     if (core.fd==-1)
         return 1;
+
+    Fl::add_timeout(2.0, Timer_CB, (void *)&core);
 
     return(Fl::run());
 }

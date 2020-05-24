@@ -148,7 +148,7 @@ if (PART == "cam") {
 //laser_base_end_left(slots=1); // inner end plate with bvm_tr sized bag hole
 
 //laser_base_battery_mount_t(); // battery mounts
-laser_base_battery_mount_b(); // battery mounts
+//laser_base_battery_mount_b(); // battery mounts
 
 //laser_arm_mount(motor=1); // bushings from cam/arm mount to the arm bearings, with a hole for the motor mount
 //laser_arm_mount(motor=0); // bushings from cam/arm mount to the arm bearings
@@ -166,7 +166,7 @@ laser_base_battery_mount_b(); // battery mounts
 //laser_cam_end_plate_t(); // cam end plate opposite motor
 
 //laser_cam_center_b(); // cam center with motor shaft cutout
-//laser_cam_center_t(); // cam center with motor shaft bolt cutout
+laser_cam_center_t(); // cam center with motor shaft bolt cutout
 
 //laser_cam_encoder(); // cam end with encoder slots for optical gate
 
@@ -178,7 +178,6 @@ laser_base_battery_mount_b(); // battery mounts
 
 //laser_paddle(layer=0,h=material_t*3); // paddles for the arms.
 //laser_paddle(layer=1,h=material_t*3); // paddles for the arms.
-//laser_paddle(layer=2,h=material_t*3); // paddles for the arms.
 
 //laser_nut_support(); // little glue-on nut holder to eliminate a whole layer otherwise
 
@@ -433,7 +432,9 @@ module laser_arm_end_lock(h=material_h) {
 	projection(cut=true) arm_end_lock(h=h);
 }
 module laser_paddle(layer=0,h=material_t*3) {
-	projection(cut=true) translate([0,0,-layer*material_t]) paddle(laser=1,h=h);
+	paddle_x=paddle_x+material_t*2;
+	paddle_y=paddle_y+material_t*2;
+	projection(cut=true) translate([0,0,-layer*material_t]) paddle(paddle_x,paddle_y,h=h);
 }
 module laser_bearing_bushing(ir=cam_bolt_r,or=bearing_ir) {
 	projection(cut=true) bearing_bushing(ir=ir,or=or);
@@ -1252,7 +1253,7 @@ module base_end_pin_slots(h=material_t,x_pos=x_pos,kerf=0) {
 	//translate([0,bvm_y_offset,h/2]) cube([bearing_h,bearing_h*1.5,h+extra],center=true);
 }
 
-module paddle(laser=0,h=material_t*3) {
+module paddle(paddle_x=paddle_x,paddle_y=paddle_y,laser=0,h=material_t*3) {
 	difference() {
 		hull() for (y=[-1,1]) for (x=[-1,1]) intersection() {
 			translate([x*paddle_x,y*paddle_y,-paddle_y+paddle_t]) sphere(r=paddle_y,center=true);

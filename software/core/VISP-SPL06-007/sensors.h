@@ -120,6 +120,6 @@ typedef struct baroDev_s {
   } chip;
 } baroDev_t;
 
-void detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel, busDevice_t *muxDevice, busDeviceEnableCbk enableCbk);
+void detectIndividualSensor(uint8_t devNum, uint8_t sensorNum, TwoWire *wire, uint8_t address, uint8_t channel, busDevice_t *muxDevice, busDeviceEnableCbk enableCbk);
 
 #endif

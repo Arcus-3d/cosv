@@ -79,7 +79,6 @@ void handleSensorFailure()
 {
   for (uint8_t x = 0; x < 4; x++)
   {
-    busDeviceFree(sensors[x].busDev);
     sensors[x].busDev = NULL;
     sensors[x].calculate = NULL;
     sensors[x].sensorType = SENSOR_UNKNOWN;
@@ -91,15 +90,12 @@ void handleSensorFailure()
 
 void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel, busDevice_t *muxDevice, busDeviceEnableCbk enableCbk)
 {
-  busDevice_t *thisDevice = busDeviceInitI2C(wire, address, muxChannel, muxDevice, enableCbk);
-  if (!busDeviceDetect(thisDevice))
+  busDevice_t *thisDevice = busDeviceInitI2C(DEVICE_EEPROM, wire, address, muxChannel, muxDevice, enableCbk);
+  if (busDeviceDetect(thisDevice))
   {
-    busDeviceFree(thisDevice);
-    return false;
+    thisDevice->hwType = HWTYPE_EEPROM;
+    eeprom = thisDevice;
   }
-  thisDevice->hwType = HWTYPE_EEPROM;
-  eeprom = thisDevice;
-  return true;
 }
 
 
@@ -108,12 +104,9 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
   // MUX has a switching chip that can have different adresses (including ones on our devices)
   // Could be 2 paths with 2 sensors each or 4 paths with 1 on each.
 
-  busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enableCbk);
+  busDevice_t *muxDevice = busDeviceInitI2C(DEVICE_MUX, wire, 0x70, 0, NULL, enableCbk);
   if (!busDeviceDetect(muxDevice))
-  {
-    busDeviceFree(muxDevice);
     return false;
-  }
 
   // Assign the device it's correct type
   muxDevice->hwType = HWTYPE_MUX;
@@ -121,11 +114,11 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
   detectEEPROM(wire, 0x54, 1, muxDevice, enableCbk);
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 1, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wire, 0x76, 1, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wire, 0x77, 1, muxDevice, enableCbk);
   // Detect U7, U8
-  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x76, 2, muxDevice, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x77, 2, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wire, 0x76, 2, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wire, 0x77, 2, muxDevice, enableCbk);
 
   detectedVispType = VISP_BUS_TYPE_MUX;
 
@@ -139,25 +132,19 @@ bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
   // XLATE version has chips at 0x74, 0x75, 0x76, and 0x77
   // So, if we find 0x74... We are good to go
 
-  busDevice_t *seventyFour = busDeviceInitI2C(wire, 0x74, 0, NULL, enableCbk);
+  busDevice_t *seventyFour = busDeviceInitI2C(DEVICE_SENSOR_U7, wire, 0x74, 0, NULL, enableCbk);
   if (!busDeviceDetect(seventyFour))
-  {
-    busDeviceFree(seventyFour);
     return false;
-  }
-
-  // It gets Initialized down below...
-  busDeviceFree(seventyFour);
 
   detectEEPROM(wire, 0x54, 0, NULL, enableCbk);
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 0, NULL, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wire, 0x76, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wire, 0x77, 0, NULL, enableCbk);
 
   // Detect U7, U8
-  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x74, 0, NULL, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x75, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wire, 0x74, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wire, 0x75, 0, NULL, enableCbk);
 
   detectedVispType = VISP_BUS_TYPE_XLATE;
 
@@ -172,7 +159,6 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
     detectEEPROM(wireB, 0x54, 0, NULL, enableCbkB);
     if (eeprom)
     {
-      busDeviceFree(eeprom);
       eeprom = NULL;
       busDeviceEnableCbk swapE = enableCbkA;
       TwoWire *swap = wireA;
@@ -191,22 +177,22 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
 
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wireA, 0x76, 0, NULL, enableCbkA);
-  detectIndividualSensor(&sensors[SENSOR_U6], wireA, 0x77, 0, NULL, enableCbkA);
+  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wireA, 0x76, 0, NULL, enableCbkA);
+  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wireA, 0x77, 0, NULL, enableCbkA);
 
   // TEENSY has dual i2c busses, NANO does not.
   // Detect U7, U8
   if (wireB)
   {
     //debug(PSTR("TEENSY second I2C bus"));
-    detectIndividualSensor(&sensors[SENSOR_U7], wireB, 0x76, 0, NULL, enableCbkB);
-    detectIndividualSensor(&sensors[SENSOR_U8], wireB, 0x77, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wireB, 0x76, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wireB, 0x77, 0, NULL, enableCbkB);
   }
   else
   {
     //debug(PSTR("No second HW I2C, using Primary I2C bus with enable pin"));
-    detectIndividualSensor(&sensors[SENSOR_U7], wireA, 0x76, 0, NULL, enableCbkB);
-    detectIndividualSensor(&sensors[SENSOR_U8], wireA, 0x77, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wireA, 0x76, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wireA, 0x77, 0, NULL, enableCbkB);
   }
 
   detectedVispType = VISP_BUS_TYPE_I2C;
@@ -241,10 +227,7 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
   {
     warning(PSTR("Sensors missing 0x%x"), missing);
     sensorsFound = 0;
-    for (int x = 0; x < 4; x++)
-      busDeviceFree(sensors[x].busDev);
 
-    busDeviceFree(eeprom);
     eeprom = NULL;
     return;
   }

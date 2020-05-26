@@ -92,13 +92,14 @@ void handleSensorFailure()
 void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel, busDevice_t *muxDevice, busDeviceEnableCbk enableCbk)
 {
   busDevice_t *thisDevice = busDeviceInitI2C(wire, address, muxChannel, muxDevice, enableCbk);
-  if (busDeviceDetect(thisDevice))
+  if (!busDeviceDetect(thisDevice))
   {
-    thisDevice->hwType = HWTYPE_EEPROM;
-    eeprom = thisDevice;
-  }
-  else
     busDeviceFree(thisDevice);
+    return false;
+  }
+  thisDevice->hwType = HWTYPE_EEPROM;
+  eeprom = thisDevice;
+  return true;
 }
 
 
@@ -145,6 +146,9 @@ bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
     return false;
   }
 
+  // It gets Initialized down below...
+  busDeviceFree(seventyFour);
+
   detectEEPROM(wire, 0x54, 0, NULL, enableCbk);
 
   // Detect U5, U6
@@ -168,6 +172,8 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
     detectEEPROM(wireB, 0x54, 0, NULL, enableCbkB);
     if (eeprom)
     {
+      busDeviceFree(eeprom);
+      eeprom = NULL;
       busDeviceEnableCbk swapE = enableCbkA;
       TwoWire *swap = wireA;
       wireA = wireB;
@@ -179,6 +185,10 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
     else
       return false;
   }
+
+
+  detectEEPROM(wireA, 0x54, 0, NULL, enableCbkA);
+
 
   // Detect U5, U6
   detectIndividualSensor(&sensors[SENSOR_U5], wireA, 0x76, 0, NULL, enableCbkA);
@@ -233,6 +243,9 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
     sensorsFound = 0;
     for (int x = 0; x < 4; x++)
       busDeviceFree(sensors[x].busDev);
+
+    busDeviceFree(eeprom);
+    eeprom = NULL;
     return;
   }
 

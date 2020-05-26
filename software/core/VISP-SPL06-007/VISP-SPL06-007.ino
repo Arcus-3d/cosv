@@ -115,7 +115,7 @@ unsigned long tCheck (struct t * t ) {
 }
 
 // Periodically pulse a pin
-void timeToPulseWatchdog()
+void __NOINLINE timeToPulseWatchdog()
 {
   if (sensorsFound && motorFound)
   {
@@ -229,13 +229,13 @@ void timeToCheckPatient()
 }
 
 // NANO uses NPN switches to enable/disable a bus for DUAL_I2C with a single hardware I2C bus
-void enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
+void __NOINLINE enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
 {
 #ifdef ENABLE_PIN_BUS_A
   digitalWrite(ENABLE_PIN_BUS_A, (enableFlag == true ? HIGH : LOW));
 #endif
 }
-void enableI2cBusB(busDevice_t *busDevice, bool enableFlag)
+void __NOINLINE enableI2cBusB(busDevice_t *busDevice, bool enableFlag)
 {
 #ifdef ENABLE_PIN_BUS_B
   digitalWrite(ENABLE_PIN_BUS_B, (enableFlag == true ? HIGH : LOW));
@@ -255,7 +255,7 @@ void timeToCheckSensors()
 }
 
 // Scales the analog input to a range.
-int  scaleAnalog(int analogIn, int minValue, int maxValue)
+int  __NOINLINE scaleAnalog(int analogIn, int minValue, int maxValue)
 {
   //float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
   //return minValue + (maxValue * percentage);
@@ -278,7 +278,7 @@ void timeToCheckADC()
   }
 }
 
-void timeToSendHealthStatus()
+void __NOINLINE timeToSendHealthStatus()
 {
   batteryLevel = scaleAnalog(analogRead(ADC_BATTERY), 0, 100);
   sendCurrentSystemHealth();

@@ -57,7 +57,7 @@ void busPrint(busDevice_t *bus, const char *function)
 
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("%S(I2C: bus=0x%x address=0x%x channel=%d refCount=%d)"), function, bus->busdev.i2c.i2cBus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
+    debug(PSTR("%S(I2C: bus=0x%x a=0x%x ch=%d refC=%d)"), function, bus->busdev.i2c.i2cBus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
     return;
   }
 
@@ -116,7 +116,6 @@ busDevice_t *busDeviceInitSPI(SPIClass *spiBus, busDeviceEnableCbk enableCbk, hw
       return dev;
     }
   return NULL;
-
 }
 
 // TODO: check to see if this is a mux...
@@ -140,31 +139,34 @@ void busDeviceFree(busDevice_t *dev)
 // Simply detect if the device is present on this device assignment
 bool busDeviceDetect(busDevice_t *busDev)
 {
-  if (busDev && busDev->busType == BUSTYPE_I2C)
+  if (busDev)
   {
-    int error;
-    uint8_t address = busDev->busdev.i2c.address;
-    TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
-    busDev->enableCbk(busDev, true);
-    muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
+    if (busDev->busType == BUSTYPE_I2C)
+    {
+      int error;
+      uint8_t address = busDev->busdev.i2c.address;
+      TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    wire->beginTransmission(address);
-    error = wire->endTransmission();
+      // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
+      busDev->enableCbk(busDev, true);
+      muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
-    busDev->enableCbk(busDev, false);
+      wire->beginTransmission(address);
+      error = wire->endTransmission();
 
-    if (error == 0)
-      busPrint(busDev, PSTR("DETECTED!!!"));
+      busDev->enableCbk(busDev, false);
+
+      if (error == 0)
+        busPrint(busDev, PSTR("DETECTED!!!"));
+      else
+        busPrint(busDev, PSTR("MISSING..."));
+
+      return (error == 0);
+    }
     else
-      busPrint(busDev, PSTR("MISSING..."));
-
-    return (error == 0);
+      warning(PSTR("busDeviceDetect() unsupported bustype %d"), (busDev ? busDev->busType : -1));
   }
-  else
-    warning(PSTR("busDeviceDetect() unsupported bustype"));
-
   return false;
 }
 
@@ -172,7 +174,7 @@ bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, 
 {
   int error;
 
-  if (busDev != NULL && busDev->busType == BUSTYPE_I2C)
+  if (busDev && busDev->busType == BUSTYPE_I2C)
   {
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;

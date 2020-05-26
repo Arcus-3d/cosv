@@ -31,7 +31,8 @@ typedef enum {
   HWTYPE_NONE = 0,
   HWTYPE_SENSOR  = 1,
   HWTYPE_MUX  = 2,
-  HWTYPE_EEPROM = 3
+  HWTYPE_EEPROM = 3,
+  HWTYPE_SSD1306 = 4
 } hwType_e;
 
 typedef void (*busDeviceEnableCbk)(struct busDevice_s *, bool enableFlag);

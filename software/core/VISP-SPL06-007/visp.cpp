@@ -272,14 +272,14 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
   sendCurrentSystemHealth();
 }
 
-void calibrateClear()
+void  __NOINLINE calibrateClear()
 {
   calibrationSampleCounter = 0;
   memset(&calibrationOffsets, 0, sizeof(calibrationOffsets));
 }
 
 
-void calibrateApply()
+void  __NOINLINE calibrateApply()
 {
   for (int x = 0; x < 4; x++)
     sensors[x].pressure += calibrationOffsets[x];
@@ -304,7 +304,7 @@ void calibrateSensors()
       average /= 400.0;
 
       for (x = 0; x < 4; x++)
-        calibrationOffsets[x] = average - calibrationOffsets[x] / 100.0;
+        calibrationOffsets[x] = average - (calibrationOffsets[x] / 100.0);
       respond('C', PSTR("2,Calibration Finished"));
     }
   }
@@ -399,7 +399,7 @@ void calculateVenturiValues()
 }
 
 
-void calculateTidalVolume()
+void  __NOINLINE calculateTidalVolume()
 {
   static unsigned long lastSampleTime = 0;
   unsigned long sampleTime = millis();

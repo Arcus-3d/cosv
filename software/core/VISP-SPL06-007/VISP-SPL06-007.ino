@@ -22,6 +22,13 @@
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
 // TODO: periodic battery monitoring and reporting to front end (every 15 seconds?)
 
+// Air flow is difference between the two pitot sensors
+// Relative pressure is difference between inside and outside sensors
+
+// The kilopascal is a unit of pressure.  1 kPa is approximately the pressure
+// exerted by a 10-g mass resting on a 1-cm2 area.  101.3 kPa = 1 atm.  There
+// are 1,000 pascals in 1 kilopascal.
+
 #include "config.h"
 
 #ifdef ARDUINO_TEENSY40
@@ -45,14 +52,14 @@ TwoWire *i2cBus2 = NULL;
 uint8_t currentMode = MODE_OFF;
 debugState_e debug = DEBUG_DISABLED;
 
-  uint16_t breathPressure; // For pressure controlled automatic ventilation
-  uint16_t breathVolume;
-  uint8_t breathRate;
-  uint8_t breathRatio;
-  uint16_t breathThreshold;
-  uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
+uint16_t breathPressure; // For pressure controlled automatic ventilation
+uint16_t breathVolume;
+uint8_t  breathRate;
+uint8_t  breathRatio;
+uint16_t breathThreshold;
+uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
 
-
+int8_t batteryLevel;
 
 // DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
 //
@@ -248,7 +255,7 @@ void timeToCheckSensors()
 }
 
 // Scales the analog input to a range.
-int scaleAnalog(int analogIn, int minValue, int maxValue)
+int  scaleAnalog(int analogIn, int minValue, int maxValue)
 {
   //float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
   //return minValue + (maxValue * percentage);
@@ -273,7 +280,9 @@ void timeToCheckADC()
 
 void timeToSendHealthStatus()
 {
+  batteryLevel = scaleAnalog(analogRead(ADC_BATTERY), 0, 100);
   sendCurrentSystemHealth();
+  respondAppropriately(RESPOND_BATTERY);
 }
 
 

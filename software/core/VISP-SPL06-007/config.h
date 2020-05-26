@@ -35,6 +35,14 @@
 #error Unsupported board selection.
 #endif
 
+// Don't compile this function inline
+//   '__NOINLINE void foo(void){ ... }'
+#ifdef __GNUC__
+#define __NOINLINE  __attribute__ ((noinline))
+#else
+#define __NOINLINE error 'NOINLINE' not defined for this compiler
+#endif
+
 #define SERIAL_BAUD 115200
 
 
@@ -76,6 +84,7 @@ extern uint16_t breathVolume;
 extern uint8_t breathRate;
 extern uint8_t breathRatio;
 extern uint16_t breathThreshold;
+extern int8_t batteryLevel;
 
 
 #define VERSION_MAJOR     0

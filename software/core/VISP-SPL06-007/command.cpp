@@ -57,33 +57,6 @@ void updateEEPROMdata(uint16_t address, uint8_t data)
   cbuf[address] = data;
 }
 
-#define RESPOND_ALL           0xFFFFFFFFL
-#define RESPOND_LIMITS             1UL<<0 // Special
-#define SAVE_THIS                  1UL<<1 // Special
-#define EXPERT                     1UL<<2 // Special
-#define RESPOND_DEBUG              1UL<<3
-#define RESPOND_MODE               1UL<<4
-#define RESPOND_BREATH_VOLUME      1UL<<5
-#define RESPOND_BREATH_PRESSURE    1UL<<6
-#define RESPOND_BREATH_RATE        1UL<<7
-#define RESPOND_BREATH_RATIO       1UL<<8
-#define RESPOND_BREATH_THRESHOLD   1UL<<9
-#define RESPOND_BODYTYPE           1UL<<10
-
-#define RESPOND_CALIB0             1UL<<11
-#define RESPOND_CALIB1             1UL<<12
-#define RESPOND_CALIB2             1UL<<13
-#define RESPOND_CALIB3             1UL<<14
-#define RESPOND_SENSOR0            1UL<<15
-#define RESPOND_SENSOR1            1UL<<16
-#define RESPOND_SENSOR2            1UL<<17
-#define RESPOND_SENSOR3            1UL<<18
-
-#define RESPOND_MOTOR_TYPE          1UL<<20
-#define RESPOND_MOTOR_SPEED         1UL<<21
-#define RESPOND_MOTOR_MIN_SPEED     1UL<<22
-#define RESPOND_MOTOR_HOMING_SPEED  1UL<<23
-#define RESPOND_MOTOR_STEPS_PER_REV 1UL<<24
 
 struct dictionary_s {
   int theAssociatedValue; // -1 is END OF LIST marker
@@ -167,7 +140,7 @@ const struct dictionary_s motorTypeDict[] PUTINFLASH = {
 };
 
 
-char *currentModeStr(char *buff, int buffSize)
+char * currentModeStr(char *buff, int buffSize)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -247,8 +220,11 @@ const char strML[] PUTINFLASH = "mL";
 const char strCMH2O[] PUTINFLASH = "cmH2O";
 const char strPascals[] PUTINFLASH = "pascals";
 const char strPercentage[] PUTINFLASH = "%";
+const char strStatus[] PUTINFLASH = "status";
+const char strValue[] PUTINFLASH = "value";
 const char strGood[] PUTINFLASH = "good";
 const char strBad[] PUTINFLASH = "bad";
+const char strBattery[] PUTINFLASH = "Battery";
 
 bool noSet(struct settingsEntry_s * entry, const char *arg);
 bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg);
@@ -261,86 +237,127 @@ void respondInt16(struct settingsEntry_s * entry);
 void respondInt8ToDict(struct settingsEntry_s * entry);
 void actionModeChanged(struct settingsEntry_s *);
 
+// But not inlining these, we save flash space!  32206->32086 on Uno
+void __NOINLINE settingReply(const char *nameStr, const char *typeStr, int value)
+{
+    respond('S', PSTR("%S,%S,%d"), nameStr, typeStr, value);
+}
+void __NOINLINE settingReply(const char *nameStr, const char *typeStr, const char *valueStr)
+{
+    respond('S', PSTR("%S,%S,%S"), nameStr, typeStr, valueStr);
+}
+void __NOINLINE settingReply(const char *nameStr, const char *typeStr, char *valueStr)
+{
+    respond('S', PSTR("%S,%S,%s"), nameStr, typeStr, valueStr);
+}
 
-void handleNewVolume(struct settingsEntry_s * entry)
+void __NOINLINE settingReplyValue(const char *nameStr, int value)
+{
+  respond('S', PSTR("%S,value,%d"), nameStr, value);
+}
+
+void __NOINLINE settingReplyValue(const char *nameStr, const char *value)
+{
+  respond('S', PSTR("%S,value,%S"), nameStr, value);
+}
+void __NOINLINE settingReplyValue(const char *nameStr, char *value)
+{
+  respond('S', PSTR("%S,value,%s"), nameStr, value);
+}
+
+void __NOINLINE settingReplyStatus(const char *nameStr, bool isGood)
+{
+    respond('S', PSTR("%S,status,%S"), nameStr, isGood ? strGood : strBad);  
+}
+
+void __NOINLINE handleNewVolume(struct settingsEntry_s * entry)
 {
   //volumeTimeout=((motorCycleTime/2)*(visp_eeprom.vreath_volume/MAX_VOLUME); // Half way through a cycle is full compression
 }
 
 void actionModeChanged(struct settingsEntry_s *);
-void actionMotorChange(struct settingsEntry_s * entry)
+void __NOINLINE actionMotorChange(struct settingsEntry_s * entry)
 {
   motorSetup();
 }
 
 // See motor.cpp
-void updateMotorSpeed()
+void __NOINLINE updateMotorSpeed()
 {
-  respond('S', PSTR("%S,value,%d"), strMotorSpeed, motorSpeed);
-  respond('S', PSTR("%S,units,%S"), strMotorSpeed, motorIsHoming ? PSTR("Homing") : strPercentage);
+  settingReplyValue(strMotorSpeed, motorSpeed);
+  settingReply(strMotorSpeed, PSTR("units"), motorIsHoming ? PSTR("Homing") : strPercentage);
 }
-void actionMotorSpeed(struct settingsEntry_s * entry)
+void __NOINLINE actionMotorSpeed(struct settingsEntry_s * entry)
 {
   motorGo();
 }
 
+
+
 // Buttons can now be good/bad to reflect what is wrong with the core
-void handleMotorGood(struct settingsEntry_s * entry)
+void __NOINLINE handleMotorGood(struct settingsEntry_s * entry)
 {
-  respond('S', PSTR("%S,status,%S"), entry->theName, motorFound ? PSTR("good") : PSTR("bad"));
+  settingReplyStatus(entry->theName, motorFound);
 }
 
 // Buttons can now be good/bad to reflect what is wrong with the core
-void handleSensorGood(struct settingsEntry_s * entry)
+void __NOINLINE handleSensorGood(struct settingsEntry_s * entry)
 {
-  respond('S', PSTR("%S,status,%S"), entry->theName, sensorsFound ? strGood : strBad);
+  settingReplyStatus(entry->theName, sensorsFound);
 }
 
-void handleVispSaveSettings(struct settingsEntry_s * entry)
+// Buttons can now be good/bad to reflect what is wrong with the core
+void __NOINLINE handleBatteryGood(struct settingsEntry_s * entry)
+{
+  settingReplyStatus(entry->theName, batteryLevel>30);
+}
+
+void __NOINLINE handleVispSaveSettings(struct settingsEntry_s * entry)
 {
   saveParametersToVISP();
 }
 
 void handleQueryCommand(const char *arg1, const char *arg2);
-void actionQueryCommand(struct settingsEntry_s * entry)
+void __NOINLINE actionQueryCommand(struct settingsEntry_s * entry)
 {
   handleQueryCommand(NULL,NULL);
 }
 
 //const char *const string_table[] PUTINFLASH = {string_0, string_1, string_2, string_3, string_4, string_5};
 const struct settingsEntry_s settings[] PUTINFLASH = {
-  {RESPOND_MODE,                (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionModeChanged, NULL, &currentMode},
-  {RESPOND_BREATH_RATE      | SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strBreathRate, strBPM, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &breathRate},
-  {RESPOND_BREATH_RATIO     | SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strBreathRatio, NULL, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &breathRatio},
-  {RESPOND_BREATH_VOLUME    | SAVE_THIS, (MODE_VCCMV | MODE_OFF), strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, NULL, &breathVolume},
-  {RESPOND_BREATH_PRESSURE  | SAVE_THIS, (MODE_PCCMV | MODE_OFF), strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathPressure},
-  {RESPOND_BREATH_THRESHOLD | SAVE_THIS, MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathThreshold},
-  {RESPOND_BODYTYPE|EXPERT,            MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, handleVispSaveSettings, &visp_eeprom.bodyType},
-  {RESPOND_CALIB0|EXPERT,              MODE_ALL, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[0]},
-  {RESPOND_CALIB1|EXPERT,              MODE_ALL, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[1]},
-  {RESPOND_CALIB2|EXPERT,              MODE_ALL, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[2]},
-  {RESPOND_CALIB3|EXPERT,              MODE_ALL, strCalib3, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[3]},
-  {RESPOND_SENSOR0,             MODE_ALL, strSensor0, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[0].sensorType},
-  {RESPOND_SENSOR1,             MODE_ALL, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[1].sensorType},
-  {RESPOND_SENSOR2,             MODE_ALL, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[2].sensorType},
-  {RESPOND_SENSOR3,             MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[3].sensorType},
-  {RESPOND_MOTOR_TYPE |EXPERT| SAVE_THIS,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, actionMotorChange, handleMotorGood, &motorType},
-  {RESPOND_MOTOR_SPEED |EXPERT,                     (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,        0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorSpeed, NULL, &motorSpeed},
-  {RESPOND_MOTOR_MIN_SPEED |EXPERT| SAVE_THIS,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,     0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorMinSpeed},
-  {RESPOND_MOTOR_HOMING_SPEED |EXPERT| SAVE_THIS,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorHomingSpeed},
-  {RESPOND_MOTOR_STEPS_PER_REV |EXPERT| SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, actionMotorChange, NULL, &motorStepsPerRev},
-  {RESPOND_DEBUG,               (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, actionQueryCommand, NULL, &debug},
+  {RESPOND_MODE,                        (MODE_ALL ^ MODE_MANUAL), strMode, NULL, 0, 0, modeDict, verifyDictWordToInt8, respondInt8ToDict, actionModeChanged, NULL, &currentMode},
+  {RESPOND_BREATH_RATE      |SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strBreathRate, strBPM, MIN_BREATH_RATE, MAX_BREATH_RATE, NULL, verifyLimitsToInt8, respondInt8, NULL, NULL, &breathRate},
+  {RESPOND_BREATH_RATIO     |SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strBreathRatio, NULL, 0, 0, breathRatioDict, verifyDictWordToInt8, respondInt8ToDict, NULL, NULL, &breathRatio},
+  {RESPOND_BREATH_VOLUME    |SAVE_THIS, (MODE_VCCMV | MODE_OFF), strBreathVolume, strML, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, handleNewVolume, NULL, &breathVolume},
+  {RESPOND_BREATH_PRESSURE  |SAVE_THIS, (MODE_PCCMV | MODE_OFF), strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathPressure},
+  {RESPOND_BREATH_THRESHOLD |SAVE_THIS,  MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathThreshold},
+  {RESPOND_BODYTYPE|EXPERT,              MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, handleVispSaveSettings, &visp_eeprom.bodyType},
+  {RESPOND_BATTERY,                      MODE_ALL,  strBattery, NULL, 0, 100, NULL, noSet, respondInt8, NULL, handleBatteryGood, &batteryLevel},
+  {RESPOND_CALIB0|EXPERT,                MODE_ALL, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[0]},
+  {RESPOND_CALIB1|EXPERT,                MODE_ALL, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[1]},
+  {RESPOND_CALIB2|EXPERT,                MODE_ALL, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[2]},
+  {RESPOND_CALIB3|EXPERT,                MODE_ALL, strCalib3, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[3]},
+  {RESPOND_SENSOR0|EXPERT,               MODE_ALL, strSensor0, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[0].sensorType},
+  {RESPOND_SENSOR1|EXPERT,               MODE_ALL, strSensor1, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[1].sensorType},
+  {RESPOND_SENSOR2|EXPERT,               MODE_ALL, strSensor2, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[2].sensorType},
+  {RESPOND_SENSOR3|EXPERT,               MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[3].sensorType},
+  {RESPOND_MOTOR_TYPE|EXPERT|SAVE_THIS,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, actionMotorChange, handleMotorGood, &motorType},
+  {RESPOND_MOTOR_SPEED|EXPERT,                   (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,        0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorSpeed, NULL, &motorSpeed},
+  {RESPOND_MOTOR_MIN_SPEED|EXPERT|SAVE_THIS,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,     0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorMinSpeed},
+  {RESPOND_MOTOR_HOMING_SPEED|EXPERT|SAVE_THIS,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorHomingSpeed},
+  {RESPOND_MOTOR_STEPS_PER_REV|EXPERT|SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, actionMotorChange, NULL, &motorStepsPerRev},
+  {RESPOND_DEBUG,                                (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, actionQueryCommand, NULL, &debug},
   {0, MODE_NONE,  NULL, NULL, 0, 0, NULL, NULL, NULL, NULL}
 };
 
 
-bool noSet(struct settingsEntry_s * entry, const char *arg)
+bool __NOINLINE noSet(struct settingsEntry_s * entry, const char *arg)
 {
   warning(PSTR("%S is read-only"), entry->theName);
   return true;
 }
 
-bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg)
+bool __NOINLINE verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -358,7 +375,7 @@ bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg)
   return false;
 }
 
-bool verifyDictWordToInt16(struct settingsEntry_s * entry, const char *arg)
+bool __NOINLINE verifyDictWordToInt16(struct settingsEntry_s * entry, const char *arg)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -376,7 +393,7 @@ bool verifyDictWordToInt16(struct settingsEntry_s * entry, const char *arg)
   return false;
 }
 
-bool verifyLimitsToFloat(struct settingsEntry_s * entry, const char *arg)
+bool __NOINLINE verifyLimitsToFloat(struct settingsEntry_s * entry, const char *arg)
 {
   float value = atof(arg);
   // TODO: other checks on the argument...
@@ -388,7 +405,7 @@ bool verifyLimitsToFloat(struct settingsEntry_s * entry, const char *arg)
   return false;
 }
 
-bool verifyLimitsToInt16(struct settingsEntry_s * entry, const char *arg)
+bool __NOINLINE verifyLimitsToInt16(struct settingsEntry_s * entry, const char *arg)
 {
   int value = strtol(arg, NULL, 0);
   // TODO: other checks on the argument...
@@ -400,7 +417,7 @@ bool verifyLimitsToInt16(struct settingsEntry_s * entry, const char *arg)
   return false;
 }
 
-bool verifyLimitsToInt8(struct settingsEntry_s * entry, const char *arg)
+bool __NOINLINE verifyLimitsToInt8(struct settingsEntry_s * entry, const char *arg)
 {
   int value = strtol(arg, NULL, 0);
   // TODO: other checks on the argument...
@@ -412,15 +429,15 @@ bool verifyLimitsToInt8(struct settingsEntry_s * entry, const char *arg)
   return false;
 }
 
-void respondInt8(struct settingsEntry_s * entry)
+void __NOINLINE respondInt8(struct settingsEntry_s * entry)
 {
-  respond('S', PSTR("%S,value,%d"), entry->theName, *(int8_t *)entry->data);
+  settingReplyValue(entry->theName, *(int8_t *)entry->data);
 }
-void respondInt16(struct settingsEntry_s * entry)
+void __NOINLINE respondInt16(struct settingsEntry_s * entry)
 {
-  respond('S', PSTR("%S,value,%d"), entry->theName, *(int16_t *)entry->data);
+  settingReplyValue(entry->theName, *(int16_t *)entry->data);
 }
-void respondFloat(struct settingsEntry_s * entry)
+void __NOINLINE respondFloat(struct settingsEntry_s * entry)
 {
   hwSerial.print('S');
   hwSerial.print(',');
@@ -432,7 +449,7 @@ void respondFloat(struct settingsEntry_s * entry)
   hwSerial.println();
 }
 
-void respondInt8ToDict(struct settingsEntry_s * entry)
+void __NOINLINE respondInt8ToDict(struct settingsEntry_s * entry)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -446,20 +463,21 @@ void respondInt8ToDict(struct settingsEntry_s * entry)
     {
       if (dict.theAssociatedValue == *(int8_t*)entry->data)
       {
-        respond('S', PSTR("%S,value,%S"), entry->theName, dict.theWord);
+        settingReplyValue(entry->theName, dict.theWord);
         return;
       }
     }
   } while (dict.theWord);
 }
 
-void respondStatus(struct settingsEntry_s * entry)
+void __NOINLINE respondStatus(struct settingsEntry_s * entry)
 {
   if (entry->handleGood)
     entry->handleGood(entry);
 }
 
-void respondSettingLimits(struct settingsEntry_s * entry)
+
+void __NOINLINE respondSettingLimits(struct settingsEntry_s * entry)
 {
   struct dictionary_s dict = {0};
   uint8_t d = 0;
@@ -487,28 +505,28 @@ void respondSettingLimits(struct settingsEntry_s * entry)
   }
   else
   {
-    respond('S', PSTR("%S,min,%d"), entry->theName, entry->theMin);
-    respond('S', PSTR("%S,max,%d"), entry->theName, entry->theMax);
+    settingReply(entry->theName, PSTR("min"), entry->theMin);
+    settingReply(entry->theName, PSTR("max"), entry->theMin);
   }
   // What group does this belong to?
-  respond('S', PSTR("%S,group,%S"), entry->theName, (entry->verifyIt == noSet ? PSTR("status") : PSTR("button")));
+  settingReply(entry->theName, PSTR("group"), (entry->verifyIt == noSet ? PSTR("status") : PSTR("button")));
 
   // Any special units we need to display in the button?
   if (entry->theUnits)
-    respond('S', PSTR("%S,units,%S"), entry->theName, entry->theUnits);
+    settingReply(entry->theName, PSTR("units"), entry->theUnits);
 }
 
-void respondEnabled(struct settingsEntry_s * entry)
+void __NOINLINE respondEnabled(struct settingsEntry_s * entry)
 {
   bool showThis = ((entry->validModes & currentMode) ? true : false);
   if ((entry->bitmask & EXPERT) && debug==DEBUG_DISABLED)
       showThis = false;
 
-  respond('S', PSTR("%S,enabled,%S"), entry->theName, (showThis ? strTrue : strFalse));
+  settingReply(entry->theName, PSTR("enabled"), (showThis ? strTrue : strFalse));
 }
 
 // Called when mode changes (Hijacked by motor change to update motor settings on the display)
-void actionModeChanged(struct settingsEntry_s *)
+void __NOINLINE actionModeChanged(struct settingsEntry_s *)
 {
   uint8_t x = 0;
   struct settingsEntry_s entry = {0};
@@ -531,7 +549,7 @@ void actionModeChanged(struct settingsEntry_s *)
   while (entry.bitmask != 0);
 }
 
-void respondAppropriately(uint32_t flags)
+void __NOINLINE respondAppropriately(uint32_t flags)
 {
   uint8_t x = 0;
   struct settingsEntry_s entry = {0};
@@ -546,11 +564,11 @@ void respondAppropriately(uint32_t flags)
     {
       if (flags & RESPOND_LIMITS)
       {
-        respondSettingLimits(&entry);
-        respondEnabled(&entry);
-        respondStatus(&entry);
+        respondSettingLimits(&entry); // Limits, Dictionary, and group output
+        respondEnabled(&entry);       // Is the icon enabled/disabled?
       }
-      entry.respondIt(&entry);
+      respondStatus(&entry); // Is it good or bad?
+      entry.respondIt(&entry); // What is it's value?
     }
   }
   while (entry.bitmask != 0);
@@ -663,15 +681,6 @@ void handleEepromCommand(const char *arg1, const char *arg2)
     sendEEPROMdata(0, 128);
 }
 
-void handleBatteryCommand(const char *arg1, const char *arg2)
-{
-  int b = analogRead(ADC_BATTERY);
-
-  // TODO: calculate runtime based on voltage
-  respond('B', PSTR("%d"), b, b);
-}
-
-
 typedef void (*commandCallback)(const char *arg1, const char *arg2);
 
 struct commandEntry_s {
@@ -686,7 +695,6 @@ const struct commandEntry_s commands[] PUTINFLASH = {
   { 'S', handleSettingCommand },
   { 'E', handleEepromCommand },
   { 'H', handleHealthCommand },
-  { 'B', handleBatteryCommand },
   { 'R', NULL}, // declare reset function at address 0
   { 0, NULL}
 };
@@ -832,7 +840,7 @@ const unsigned long crc_table[16] = {
 
 static unsigned long crc;
 
-unsigned long eeprom_crc(void) {
+unsigned long  eeprom_crc(void) {
 
   crc = ~0L;
 

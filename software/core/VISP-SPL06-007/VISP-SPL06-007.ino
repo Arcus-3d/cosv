@@ -20,7 +20,7 @@
 // TODO: Better input validation
 // TODO: Failure modes (all of them) need to be accounted for and baked into the system
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
-// TODO: periodic battery monitoring and reporting to front end (every 15 seconds?)
+// TODO: 2.8" SPI display for TEENSY and BluePill
 
 // Air flow is difference between the two pitot sensors
 // Relative pressure is difference between inside and outside sensors

@@ -59,12 +59,11 @@ void busPrint(busDevice_t *bus, const char *function)
     debug(PSTR("%S(I2C: bus=0x%x a=0x%x ch=%d)"), function, bus->busdev.i2c.i2cBus, bus->busdev.i2c.address, bus->busdev.i2c.channel);
     return;
   }
-
-  if (bus->busType == BUSTYPE_SPI)
-  {
-    debug(PSTR("%S(SPI)"), function);
-    return;
-  }
+  //  if (bus->busType == BUSTYPE_SPI)
+  //  {
+  //    debug(PSTR("%S(SPI)"), function);
+  //    return;
+  //  }
 }
 
 void noEnableCbk(busDevice_t *busDevice, bool enableFlag)
@@ -100,35 +99,24 @@ busDevice_t *busDeviceInitSPI(uint8_t devNum, SPIClass *spiBus, busDeviceEnableC
 // Simply detect if the device is present on this device assignment
 bool busDeviceDetect(busDevice_t *busDev)
 {
-  if (busDev)
+  int8_t error = 1;
+  if (busDev->busType == BUSTYPE_I2C)
   {
+    uint8_t address = busDev->busdev.i2c.address;
+    TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
-    if (busDev->busType == BUSTYPE_I2C)
-    {
-      int error;
-      uint8_t address = busDev->busdev.i2c.address;
-      TwoWire *wire = busDev->busdev.i2c.i2cBus;
+    // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
+    busDev->enableCbk(busDev, true);
+    muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
 
-      // NANO uses NPN switches to enable/disable a bus for DUAL_I2C
-      busDev->enableCbk(busDev, true);
-      muxSelectChannel(busDev->busdev.i2c.channelDev, busDev->busdev.i2c.channel);
+    wire->beginTransmission(address);
+    error = wire->endTransmission();
 
-      wire->beginTransmission(address);
-      error = wire->endTransmission();
+    busDev->enableCbk(busDev, false);
 
-      busDev->enableCbk(busDev, false);
-
-      if (error == 0)
-        busPrint(busDev, PSTR("DETECTED!!!"));
-      else
-        busPrint(busDev, PSTR("MISSING..."));
-
-      return (error == 0);
-    }
-    else
-      warning(PSTR("busDeviceDetect() unsupported bustype %d"), (busDev ? busDev->busType : -1));
+    //busPrint(busDev, (error ? PSTR("MISSING...") : PSTR("DETECTED!!!")));
   }
-  return false;
+  return (error == 0);
 }
 
 bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)

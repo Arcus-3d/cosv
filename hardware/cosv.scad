@@ -145,7 +145,7 @@ if (PART == "cam") {
 //laser_base_end_right(slots=0,battery=0); // outer end plate with bvm_br sized bag hole
 //laser_base_end_left(slots=0,battery=0); // outer end plate with bvm_tr sized bag hole
 
-laser_base_end_right(slots=1,battery=0); // inner end plate with bvm_br sized bag hole
+//laser_base_end_right(slots=1,battery=0); // inner end plate with bvm_br sized bag hole
 //laser_base_end_left(slots=1,battery=1); // inner end plate with bvm_tr sized bag hole
 
 //laser_base_battery_mount_t(); // battery mounts
@@ -168,7 +168,7 @@ laser_base_end_right(slots=1,battery=0); // inner end plate with bvm_br sized ba
 
 //laser_cam_center_b(); // cam center with motor shaft cutout
 //laser_cam_center_t(); // cam center with motor shaft bolt cutout
-//laser_bearing_kerf_test();
+laser_bearing_kerf_test();
 //laser_cam_encoder(); // cam end with encoder slots for optical gate
 
 //laser_base_top(); // top panel with rj45 jack and holes for arms
@@ -240,7 +240,7 @@ nozzle_r=0.4/2;
 kerf=param_kerf;
 
 // material thickness for laser cutting
-material_t=3.0;
+material_t=3.175;
 
 arm_w=12*nozzle_r*2; 
 arm_h=material_t*3;
@@ -494,12 +494,14 @@ module laser_nut_support(r1=6.25/2,r2=6) {
 	projection(cut=true) nut_support(r1=r1,r2=r2,h=h);
 }
 module laser_bearing_kerf_test() {
+	$fn=90;
 	bearing_or=22/2;
 	for (x=[0:0.025:0.25]) translate([-bearing_or*20/2+bearing_or/0.025*2.3*x,0]) {
 		difference() {
-			square([bearing_or*2.3+extra,bearing_or*3],center=true);
-			translate([0,-2]) circle(r=22/2-x,center=true);
-			translate([0,bearing_or]) text(text=str(x),size=4,halign="center");
+			square([bearing_or*2.5+extra,bearing_or*3.5],center=true);
+			translate([0,1]) circle(r=22/2-x,center=true);
+			translate([0,bearing_or+2]) text(text=str(x),size=4,halign="center");
+			translate([0,-bearing_or-3]) square([bearing_or*2,material_t],center=true);
 		}
 	}
 }

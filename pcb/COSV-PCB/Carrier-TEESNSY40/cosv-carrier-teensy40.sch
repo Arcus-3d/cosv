@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="7.7.0">
+<eagle version="7.6.0">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -8860,8 +8860,6 @@ Source: AVX .. aphvc.pdf</description>
 <text x="55.88" y="109.22" size="1.778" layer="91">Encoder
 (Reverse connection swaps HOME/ENCODER)
 (Can be identified in software)</text>
-<text x="60.96" y="48.26" size="1.778" layer="91">Motor
-(Reverse connection proof)</text>
 <text x="104.14" y="48.26" size="1.778" layer="91">VISP - RJ45
 (reverse connection will not break anything)</text>
 <text x="116.84" y="38.1" size="1.778" layer="91">Support up to 15V input voltages
@@ -8901,7 +8899,7 @@ TEENSY carrier board for COSV</text>
 <instance part="GND8" gate="1" x="144.78" y="91.44"/>
 <instance part="GND5" gate="1" x="144.78" y="53.34"/>
 <instance part="GND9" gate="1" x="109.22" y="66.04"/>
-<instance part="GND10" gate="1" x="86.36" y="53.34"/>
+<instance part="GND10" gate="1" x="55.88" y="55.88"/>
 <instance part="GND11" gate="1" x="99.06" y="83.82"/>
 <instance part="GND12" gate="1" x="58.42" y="93.98"/>
 <instance part="X3" gate="-1" x="233.68" y="109.22"/>
@@ -9048,17 +9046,6 @@ TEENSY carrier board for COSV</text>
 <junction x="114.3" y="63.5"/>
 </segment>
 <segment>
-<pinref part="SV3" gate="G$1" pin="1"/>
-<pinref part="GND10" gate="1" pin="GND"/>
-<wire x1="78.74" y1="55.88" x2="86.36" y2="55.88" width="0.1524" layer="91"/>
-<pinref part="SV3" gate="G$1" pin="8"/>
-<wire x1="63.5" y1="63.5" x2="63.5" y2="71.12" width="0.1524" layer="91"/>
-<wire x1="63.5" y1="71.12" x2="91.44" y2="71.12" width="0.1524" layer="91"/>
-<wire x1="91.44" y1="71.12" x2="91.44" y2="55.88" width="0.1524" layer="91"/>
-<wire x1="91.44" y1="55.88" x2="86.36" y2="55.88" width="0.1524" layer="91"/>
-<junction x="86.36" y="55.88"/>
-</segment>
-<segment>
 <pinref part="X1" gate="-6" pin="S"/>
 <pinref part="GND11" gate="1" pin="GND"/>
 </segment>
@@ -9101,6 +9088,12 @@ TEENSY carrier board for COSV</text>
 <wire x1="38.1" y1="25.4" x2="27.94" y2="25.4" width="0.1524" layer="91"/>
 <pinref part="GND13" gate="1" pin="GND"/>
 <wire x1="27.94" y1="25.4" x2="27.94" y2="20.32" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="SV3" gate="G$1" pin="8"/>
+<pinref part="GND10" gate="1" pin="GND"/>
+<wire x1="63.5" y1="63.5" x2="55.88" y2="63.5" width="0.1524" layer="91"/>
+<wire x1="55.88" y1="63.5" x2="55.88" y2="58.42" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="RX1" class="0">
@@ -9261,14 +9254,9 @@ TEENSY carrier board for COSV</text>
 <label x="177.8" y="88.9" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="SV3" gate="G$1" pin="5"/>
-<wire x1="78.74" y1="60.96" x2="83.82" y2="60.96" width="0.1524" layer="91"/>
-<label x="83.82" y="60.96" size="1.778" layer="95"/>
-</segment>
-<segment>
-<pinref part="SV3" gate="G$1" pin="4"/>
-<wire x1="63.5" y1="58.42" x2="58.42" y2="58.42" width="0.1524" layer="91"/>
-<label x="58.42" y="58.42" size="1.778" layer="95"/>
+<pinref part="SV3" gate="G$1" pin="3"/>
+<wire x1="78.74" y1="58.42" x2="81.28" y2="58.42" width="0.1524" layer="91"/>
+<label x="81.28" y="58.42" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="L_EN" class="0">
@@ -9283,14 +9271,9 @@ TEENSY carrier board for COSV</text>
 <label x="177.8" y="86.36" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="SV3" gate="G$1" pin="7"/>
-<wire x1="78.74" y1="63.5" x2="83.82" y2="63.5" width="0.1524" layer="91"/>
-<label x="83.82" y="63.5" size="1.778" layer="95"/>
-</segment>
-<segment>
-<pinref part="SV3" gate="G$1" pin="2"/>
-<wire x1="63.5" y1="55.88" x2="58.42" y2="55.88" width="0.1524" layer="91"/>
-<label x="58.42" y="55.88" size="1.778" layer="95"/>
+<pinref part="SV3" gate="G$1" pin="4"/>
+<wire x1="63.5" y1="58.42" x2="60.96" y2="58.42" width="0.1524" layer="91"/>
+<label x="58.42" y="58.42" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="PWM" class="0">
@@ -9305,14 +9288,14 @@ TEENSY carrier board for COSV</text>
 <label x="175.26" y="63.5" size="1.778" layer="95"/>
 </segment>
 <segment>
-<pinref part="SV3" gate="G$1" pin="3"/>
-<wire x1="78.74" y1="58.42" x2="83.82" y2="58.42" width="0.1524" layer="91"/>
-<label x="83.82" y="58.42" size="1.778" layer="95"/>
-</segment>
-<segment>
-<pinref part="SV3" gate="G$1" pin="6"/>
-<wire x1="63.5" y1="60.96" x2="58.42" y2="60.96" width="0.1524" layer="91"/>
-<label x="58.42" y="60.96" size="1.778" layer="95"/>
+<pinref part="SV3" gate="G$1" pin="2"/>
+<label x="68.58" y="50.8" size="1.778" layer="95"/>
+<wire x1="63.5" y1="55.88" x2="60.96" y2="55.88" width="0.1524" layer="91"/>
+<wire x1="60.96" y1="55.88" x2="60.96" y2="50.8" width="0.1524" layer="91"/>
+<pinref part="SV3" gate="G$1" pin="1"/>
+<wire x1="78.74" y1="55.88" x2="81.28" y2="55.88" width="0.1524" layer="91"/>
+<wire x1="60.96" y1="50.8" x2="81.28" y2="50.8" width="0.1524" layer="91"/>
+<wire x1="81.28" y1="50.8" x2="81.28" y2="55.88" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="LINE_DETECT" class="0">
@@ -9544,11 +9527,12 @@ TEENSY carrier board for COSV</text>
 <wire x1="160.02" y1="99.06" x2="152.4" y2="99.06" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="N$2" class="0">
+<net name="BAT+" class="0">
 <segment>
 <pinref part="BAT+" gate="A" pin="1"/>
 <pinref part="R1" gate="G$1" pin="1"/>
 <wire x1="121.92" y1="30.48" x2="129.54" y2="30.48" width="0.1524" layer="91"/>
+<label x="127" y="30.48" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="N$3" class="0">

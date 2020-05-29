@@ -35,6 +35,14 @@
 #error Unsupported board selection.
 #endif
 
+// Don't compile this function inline
+//   '__NOINLINE void foo(void){ ... }'
+#ifdef __GNUC__
+#define __NOINLINE  __attribute__ ((noinline))
+#else
+#define __NOINLINE error 'NOINLINE' not defined for this compiler
+#endif
+
 #define SERIAL_BAUD 115200
 
 
@@ -71,17 +79,26 @@ extern debugState_e debug;
 
 void clearCalibrationData();
 
+extern uint16_t breathPressure; // For pressure controlled automatic ventilation
+extern uint16_t breathVolume;
+extern uint8_t breathRate;
+extern uint8_t breathRatio;
+extern uint16_t breathThreshold;
+extern int8_t batteryLevel;
+
+
 #define VERSION_MAJOR     0
 #define VERSION_MINOR     1
-#define VERSION_REVISION  6
+#define VERSION_REVISION  7
 
 
 // Motor specific configurations
 
 // percentage as 0->100 of MAX_PWM
-#define WIPER_SWEEP_SPEED   65 // Ford F150 motor wiper
-#define STEPPER_SWEEP_SPEED 50
-#define BLDC_SWEEP_SPEED    50
+#define HBRIDGE_SWEEP_SPEED   65 // Ford F150 motor wiper
+#define STEPPER_SWEEP_SPEED   50
+
+#define MOTOR_ENCODER_FEEDBACK   MOTOR_PIN_A  // Must be IRQ capable
 
 // ok, we can have a simple H bridge  HiLetGo BTS7960
 #define MOTOR_HBRIDGE_R_EN    MOTOR_PIN_B   // R_EN: forware drive enable input, high-level enable, low level off  (ACTIVE_HIGH)
@@ -89,15 +106,11 @@ void clearCalibrationData();
 #define MOTOR_HBRIDGE_PWM     MOTOR_PIN_PWM // PWM: PWM signal, active high, attach to BOTH LPWM and RPWM
 // WARNING: If you enable R_EN and L_EN at the same time, you fry the chip, so always set both to 0 first, then enable delay(1) and then set the direction pin
 
-// We can have a stepper motor - Schmalz easy driver (Does not fry H if used mistakenly)
-#define MOTOR_STEPPER_ENABLE  MOTOR_PIN_A  //  enable input, low-level enable, high level off   (ACTIVE LOW)<-- This is important as BLDC detection pulls this pin HIGH and looks for a pull to zero
+// We can have a stepper motor - Schmalz easy driver (WILL FRY HBRIDGE IF USED MISTAKENLY (_ENABLE==1 and _DIR==1))
+#define MOTOR_STEPPER_ENABLE  MOTOR_PIN_B  //  enable input, low-level enable, high level off   (ACTIVE LOW)<-- This is important as HBRIDGE will fry if both _B & _C are active high at the same time
 #define MOTOR_STEPPER_DIR     MOTOR_PIN_C
 #define MOTOR_STEPPER_STEP    MOTOR_PIN_PWM
 
-// Same pins as the stepper.   Except that when watching for the FEEDBACK, the pin is high, disabling the stepper
-#define MOTOR_BLDC_FEEDBACK   MOTOR_PIN_A  // Must be IRQ capable
-#define MOTOR_BLDC_DIR        MOTOR_PIN_C
-#define MOTOR_BLDC_PWM        MOTOR_PIN_PWM
 
 
 

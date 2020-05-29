@@ -20,8 +20,7 @@
 #include "config.h"
 
 // Get rid of malloc() and free() issues
-#define MAX_DEVICES 8
-busDevice_t devices[MAX_DEVICES];
+busDevice_t devices[DEVICE_MAX];
 
 
 void busDeviceInit()
@@ -53,21 +52,18 @@ static uint8_t muxSelectChannel(busDevice_t *busDev, uint8_t channel)
 void busPrint(busDevice_t *bus, const char *function)
 {
   if (bus == NULL)
-  {
-    debug(PSTR("%S(busDev is NULL)"), function);
     return;
-  }
+
   if (bus->busType == BUSTYPE_I2C)
   {
-    debug(PSTR("%S(I2C: bus=0x%x address=0x%x channel=%d refCount=%d)"), function, bus->busdev.i2c.i2cBus, bus->busdev.i2c.address, bus->busdev.i2c.channel, bus->refCount);
+    debug(PSTR("%S(I2C: bus=0x%x a=0x%x ch=%d)"), function, bus->busdev.i2c.i2cBus, bus->busdev.i2c.address, bus->busdev.i2c.channel);
     return;
   }
-
-  if (bus->busType == BUSTYPE_SPI)
-  {
-    debug(PSTR("%S(SPI)"), function);
-    return;
-  }
+  //  if (bus->busType == BUSTYPE_SPI)
+  //  {
+  //    debug(PSTR("%S(SPI)"), function);
+  //    return;
+  //  }
 }
 
 void noEnableCbk(busDevice_t *busDevice, bool enableFlag)
@@ -75,76 +71,37 @@ void noEnableCbk(busDevice_t *busDevice, bool enableFlag)
   /* Do nothing */
 }
 
-busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel, busDevice_t *channelDev, busDeviceEnableCbk enableCbk, hwType_e hwType)
+busDevice_t *busDeviceInitI2C(uint8_t devNum, TwoWire *wire, uint8_t address, uint8_t channel, busDevice_t *channelDev, busDeviceEnableCbk enableCbk, hwType_e hwType)
 {
-  busDevice_t *dev = NULL;
-
-  for (uint8_t x = 0; x < MAX_DEVICES; x++)
-  {
-    if (devices[x].refCount == 0)
-    {
-      dev = &devices[x];
-      memset(dev, 0, sizeof(busDevice_t));
-      dev->busType = BUSTYPE_I2C;
-      dev->hwType = hwType;
-      dev->enableCbk = enableCbk;
-      dev->busdev.i2c.i2cBus = wire;
-      dev->busdev.i2c.address = address;
-      dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
-      dev->busdev.i2c.channelDev = channelDev;
-      dev->refCount = 1;
-      if (channelDev)
-        channelDev->refCount++;
-      return dev;
-    }
-  }
-  return NULL;
+  busDevice_t *dev = &devices[devNum];
+  memset(dev, 0, sizeof(busDevice_t));
+  dev->busType = BUSTYPE_I2C;
+  dev->hwType = hwType;
+  dev->enableCbk = enableCbk;
+  dev->busdev.i2c.i2cBus = wire;
+  dev->busdev.i2c.address = address;
+  dev->busdev.i2c.channel = channel; // If non-zero, then it is a channel on a TCA9546 at mux
+  dev->busdev.i2c.channelDev = channelDev;
+  return dev;
 }
 
-busDevice_t *busDeviceInitSPI(SPIClass *spiBus, busDeviceEnableCbk enableCbk, hwType_e hwType)
+busDevice_t *busDeviceInitSPI(uint8_t devNum, SPIClass *spiBus, busDeviceEnableCbk enableCbk, hwType_e hwType)
 {
-  busDevice_t *dev = NULL;
-
-  for (uint8_t x = 0; x < MAX_DEVICES; x++)
-    if (devices[x].refCount == 0)
-    {
-      dev = &devices[x];
-      memset(dev, 0, sizeof(busDevice_t));
-      dev->busType = BUSTYPE_SPI;
-      dev->hwType = hwType;
-      dev->enableCbk = enableCbk;
-      dev->busdev.spi.spiBus = spiBus;
-      dev->refCount = 1;
-      return dev;
-    }
-  return NULL;
-
-}
-
-// TODO: check to see if this is a mux...
-void busDeviceFree(busDevice_t *dev)
-{
-  if (dev != NULL)
-  {
-    dev->refCount--;
-    if (dev->refCount == 0)
-    {
-      // If there is a muxDevice as a part of this channel, go free it.
-      // Note: mux devices might be daisy chained and support multiple layers.
-      // Consider a Core with a Mux to 2 VISP sensors with MUX's of their own
-      if (dev->busType == BUSTYPE_I2C && dev->busdev.i2c.channelDev)
-        busDeviceFree(dev->busdev.i2c.channelDev);
-      memset(dev, 0, sizeof(busDevice_t));
-    }
-  }
+  busDevice_t *dev = &devices[devNum];
+  memset(dev, 0, sizeof(busDevice_t));
+  dev->busType = BUSTYPE_SPI;
+  dev->hwType = hwType;
+  dev->enableCbk = enableCbk;
+  dev->busdev.spi.spiBus = spiBus;
+  return dev;
 }
 
 // Simply detect if the device is present on this device assignment
 bool busDeviceDetect(busDevice_t *busDev)
 {
-  if (busDev && busDev->busType == BUSTYPE_I2C)
+  int8_t error = 1;
+  if (busDev->busType == BUSTYPE_I2C)
   {
-    int error;
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;
 
@@ -157,24 +114,16 @@ bool busDeviceDetect(busDevice_t *busDev)
 
     busDev->enableCbk(busDev, false);
 
-    if (error == 0)
-      busPrint(busDev, PSTR("DETECTED!!!"));
-    else
-      busPrint(busDev, PSTR("MISSING..."));
-
-    return (error == 0);
+    //busPrint(busDev, (error ? PSTR("MISSING...") : PSTR("DETECTED!!!")));
   }
-  else
-    warning(PSTR("busDeviceDetect() unsupported bustype"));
-
-  return false;
+  return (error == 0);
 }
 
 bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length)
 {
   int error;
 
-  if (busDev != NULL && busDev->busType == BUSTYPE_I2C)
+  if (busDev && busDev->busType == BUSTYPE_I2C)
   {
     uint8_t address = busDev->busdev.i2c.address;
     TwoWire *wire = busDev->busdev.i2c.i2cBus;

@@ -18,10 +18,7 @@
 */
 
 
-// TODO: timer to go bad if we stop hearing from the core
-// TODO: reconnect to serial if it goes away
-// TODO: adjustable amount of time on the charts?  Currently fixed at 15 seconds
-// TODO: critical alerts need to be displayed somewhere (titlebar?)
+// TODO: adjustable amount of time on the charts?  Currently fixed at 20 seconds
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -255,7 +252,6 @@ Fl_Color lookupColor(const char *name)
     return FL_FOREGROUND_COLOR;
 }     
 
-
 // 'X' overlay the whole window if the core is missing or reports being 'bad'
 class My_Double_Window : public Fl_Double_Window {
 public:
@@ -280,6 +276,7 @@ public:
     }
 };
 
+class MyPopupWindow;
 
 class FL_EXPORT My_Button : public Fl_Button {
 protected:
@@ -428,6 +425,7 @@ typedef struct dynamic_button_s {
     char *name;
     int isButton; // one of 2 groups we can be, "status" or "button"
     int enabled;  // Input is enabled or disabled
+    int isBad;    // Individual buttons can be good/bad (like unknown motor, or too much volume)
     dictionary_t *dictionary; // For dictionary types
     char *textValue; // For dictionary types
     char *units;     // Units told to us by the core
@@ -448,10 +446,16 @@ typedef struct buffer_s {
 typedef struct core_s {
     int fd; // Serial/socket stream
     const char *title; // title of this patient/stream
+    const char *serialPort; // Serial port we have connected to
+    char *criticalText; // Last critical log output (stuff into titlebar)
     buffer_t streamData;
     int cmdTime; // 32-bit millis() since the core started
     int lastCmdTime; // 32-bit millis() since the core started
+    int lastCmdTimeChecked; // Just checking to see if it is different...
+    int adjustedMillis; // What we use to stuff into the chart.  adjustedMillis += ((cmdTime-lastCmdTime)>0 ? (cmdTime-lastCmdTime) : 0);
+    bool addIcons;      // Only add when we are between 'Q' commands
     char *settingName; // For use in command processing strdup()'ed
+    char *pendingChange; // slider's send us an update for every position while it's moving...
     int settingType;
     int sentQ;
     dynamic_button_t *button_list;
@@ -461,9 +465,14 @@ typedef struct core_s {
     Fl_Pack *packedStatusItems;
 
     My_Chart *flCharts[MAX_CHARTS];
-
+    MyPopupWindow *popup; // So when a 'Q' happens, we can dismiss the active popup
 } core_t;
 
+void bufferClear(buffer_t *buffer)
+{
+    memset(buffer->data, 0, buffer->size);
+    buffer->size=0;
+}
 
 void bufferAppend(buffer_t *buffer, char ch)
 {
@@ -483,10 +492,18 @@ void bufferAppend(buffer_t *buffer, char ch)
        buffer->data[buffer->size] = 0;
 }
 
+
+
 void setHealth(core_t *core, int isGood)
 {
   // if !isGood, big red X on screen, or red banner, whatever
   if (isGood) core->win->setGood(); else core->win->setBad();
+  if (isGood && core->criticalText)
+  {
+      free(core->criticalText);
+      core->criticalText=NULL;
+      core->win->label(core->title);
+  }
 }
 
 dynamic_button_t *buttonLookup(core_t *core, char *settingName)
@@ -496,6 +513,9 @@ dynamic_button_t *buttonLookup(core_t *core, char *settingName)
         if (strcasecmp(settingName,ptr->name)==0)
              return ptr;
     }
+    
+    if (!core->addIcons)
+        return NULL;
     
     dynamic_button_t *newPtr = (dynamic_button_t *)calloc(1, sizeof(dynamic_button_t));
     newPtr->name = strdup(settingName);
@@ -569,17 +589,45 @@ int hasFocus(Fl_Group *g)
     return false;
 }
 
+
+void processSerialFailure(core_t *core)
+{
+  core->sentQ=false;
+  Fl::remove_fd(core->fd);
+  close(core->fd);
+  core->fd = -1;
+  // Yeah, we are bad now...
+  setHealth(core, false);
+}
+
 class MyPopupWindow : public Fl_Double_Window {
 public:
     MyPopupWindow(int X,int Y,int W,int H, const char* title) : Fl_Double_Window (X, Y, W, H, title) {}
 
     int handle(int e) {
+        core_t *core = (core_t *)user_data();
         switch(e) {
             case FL_FOCUS:
                 break;
             case FL_UNFOCUS:
+                if (core->pendingChange)
+                {
+                  printf("<%s", core->pendingChange);
+                  if (core->fd!=-1)
+                  {
+                    if (-1==write(core->fd, core->pendingChange, strlen(core->pendingChange)))
+                      processSerialFailure(core);
+                    else
+                      fsync(core->fd);
+                  }
+                  free(core->pendingChange);
+                  core->pendingChange=NULL; 
+                }
                 if (!hasFocus((Fl_Pack *)this->child(0)))
+                {
+                  core->popup=NULL;
                   Fl::delete_widget(this);
+                }
                 break;
         }
         return(Fl_Double_Window::handle(e));
@@ -588,19 +636,18 @@ public:
 
 
 
+
 void sliderChanged(Fl_Widget *w, void *data)
 {
-    core_t *core = (core_t *)data;
-    const char *bname = (const char *)w->parent()->user_data();
+    const char *bname = (const char *)data;
+    core_t *core = (core_t *)w->parent()->user_data();
 
     if (core->fd!=-1)
     {
-      char *buf;
-      int len=asprintf(&buf, "S,%s,%d\n", bname, (int)((Fl_Value_Slider *)w)->value());
-      printf("<%s", buf);
-      write(core->fd, buf, len);
-      fsync(core->fd);      
-      free(buf);  
+      if (core->pendingChange)
+          free(core->pendingChange);
+      core->pendingChange=NULL;
+      asprintf(&core->pendingChange, "S,%s,%d\n", bname, (int)((Fl_Value_Slider *)w)->value());
     }
 }
 
@@ -608,17 +655,17 @@ void sliderChanged(Fl_Widget *w, void *data)
 // Simple slider bar set to current strtoul(b->textValue); with ninRange/maxRange values
 void popupRangeSelection(core_t *core, dynamic_button_t *b)
 {
-  MyPopupWindow *popup = new MyPopupWindow(0,0,300, BUTTON_HEIGHT, b->name);
+  core->popup = new MyPopupWindow(0,0,300, BUTTON_HEIGHT, b->name);
+  core->popup->user_data((void *)core);
 
   Fl_Value_Slider *slider = new Fl_Value_Slider(0,0,300,BUTTON_HEIGHT);
   slider->bounds(b->minRange, b->maxRange);
   slider->type(FL_HOR_NICE_SLIDER);
   slider->value(atoi(b->textValue));
-  popup->user_data(b->name);
-  slider->callback(sliderChanged, (void *)core);
+  slider->callback(sliderChanged, (void *)b->name);
   slider->step(1);
-  popup->position((Fl::w() - popup->w())/2, (Fl::h() - popup->h())/2);
-  popup->show();
+  core->popup->position((Fl::w() - core->popup->w())/2, (Fl::h() - core->popup->h())/2);
+  core->popup->show();
 }
 
 void popupSelected(Fl_Widget *w, void *data)
@@ -631,12 +678,15 @@ void popupSelected(Fl_Widget *w, void *data)
     if (core->fd!=-1)
     {
       printf("<%s", buf);
-      write(core->fd, buf, strlen(buf));
-      fsync(core->fd);      
+      if (-1==write(core->fd, buf, strlen(buf)))
+        processSerialFailure(core);
+      else
+        fsync(core->fd);      
     }
     free(buf);
     // Tell the window to hide
     w->parent()->parent()->hide();
+    //Fl::delete_widget(w->parent()->parent());
 }
 
 // Generate a popup window that is dictionary based
@@ -648,9 +698,10 @@ void popupDictionarySelection(core_t *core, dynamic_button_t *b)
 
   if (count)
   {
-    MyPopupWindow *popup = new MyPopupWindow(0,0,300, count*BUTTON_HEIGHT, b->name);
+    core->popup = new MyPopupWindow(0,0,300, count*BUTTON_HEIGHT, b->name);
     Fl_Pack *packer = new Fl_Pack(0,0,300, count*BUTTON_HEIGHT);
     packer->type(Fl_Pack::VERTICAL);
+    core->popup->user_data((void *)core);
     for (dictionary_t *d=b->dictionary; d; d=d->next)
     {
       Fl_Button *button = new Fl_Button(0,0,BUTTON_WIDTH, BUTTON_HEIGHT, d->name);
@@ -658,8 +709,8 @@ void popupDictionarySelection(core_t *core, dynamic_button_t *b)
       packer->user_data(b->name);
       button->callback(popupSelected, (void *)core);
     }
-    popup->position((Fl::w() - popup->w())/2, (Fl::h() - popup->h())/2);
-    popup->show();
+    core->popup->position((Fl::w() - core->popup->w())/2, (Fl::h() - core->popup->h())/2);
+    core->popup->show();
   }
 }
 
@@ -682,36 +733,59 @@ void buttonPushed(Fl_Widget *w, void *data)
   }
 }
 
+void wipeIcon(core_t *core, dynamic_button_t *button)
+{
+    buttonDictionaryClear(button);
+    if (button->textValue)
+        free(button->textValue);
+    if (button->units)
+        free(button->units);
+    if (button->bgcolor)
+        free(button->bgcolor);
+    if (button->fgcolor)
+        free(button->fgcolor);
+}
 
+void wipeIcons(core_t *core)
+{
+  core->packedButtons->clear();
+  core->packedStatusItems->clear();
+  while (core->button_list)
+  {
+      dynamic_button_t *b = core->button_list;
+      core->button_list = b->next;
+      wipeIcon(core, b);
+      free(b);
+  }
+}
 
 void refreshIcons(core_t *core)
 {
     for (dynamic_button_t *b=core->button_list; b; b=b->next)
     {
         if (b->flButton==NULL)
-        {
             b->flButton = new My_Button(0,0,BUTTON_WIDTH,BUTTON_HEIGHT);
+        
 
-            b->flButton->box(FL_RFLAT_BOX);    // buttons won't have 'edges'
-            // If a color is sent from the core, and it is not 'empty', use the core defined color, else, our own
-            b->flButton->color(b->bgcolor && *b->bgcolor ? lookupColor(b->bgcolor) : lookupColor("Gray"));
-            b->flButton->labelcolor(b->fgcolor && *b->fgcolor ? lookupColor(b->fgcolor) : lookupColor("SkyBlue"));
-            b->flButton->labelsize(24);
-            if (b->isButton)
-            {
-                b->flButton->callback(buttonPushed, (void *)core);
-                core->packedButtons->add(b->flButton);
-            }
-            else
-            {
-                // No action for status outputs
-                core->packedStatusItems->add(b->flButton);
-            }
+        b->flButton->box(FL_RFLAT_BOX);    // buttons won't have 'edges'
+        // If a color is sent from the core, and it is not 'empty', use the core defined color, else, our own
+        b->flButton->labelsize(24);
+        if (b->isButton)
+        {
+            b->flButton->callback(buttonPushed, (void *)core);
+            core->packedButtons->add(b->flButton);
+        }
+        else
+        {
+            // No action for status outputs
+            core->packedStatusItems->add(b->flButton);
         }
 
         b->flButton->name(b->name);
         b->flButton->label(b->textValue);
         b->flButton->units(b->units);
+        b->flButton->color(b->bgcolor && *b->bgcolor ? lookupColor(b->bgcolor) : (b->isBad ? lookupColor("DarkRed") :  lookupColor("Gray")));
+        b->flButton->labelcolor(b->fgcolor && *b->fgcolor ? lookupColor(b->fgcolor) : (b->isBad ? lookupColor("White") : lookupColor("SkyBlue")));
 
         if (b->enabled)
            b->flButton->show();
@@ -731,17 +805,17 @@ void refreshIcons(core_t *core)
 }
 
 
-#define SETTING_UNKNOWN 0
-#define SETTING_VALUE   1
-#define SETTING_MIN     2
-#define SETTING_MAX     3
-#define SETTING_DICT    4
-#define SETTING_GROUP   5
-#define SETTING_ENABLED 6
-#define SETTING_UNITS   7
-#define SETTING_BGCOLOR 8
-#define SETTING_FGCOLOR 9
-
+#define SETTING_UNKNOWN  0
+#define SETTING_VALUE    1
+#define SETTING_MIN      2
+#define SETTING_MAX      3
+#define SETTING_DICT     4
+#define SETTING_GROUP    5
+#define SETTING_ENABLED  6
+#define SETTING_UNITS    7
+#define SETTING_BGCOLOR  8
+#define SETTING_FGCOLOR  9
+#define SETTING_STATUS  10
 void processSetting(core_t *core, char *settingName, int argIndex, buffer_t *arg)
 {
     int len=strlen(settingName);
@@ -772,6 +846,7 @@ void processSetting(core_t *core, char *settingName, int argIndex, buffer_t *arg
         break;
     case SETTING_GROUP:
         button->isButton = (strcasecmp(arg->data,"button")==0); // Is it in the button group?
+        refreshIcons(core);
         break;
     case SETTING_VALUE:
         if (button->textValue)
@@ -797,11 +872,16 @@ void processSetting(core_t *core, char *settingName, int argIndex, buffer_t *arg
         button->fgcolor=strdup(arg->data);
         refreshIcons(core);
         break;
+    case SETTING_STATUS:
+        button->isBad = (strcasecmp(arg->data,"good")!=0);
+        refreshIcons(core);
+        break;
     }
 }
 
 void processCommandArgument(core_t *core, char commandByte, int currentArgIndex, buffer_t *argBuffer)
 {
+  int dTime;
   // Everything comes prefixed with a timestamp, which is arg# 0
   if (currentArgIndex==0)
   {
@@ -814,14 +894,16 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'H': // Health check ("good" or "bad")
       if (currentArgIndex==1)
           setHealth(core, strncasecmp(argBuffer->data, "good", argBuffer->size)==0);
-
+  
       // Let's request everything in a batch
-      if (core->sentQ==0)
+      if (core->fd!=-1 && core->sentQ==0)
       {
           core->sentQ++;
           printf("<Q\n");
-          write(core->fd, "\nQ\n", 3);
-          fsync(core->fd);
+          if (-1==write(core->fd, "\nQ\n", 3))
+            processSerialFailure(core);
+          else
+            fsync(core->fd);
       }
       break;
   case 'I': // Identify with version numbers (should do compatibility info here
@@ -829,6 +911,10 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'c': // critical log output
       // Should go titlebar?
       // and get cleared on "good" health...
+      if (core->criticalText)
+          free(core->criticalText);
+      core->criticalText = strdup(argBuffer->data);
+      core->win->label(core->criticalText);
       break;
   case 'i': // Infor log output
   case 'w': // warning log output
@@ -842,9 +928,9 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
       case 2: // Volume
       case 3: // Tidal Volume
           // Detect milli wrap or core reboot (clear array when millis go back in time)
-          if (core->lastCmdTime > core->cmdTime)
-              core->flCharts[currentArgIndex-1]->clear();
-          core->flCharts[currentArgIndex-1]->add(core->cmdTime, atof(argBuffer->data), NULL, charts[currentArgIndex-1].color);
+          dTime = core->cmdTime - core->lastCmdTime;
+          core->adjustedMillis += ((dTime>0) ? dTime : 0); // Handle milli wrapping or core restarting gracefully
+          core->flCharts[currentArgIndex-1]->add(core->adjustedMillis, atof(argBuffer->data), NULL, charts[currentArgIndex-1].color);
           break;
       default: // Debug output follows
           break;
@@ -858,7 +944,7 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
                free(core->settingName);
            core->settingName = strdup(argBuffer->data);
            break;
-      case 2: // type of setting response
+       case 2: // type of setting response
            if (strcasecmp(argBuffer->data,"value")==0)
                core->settingType = SETTING_VALUE;
            else if (strcasecmp(argBuffer->data,"min")==0)
@@ -877,6 +963,8 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
                core->settingType = SETTING_BGCOLOR;
            else if (strcasecmp(argBuffer->data,"fgcolor")==0)
                core->settingType = SETTING_FGCOLOR;
+           else if (strcasecmp(argBuffer->data,"status")==0) // Individual buttons can be good/bad
+               core->settingType = SETTING_STATUS;
           else
               core->settingType = SETTING_UNKNOWN;
            break;
@@ -887,7 +975,14 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
        break;
    case 'Q':
        // End of a "query" command, we need to redraw all of the buttons! (Maybe)
-       refreshIcons(core);
+       // We get a   Q,<t>,Begin
+       // A bunch of S,<t>,....
+       // And a      Q,<t>,End
+       core->addIcons = (strcasecmp(argBuffer->data,"Begin")==0);
+       if (core->addIcons)
+           wipeIcons(core);
+       else
+           refreshIcons(core);
        break;
   }
 }
@@ -897,13 +992,14 @@ void processCommand(core_t *core)
     int state=0;
     char commandByte=0;
     int argumentCount=0;
-    buffer_t argumentBuffer;
 
-    // debug output (ignore data samples for now)
-    if (core->streamData.size && *core->streamData.data!='d')
+ static buffer_t argumentBuffer;
+
+    // debug output (ignore data samples and Health checks)
+    if (core->streamData.size && (*core->streamData.data!='d' && *core->streamData.data!='H'))
         printf(">%.*s\n", core->streamData.size, core->streamData.data);
 
-    memset(&argumentBuffer, 0, sizeof(argumentBuffer));
+    bufferClear(&argumentBuffer);
 
     // ok, we have a bunch of crap that has encountered a '\n' or '\l'
     // Decode what is in core->buffer
@@ -1023,8 +1119,7 @@ void HandleFD(int fd, void *data)
       processSerialInput((core_t *)data, ch);
   else
   {
-      Fl::remove_fd(fd);
-      close(fd);
+      processSerialFailure((core_t *)data);
   }
 }
 
@@ -1035,11 +1130,26 @@ void openSerial(core_t *core, const char *name)
     if (fd!=-1)
     {
         core->fd=fd;
-        core->title = name;
+        core->title = name; // Patient name?  Bed number?
+        core->serialPort = name;
         set_interface_attribs (fd, B115200, 0);  // set speed to 115,200 bps, 8n1 (no parity)
         Fl::add_fd(fd, HandleFD, (void *)core);
     }
 }
+
+static void Timer_CB(void *data) {              // timer callback
+    core_t *core = (core_t *)data;
+    if (core->fd==-1)
+        openSerial(core, core->serialPort);
+    // Looking for *anything* from the core in the past second
+    // Health checks are sent out periodically
+    if (core->lastCmdTimeChecked == core->cmdTime)
+        setHealth(core, false);
+    core->lastCmdTimeChecked = core->cmdTime;
+    
+    Fl::repeat_timeout(2.0, Timer_CB, data);
+}
+
 
 int main(int argc, char **argv) {
     core_t core;
@@ -1047,7 +1157,7 @@ int main(int argc, char **argv) {
     memset(&core, 0, sizeof(core));
     core.fd=-1;
 
-
+    
     // TODO: better CLI argument parser
     for (int x=1; x<argc; x++)
         openSerial(&core, argv[x]);
@@ -1062,6 +1172,8 @@ int main(int argc, char **argv) {
 
     if (core.fd==-1)
         return 1;
+
+    Fl::add_timeout(2.0, Timer_CB, (void *)&core);
 
     return(Fl::run());
 }

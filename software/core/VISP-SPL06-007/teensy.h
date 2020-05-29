@@ -38,10 +38,10 @@
 
 
 // All motors use these 4 signals.
-#define MOTOR_PIN_A    3 // MUST BE IRQ CAPABLE!  (STEPPER_ENABLE, BLDC_FEEDBACK)  
-#define MOTOR_PIN_B    4 // (MOTOR_HBRIDGE_R_EN)
-#define MOTOR_PIN_C    5 // (MOTOR_HBRIDGE_L_EN, MOTOR_STEPPER_DIR, MOTOR_BLDC_DIR)
-#define MOTOR_PIN_PWM  6 // HARDWARE PWM Capable output required (MOTOR_HBRIDGE_PWM, MOTOR_STEPPER_STEP, MOTOR_BLDC_PWM)
+#define MOTOR_PIN_A    3 // MUST BE IRQ CAPABLE!  (ENCODER_FEEDBACK - IRQ on low.)
+#define MOTOR_PIN_B    4 // (MOTOR_HBRIDGE_R_EN, MOTOR_STEPPER_ENABLE)
+#define MOTOR_PIN_C    5 // (MOTOR_HBRIDGE_L_EN, MOTOR_STEPPER_DIR)
+#define MOTOR_PIN_PWM  6 // HARDWARE PWM Capable output required (MOTOR_HBRIDGE_PWM, MOTOR_STEPPER_STEP)
 
 #define LINE_POWER_DETECTION 7 // Future: need to detect line power
 #define MISSING_PULSE_PIN    8 // Output a pulse every time we check the sensors.

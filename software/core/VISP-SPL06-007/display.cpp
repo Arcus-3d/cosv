@@ -32,8 +32,8 @@ class SSD1306AsciiWire : public SSD1306Ascii {
       m_i2cAddr = i2cAddr;
       // Only if it was found..
       wire->beginTransmission(m_i2cAddr);
-      m_oledWire = (wire->endTransmission()==0 ? wire : NULL);
-      init(dev);    
+      m_oledWire = (wire->endTransmission() == 0 ? wire : NULL);
+      init(dev);
     }
   protected:
     void writeDisplay(uint8_t b, uint8_t mode) {
@@ -62,41 +62,56 @@ void displaySetup(TwoWire *wire)
   oledVISP.setFont(Adafruit5x7);
 }
 
-void displayToThis(SSD1306AsciiWire *lcd, bool isVISP)
+void displayToThis(SSD1306AsciiWire *lcd, bool isVISP, uint8_t counter)
 {
   char modeBuff[16] = {0};
 
-  // 4 lines on a VISP, 8 on a Main
-  lcd->setCursor(0, 0);
-  lcd->print((isVISP ? F("VISP:") : F("Boxy:")));
-  lcd->print(currentModeStr(modeBuff, sizeof(modeBuff)));
-  lcd->clearToEOL();
-  lcd->println();
+  switch (counter & 0x3)
+  {
 
-  lcd->print(F("IE 1:"));
-  lcd->print(visp_eeprom.breath_ratio);
-  lcd->print(F("  Rate "));
-  lcd->print(visp_eeprom.breath_rate);
-  lcd->clearToEOL();
-  lcd->println();
-
-  lcd->print(F("Pressure "));
-  lcd->print(pressure);
-  lcd->print('/');
-  lcd->print(visp_eeprom.breath_pressure);
-  lcd->clearToEOL();
-  lcd->println();
-
-  lcd->print(F("Volume   "));
-  lcd->print(volume);
-  lcd->print('/');
-  lcd->print(visp_eeprom.breath_volume);
-  lcd->clearToEOL();
-  lcd->println();
+    case 0:
+      // 4 lines on a VISP, 8 on a Main
+      lcd->setCursor(0, 0);
+      lcd->print((isVISP ? F("VISP:") : F("Boxy:")));
+      lcd->print(currentModeStr(modeBuff, sizeof(modeBuff)));
+      lcd->clearToEOL();
+      lcd->println();
+      break;
+    case 1:
+      lcd->print(F("IE 1:"));
+      lcd->print(breathRatio);
+      lcd->print(F("  Rate "));
+      lcd->print(breathRate);
+      lcd->clearToEOL();
+      lcd->println();
+      break;
+    case 2:
+      lcd->print(F("Pressure "));
+      lcd->print(pressure);
+      lcd->print('/');
+      lcd->print(breathPressure);
+      lcd->clearToEOL();
+      lcd->println();
+      break;
+    case 3:
+      lcd->print(F("Volume   "));
+      lcd->print(volume);
+      lcd->print('/');
+      lcd->print(breathVolume);
+      lcd->clearToEOL();
+      lcd->println();
+      break;
+  }
 }
 
+// We are seeing pauses in the data stream when both displays are being updated at the same time
 void displayUpdate()
 {
-  displayToThis(&oledMain, false);
-  displayToThis(&oledVISP, true);
+  static uint8_t counter;
+
+  if (counter & 0x04)
+    displayToThis(&oledMain, false, counter);
+  else
+    displayToThis(&oledVISP, true, counter);
+  counter++;
 }

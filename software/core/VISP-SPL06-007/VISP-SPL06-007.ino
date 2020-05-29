@@ -20,6 +20,14 @@
 // TODO: Better input validation
 // TODO: Failure modes (all of them) need to be accounted for and baked into the system
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
+// TODO: 2.8" SPI display for TEENSY and BluePill
+
+// Air flow is difference between the two pitot sensors
+// Relative pressure is difference between inside and outside sensors
+
+// The kilopascal is a unit of pressure.  1 kPa is approximately the pressure
+// exerted by a 10-g mass resting on a 1-cm2 area.  101.3 kPa = 1 atm.  There
+// are 1,000 pascals in 1 kilopascal.
 
 #include "config.h"
 
@@ -44,8 +52,14 @@ TwoWire *i2cBus2 = NULL;
 uint8_t currentMode = MODE_OFF;
 debugState_e debug = DEBUG_DISABLED;
 
+uint16_t breathPressure; // For pressure controlled automatic ventilation
+uint16_t breathVolume;
+uint8_t  breathRate;
+uint8_t  breathRatio;
+uint16_t breathThreshold;
+uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
 
-
+int8_t batteryLevel;
 
 // DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
 //
@@ -101,7 +115,7 @@ unsigned long tCheck (struct t * t ) {
 }
 
 // Periodically pulse a pin
-void timeToPulseWatchdog()
+void __NOINLINE timeToPulseWatchdog()
 {
   if (sensorsFound && motorFound)
   {
@@ -109,6 +123,10 @@ void timeToPulseWatchdog()
     delayMicroseconds(1);
     digitalWrite(MISSING_PULSE_PIN, LOW);
   }
+
+  // Save some flash code space and do this often, the display code prints 1 line per invocation, and has 2 displays to output to.
+  // 8 lines of text being updated, so we need to do this every 100ms or so.
+  displayUpdate();
 }
 
 void timeToReadVISP()
@@ -164,12 +182,12 @@ void timeToCheckPatient()
   // The patenti hasn't tried to breath on their own...
   if (theMillis > timeToInhale)
   {
-    unsigned long nextBreathCycle = ((60.0 / (float)visp_eeprom.breath_rate) * 1000.0);
+    unsigned long nextBreathCycle = ((60.0 / (float)breathRate) * 1000.0);
     timeToInhale = nextBreathCycle;
-    timeToStopInhale = (nextBreathCycle / visp_eeprom.breath_ratio);
+    timeToStopInhale = (nextBreathCycle / breathRatio);
 
     // This info is 200 bytes long...
-    info(PSTR("brate=%d  bratio=%d nextBreathCycle=%l timeToStopInhale=%l millis"), visp_eeprom.breath_rate, visp_eeprom.breath_ratio, nextBreathCycle, timeToStopInhale);
+    info(PSTR("brate=%d  I:E=1:%d Inhale=%l Exhale=%l millis"), breathRate, breathRatio, timeToStopInhale, nextBreathCycle-timeToStopInhale);
 
     timeToInhale += theMillis;
     timeToStopInhale += theMillis;
@@ -194,16 +212,16 @@ void timeToCheckPatient()
     {
       case MODE_MANUAL_PCCMV:
       case MODE_PCCMV:
-        if (pressure < visp_eeprom.breath_pressure)
+        if (pressure < breathPressure)
           motorSpeedUp();
-        if (pressure > visp_eeprom.breath_pressure)
+        if (pressure > breathPressure)
           motorSlowDown();
         break;
       case MODE_MANUAL_VCCMV:
       case MODE_VCCMV:
-        if (volume < visp_eeprom.breath_volume)
+        if (volume < breathVolume)
           motorSpeedUp();
-        if (volume > visp_eeprom.breath_volume)
+        if (volume > breathVolume)
           motorSlowDown();
         break;
     }
@@ -211,13 +229,13 @@ void timeToCheckPatient()
 }
 
 // NANO uses NPN switches to enable/disable a bus for DUAL_I2C with a single hardware I2C bus
-void enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
+void __NOINLINE enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
 {
 #ifdef ENABLE_PIN_BUS_A
   digitalWrite(ENABLE_PIN_BUS_A, (enableFlag == true ? HIGH : LOW));
 #endif
 }
-void enableI2cBusB(busDevice_t *busDevice, bool enableFlag)
+void __NOINLINE enableI2cBusB(busDevice_t *busDevice, bool enableFlag)
 {
 #ifdef ENABLE_PIN_BUS_B
   digitalWrite(ENABLE_PIN_BUS_B, (enableFlag == true ? HIGH : LOW));
@@ -234,13 +252,10 @@ void timeToCheckSensors()
     if (sensorsFound)
       displaySetup(i2cBus1); // Need to setup the VISP I2C OLED that just attached
   }
-
-  // Save some flash code space and do this every half second in this function
-  displayUpdate();
 }
 
 // Scales the analog input to a range.
-int scaleAnalog(int analogIn, int minValue, int maxValue)
+int  __NOINLINE scaleAnalog(int analogIn, int minValue, int maxValue)
 {
   //float percentage = (float)analogIn / (float)MAX_ANALOG; // This is CPU dependent, 1024 on Nano, 4096 on STM32
   //return minValue + (maxValue * percentage);
@@ -256,16 +271,18 @@ void timeToCheckADC()
   if (analogMode)
   {
     currentMode = (analogMode == 1 ? MODE_MANUAL_PCCMV : MODE_MANUAL_VCCMV);
-    visp_eeprom.breath_pressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
-    visp_eeprom.breath_volume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
-    visp_eeprom.breath_rate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
-    visp_eeprom.breath_ratio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
+    breathPressure = scaleAnalog(analogRead(ADC_PRESSURE), MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE);
+    breathVolume = scaleAnalog(analogRead(ADC_VOLUME), MIN_BREATH_VOLUME, MAX_BREATH_VOLUME);
+    breathRate = scaleAnalog(analogRead(ADC_RATE), MIN_BREATH_RATE, MAX_BREATH_RATE);
+    breathRatio = scaleAnalog(analogRead(ADC_RATIO), MIN_BREATH_RATIO, MAX_BREATH_RATIO);
   }
 }
 
-void timeToSendHealthStatus()
+void __NOINLINE timeToSendHealthStatus()
 {
+  batteryLevel = scaleAnalog(analogRead(ADC_BATTERY), 0, 100);
   sendCurrentSystemHealth();
+  respondAppropriately(RESPOND_BATTERY);
 }
 
 
@@ -348,7 +365,6 @@ void setup()
 
   // Some reset conditions do not reset our globals.
   sensorsFound = false;
-  sanitizeVispData(); // Apply defaults
 
   // Start the VISP calibration process
   calibrateClear();
@@ -357,6 +373,11 @@ void setup()
 
   //scanI2C(i2cBus1);
   //scanI2C(i2cBus2);
+
+  coreLoadSettings();
+
+  // primeTheFrontEnd();
+  sendCurrentSystemHealth();
 }
 
 
@@ -383,6 +404,10 @@ void loop() {
   startMicros = micros();
   while (hwSerial.available())
     commandParser(hwSerial.read());
+    
+  // Spread out the writing of the EEPROM over time
+  coreSaveSettingsStateMachine();
+  
   currentUtilization += micros() - startMicros;
 
   if (millis() > utilizationTimeout)

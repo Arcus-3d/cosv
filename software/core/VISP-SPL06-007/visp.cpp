@@ -65,8 +65,6 @@ void formatVisp(busDevice_t *busDev, struct visp_eeprom_s *data, uint8_t busType
 
   //  // Make *sure* that the calibration data is formatted properly
   //  calibrateClear();
-  //
-  //  sanitizeVispData();
 
   writeEEPROM(busDev, (unsigned short)0, (unsigned char *)&visp_eeprom, sizeof(visp_eeprom));
 }
@@ -81,7 +79,6 @@ void handleSensorFailure()
 {
   for (uint8_t x = 0; x < 4; x++)
   {
-    busDeviceFree(sensors[x].busDev);
     sensors[x].busDev = NULL;
     sensors[x].calculate = NULL;
     sensors[x].sensorType = SENSOR_UNKNOWN;
@@ -93,14 +90,12 @@ void handleSensorFailure()
 
 void detectEEPROM(TwoWire * wire, uint8_t address, uint8_t muxChannel, busDevice_t *muxDevice, busDeviceEnableCbk enableCbk)
 {
-  busDevice_t *thisDevice = busDeviceInitI2C(wire, address, muxChannel, muxDevice, enableCbk);
+  busDevice_t *thisDevice = busDeviceInitI2C(DEVICE_EEPROM, wire, address, muxChannel, muxDevice, enableCbk);
   if (busDeviceDetect(thisDevice))
   {
     thisDevice->hwType = HWTYPE_EEPROM;
     eeprom = thisDevice;
   }
-  else
-    busDeviceFree(thisDevice);
 }
 
 
@@ -109,12 +104,9 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
   // MUX has a switching chip that can have different adresses (including ones on our devices)
   // Could be 2 paths with 2 sensors each or 4 paths with 1 on each.
 
-  busDevice_t *muxDevice = busDeviceInitI2C(wire, 0x70, 0, NULL, enableCbk);
+  busDevice_t *muxDevice = busDeviceInitI2C(DEVICE_MUX, wire, 0x70, 0, NULL, enableCbk);
   if (!busDeviceDetect(muxDevice))
-  {
-    busDeviceFree(muxDevice);
     return false;
-  }
 
   // Assign the device it's correct type
   muxDevice->hwType = HWTYPE_MUX;
@@ -122,11 +114,11 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
   detectEEPROM(wire, 0x54, 1, muxDevice, enableCbk);
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 1, muxDevice, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 1, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wire, 0x76, 1, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wire, 0x77, 1, muxDevice, enableCbk);
   // Detect U7, U8
-  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x76, 2, muxDevice, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x77, 2, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wire, 0x76, 2, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wire, 0x77, 2, muxDevice, enableCbk);
 
   detectedVispType = VISP_BUS_TYPE_MUX;
 
@@ -140,22 +132,19 @@ bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
   // XLATE version has chips at 0x74, 0x75, 0x76, and 0x77
   // So, if we find 0x74... We are good to go
 
-  busDevice_t *seventyFour = busDeviceInitI2C(wire, 0x74, 0, NULL, enableCbk);
+  busDevice_t *seventyFour = busDeviceInitI2C(DEVICE_SENSOR_U7, wire, 0x74, 0, NULL, enableCbk);
   if (!busDeviceDetect(seventyFour))
-  {
-    busDeviceFree(seventyFour);
     return false;
-  }
 
   detectEEPROM(wire, 0x54, 0, NULL, enableCbk);
 
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wire, 0x76, 0, NULL, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U6], wire, 0x77, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wire, 0x76, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wire, 0x77, 0, NULL, enableCbk);
 
   // Detect U7, U8
-  detectIndividualSensor(&sensors[SENSOR_U7], wire, 0x74, 0, NULL, enableCbk);
-  detectIndividualSensor(&sensors[SENSOR_U8], wire, 0x75, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wire, 0x74, 0, NULL, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wire, 0x75, 0, NULL, enableCbk);
 
   detectedVispType = VISP_BUS_TYPE_XLATE;
 
@@ -170,6 +159,7 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
     detectEEPROM(wireB, 0x54, 0, NULL, enableCbkB);
     if (eeprom)
     {
+      eeprom = NULL;
       busDeviceEnableCbk swapE = enableCbkA;
       TwoWire *swap = wireA;
       wireA = wireB;
@@ -182,23 +172,27 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
       return false;
   }
 
+
+  detectEEPROM(wireA, 0x54, 0, NULL, enableCbkA);
+
+
   // Detect U5, U6
-  detectIndividualSensor(&sensors[SENSOR_U5], wireA, 0x76, 0, NULL, enableCbkA);
-  detectIndividualSensor(&sensors[SENSOR_U6], wireA, 0x77, 0, NULL, enableCbkA);
+  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wireA, 0x76, 0, NULL, enableCbkA);
+  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wireA, 0x77, 0, NULL, enableCbkA);
 
   // TEENSY has dual i2c busses, NANO does not.
   // Detect U7, U8
   if (wireB)
   {
     //debug(PSTR("TEENSY second I2C bus"));
-    detectIndividualSensor(&sensors[SENSOR_U7], wireB, 0x76, 0, NULL, enableCbkB);
-    detectIndividualSensor(&sensors[SENSOR_U8], wireB, 0x77, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wireB, 0x76, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wireB, 0x77, 0, NULL, enableCbkB);
   }
   else
   {
     //debug(PSTR("No second HW I2C, using Primary I2C bus with enable pin"));
-    detectIndividualSensor(&sensors[SENSOR_U7], wireA, 0x76, 0, NULL, enableCbkB);
-    detectIndividualSensor(&sensors[SENSOR_U8], wireA, 0x77, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wireA, 0x76, 0, NULL, enableCbkB);
+    detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wireA, 0x77, 0, NULL, enableCbkB);
   }
 
   detectedVispType = VISP_BUS_TYPE_I2C;
@@ -206,22 +200,6 @@ bool detectDualI2CSensors(TwoWire * wireA, TwoWire * wireB, busDeviceEnableCbk e
   return true;
 }
 
-
-void sanitizeVispData()
-{
-  if (visp_eeprom.breath_ratio > MAX_BREATH_RATIO)
-    visp_eeprom.breath_ratio = MAX_BREATH_RATIO;
-  if (visp_eeprom.breath_ratio < MIN_BREATH_RATIO)
-    visp_eeprom.breath_ratio = MIN_BREATH_RATIO;
-  if (visp_eeprom.breath_rate > MAX_BREATH_RATE)
-    visp_eeprom.breath_rate = MAX_BREATH_RATE;
-  if (visp_eeprom.breath_rate < MIN_BREATH_RATE)
-    visp_eeprom.breath_rate = MIN_BREATH_RATE;
-  if (visp_eeprom.breath_pressure > MAX_BREATH_PRESSURE)
-    visp_eeprom.breath_pressure = MAX_BREATH_PRESSURE;
-  if (visp_eeprom.breath_pressure < MIN_BREATH_PRESSURE)
-    visp_eeprom.breath_pressure = MIN_BREATH_PRESSURE;
-}
 
 const char strBasedType[] PUTINFLASH = " Based VISP Detected"; // Save some bytes in flash
 // FUTURE: read EEPROM and determine what type of VISP it is.
@@ -231,7 +209,7 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
   uint8_t missing;
   memset(&sensors, 0, sizeof(sensors));
 
-  debug(PSTR("Detecting sensors"));
+  // debug(PSTR("Detecting sensors"));
 
   if (!detectMuxedSensors(i2cBusA, enableCbkA))
     if (!detectMuxedSensors(i2cBusA, enableCbkB))
@@ -249,15 +227,15 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
   {
     warning(PSTR("Sensors missing 0x%x"), missing);
     sensorsFound = 0;
-    for (int x = 0; x < 4; x++)
-      busDeviceFree(sensors[x].busDev);
+
+    eeprom = NULL;
     return;
   }
 
-  if (detectedVispType == VISP_BUS_TYPE_I2C) debug(PSTR("DUAL I2C%S"), strBasedType);
-  else if (detectedVispType == VISP_BUS_TYPE_XLATE) debug(PSTR("XLate%S"), strBasedType);
-  else if (detectedVispType == VISP_BUS_TYPE_MUX)  debug(PSTR("MUX%S"), strBasedType);
-  else if (detectedVispType == VISP_BUS_TYPE_SPI) debug(PSTR("SPI%S"), strBasedType);
+  //if (detectedVispType == VISP_BUS_TYPE_I2C) debug(PSTR("DUAL I2C%S"), strBasedType);
+  //else if (detectedVispType == VISP_BUS_TYPE_XLATE) debug(PSTR("XLate%S"), strBasedType);
+  //else if (detectedVispType == VISP_BUS_TYPE_MUX)  debug(PSTR("MUX%S"), strBasedType);
+  //else if (detectedVispType == VISP_BUS_TYPE_SPI) debug(PSTR("SPI%S"), strBasedType);
 
   if (eeprom)
   {
@@ -268,36 +246,36 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
     {
       // ok, unformatted VISP
       format = true;
-      warning(PSTR("ERROR eeprom not formatted"));
+      //warning(PSTR("VISP eeprom not formatted"));
     }
   }
   else
   {
-    warning(PSTR("ERROR eeprom not available"));
-    // Actually, just provide soem sane numbers for the system
+    warning(PSTR("VISP eeprom missing"));
+    // Just provide some sane numbers for the system
     format = true;
   }
 
   if (format)
     formatVisp(eeprom, &visp_eeprom, detectedVispType, VISP_BODYTYPE_VENTURI);
 
-  sanitizeVispData();
-
   sensorsFound = true;
 
   // Just put it out there, what type we are for the status system to figure out
   info(PSTR("Sensors detected"));
+
+  primeTheFrontEnd(); // Updates all of the buttons...
   sendCurrentSystemHealth();
 }
 
-void calibrateClear()
+void  __NOINLINE calibrateClear()
 {
   calibrationSampleCounter = 0;
   memset(&calibrationOffsets, 0, sizeof(calibrationOffsets));
 }
 
 
-void calibrateApply()
+void  __NOINLINE calibrateApply()
 {
   for (int x = 0; x < 4; x++)
     sensors[x].pressure += calibrationOffsets[x];
@@ -322,7 +300,7 @@ void calibrateSensors()
       average /= 400.0;
 
       for (x = 0; x < 4; x++)
-        calibrationOffsets[x] = average - calibrationOffsets[x] / 100.0;
+        calibrationOffsets[x] = average - (calibrationOffsets[x] / 100.0);
       respond('C', PSTR("2,Calibration Finished"));
     }
   }
@@ -417,7 +395,7 @@ void calculateVenturiValues()
 }
 
 
-void calculateTidalVolume()
+void  __NOINLINE calculateTidalVolume()
 {
   static unsigned long lastSampleTime = 0;
   unsigned long sampleTime = millis();

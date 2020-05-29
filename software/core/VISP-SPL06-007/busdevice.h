@@ -31,17 +31,29 @@ typedef enum {
   HWTYPE_NONE = 0,
   HWTYPE_SENSOR  = 1,
   HWTYPE_MUX  = 2,
-  HWTYPE_EEPROM = 3
+  HWTYPE_EEPROM = 3,
+  HWTYPE_SSD1306 = 4
 } hwType_e;
 
+
+#define DEVICE_SENSOR_U5    0
+#define DEVICE_SENSOR_U6    1
+#define DEVICE_SENSOR_U7    2
+#define DEVICE_SENSOR_U8    3
+#define DEVICE_EEPROM       4
+#define DEVICE_MUX          5
+#define DEVICE_VISP_DISPLAY 6
+#define DEVICE_CORE_DISPLAY 7
+#define DEVICE_MAX          8
+
 typedef void (*busDeviceEnableCbk)(struct busDevice_s *, bool enableFlag);
+
 
 
 typedef struct busDevice_s {
   busType_e busType;
   hwType_e hwType;
   uint8_t currentChannel; // If this device is a HWTYPE_MUX
-  uint8_t refCount; // Reference count (mux is used by multiple sources)
   busDeviceEnableCbk enableCbk; // Used to set the appropriate enable pin for SPI peripherals or I2C bus switching
   union {
     struct {
@@ -56,13 +68,14 @@ typedef struct busDevice_s {
   } busdev;
 } busDevice_t;
 
+extern busDevice_t devices[DEVICE_MAX];
+
 void busDeviceInit();
 void noEnableCbk(busDevice_t *busDevice, bool enableFlag);
 void busPrint(busDevice_t *bus, const char *function);
-busDevice_t *busDeviceInitI2C(TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, busDeviceEnableCbk enableCbk = noEnableCbk, hwType_e hwType = HWTYPE_NONE);
-busDevice_t *busDeviceInitSPI(SPIClass *spiBus, busDeviceEnableCbk enableCbk = noEnableCbk, hwType_e hwType = HWTYPE_NONE);
-void busDeviceFree(busDevice_t *dev);
-bool busDeviceDetect(busDevice_t *busDev);
+busDevice_t *busDeviceInitI2C(uint8_t devNum, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *channelDev = NULL, busDeviceEnableCbk enableCbk = noEnableCbk, hwType_e hwType = HWTYPE_NONE);
+busDevice_t *busDeviceInitSPI(uint8_t devNum, SPIClass *spiBus, busDeviceEnableCbk enableCbk = noEnableCbk, hwType_e hwType = HWTYPE_NONE);
+bool busDeviceDetect(busDevice_t *dev);
 
 // read/write Buffers
 bool busReadBuf(busDevice_t *busDev, unsigned short reg, unsigned char *values, uint8_t length);

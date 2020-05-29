@@ -762,20 +762,16 @@ bool bmp388Detect(baroDev_t *baro, busDevice_t *busDev)
 }
 #endif
 
-void detectIndividualSensor(baroDev_t *baro, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, busDeviceEnableCbk enableCbk=noEnableCbk)
+void detectIndividualSensor(uint8_t devNum, uint8_t baroNum, TwoWire *wire, uint8_t address, uint8_t channel = 0, busDevice_t *muxDevice = NULL, busDeviceEnableCbk enableCbk=noEnableCbk)
 {
-  busDevice_t *device = busDeviceInitI2C(wire, address, channel, muxDevice, enableCbk);
-
-  if (!device)
-    return;
+  busDevice_t *device = busDeviceInitI2C(devNum, wire, address, channel, muxDevice, enableCbk);
 
   // busPrint(device, PSTR("Discovering sensor type"));
-  if (!bmp280Detect(baro, device))
-    if (!bmp388Detect(baro, device))
-      if (!spl06Detect(baro, device))
+  if (!bmp280Detect(&sensors[baroNum], device))
+    if (!bmp388Detect(&sensors[baroNum], device))
+      if (!spl06Detect(&sensors[baroNum], device))
       {
         busPrint(device, PSTR("Unknown chip"));
-        busDeviceFree(device);
         device = NULL;
       }
   device->hwType = HWTYPE_SENSOR;

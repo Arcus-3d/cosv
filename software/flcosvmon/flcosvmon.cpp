@@ -1289,9 +1289,13 @@ int main(int argc, char **argv) {
     for (int x=1; x<argc; x++)
         openSerial(&core, argv[x]);
     if (core.fd==-1)
+        openSerial(&core,"/dev/ttyS0");
+    if (core.fd==-1)
         openSerial(&core,"/dev/ttyACM0");
     if (core.fd==-1)
         openSerial(&core,"/dev/ttyUSB0");
+    if (core.fd==-1)
+        openSerial(&core,"/dev/ttyAMA0");
 
     Fl::visual(FL_DOUBLE|FL_INDEX); // dbe support
 

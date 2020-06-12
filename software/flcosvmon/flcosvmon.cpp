@@ -43,11 +43,18 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-
+// for serial
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
 
+// for network
+#include <netdb.h> 
+#include <netinet/in.h> 
+#include <stdlib.h> 
+#include <sys/socket.h> 
+#include <sys/types.h> 
+#include <sys/signal.h>
 
 #define MAX_CHARTS 3
 #define MAX_CHART_TIME 20000 /* 20 seconds on the display */
@@ -458,6 +465,10 @@ typedef struct core_s {
     char *pendingChange; // slider's send us an update for every position while it's moving...
     int settingType;
     int sentQ;
+    bool isGood;       // Is the core 'good', used for broadcasting our health out over networks
+    int broadcastSock;
+    int listeningSock;
+    int remoteFd;      // If !=-1 then we have a remote monitor in control
     dynamic_button_t *button_list;
 
     My_Double_Window *win;
@@ -497,6 +508,7 @@ void bufferAppend(buffer_t *buffer, char ch)
 void setHealth(core_t *core, int isGood)
 {
   // if !isGood, big red X on screen, or red banner, whatever
+  core->isGood = isGood;
   if (isGood) core->win->setGood(); else core->win->setBad();
   if (isGood && core->criticalText)
   {
@@ -592,7 +604,7 @@ int hasFocus(Fl_Group *g)
 
 void processSerialFailure(core_t *core)
 {
-  core->sentQ=false;
+  core->sentQ=0;
   Fl::remove_fd(core->fd);
   close(core->fd);
   core->fd = -1;
@@ -921,7 +933,6 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'g': // debug log output
       break;
   case 'd': // data
-      if (core->sentQ)
       switch(currentArgIndex)
       {
       case 1: // Pressure
@@ -993,11 +1004,29 @@ void processCommand(core_t *core)
     char commandByte=0;
     int argumentCount=0;
 
- static buffer_t argumentBuffer;
+    static buffer_t argumentBuffer;
 
     // debug output (ignore data samples and Health checks)
     if (core->streamData.size && (*core->streamData.data!='d' && *core->streamData.data!='H'))
         printf(">%.*s\n", core->streamData.size, core->streamData.data);
+
+   // Echo everything out to the remote monitor
+   if (core->remoteFd>=0 && core->streamData.size)
+   {
+       if (write(core->remoteFd, core->streamData.data, core->streamData.size)<0)
+       {
+           close(core->remoteFd);
+           Fl::remove_fd(core->remoteFd);
+           core->remoteFd=-1;
+       }
+       else
+       {
+           const char ch[3]="\n\r";
+           write(core->remoteFd, ch, 2);
+           if (core->streamData.size && (*core->streamData.data!='d'))
+             printf("<= %.*s\n", core->streamData.size, core->streamData.data);
+       }
+   }
 
     bufferClear(&argumentBuffer);
 
@@ -1137,6 +1166,23 @@ void openSerial(core_t *core, const char *name)
     }
 }
 
+#define COSV_SOCKET_PORT 8445
+static void broadcast(core_t *core, const char *mess)
+{
+    struct sockaddr_in s;
+
+    if(core->broadcastSock < 0)
+        return;
+
+    memset(&s, '\0', sizeof(struct sockaddr_in));
+    s.sin_family = AF_INET;
+    s.sin_port = (in_port_t)htons(COSV_SOCKET_PORT);
+    s.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+    if(sendto(core->broadcastSock, mess, strlen(mess), 0, (struct sockaddr *)&s, sizeof(struct sockaddr_in)) < 0)
+        perror("sendto");
+}
+
 static void Timer_CB(void *data) {              // timer callback
     core_t *core = (core_t *)data;
     if (core->fd==-1)
@@ -1146,18 +1192,99 @@ static void Timer_CB(void *data) {              // timer callback
     if (core->lastCmdTimeChecked == core->cmdTime)
         setHealth(core, false);
     core->lastCmdTimeChecked = core->cmdTime;
-    
+
+    broadcast(core, (core->isGood ? "I,flcosvmon,1,0,0\nH,good\n" : "I,flcosvmon,1,0,0\nH,bad\n"));
     Fl::repeat_timeout(2.0, Timer_CB, data);
 }
 
+void ServiceSock(int fd, void *data)
+{
+    char ch;
+    core_t *core = (core_t *)data;
+
+    // Ignore anything coming in, all remote input is ignored
+    // Remotes are view-only
+    read(fd, &ch, 1);
+}
+
+void HandleNewSock(int fd, void *data)
+{
+    core_t *core = (core_t *)data;
+    struct sockaddr_in cli; 
+    socklen_t len = sizeof(cli);
+  
+    // socket create and verification 
+    // Accept the data packet from client and verification 
+    int connfd = accept(fd, (struct sockaddr *)&cli, &len); 
+    if (connfd < 0)
+        printf("server acccept failed...\n"); 
+    else
+    {
+        printf("server acccept the client on fd%d...\n", connfd); 
+        if (core->remoteFd>=0)
+        {
+            printf("dropping older remote connection on fd%d...\n", core->remoteFd); 
+            close(core->remoteFd);
+            Fl::remove_fd(core->remoteFd);
+        }
+        core->remoteFd = connfd;
+        Fl::add_fd(connfd, ServiceSock, (void *)core);
+        core->sentQ = 0; // Need to resend the 'Q' to populate the remote client
+    }  
+}
+
+void createListeningSocket(core_t *core)
+{
+    int sockfd=-1;
+    struct sockaddr_in servaddr; 
+
+
+    core->broadcastSock = socket(AF_INET, SOCK_DGRAM, 0);
+    int broadcastEnable=1;
+    int ret=setsockopt(core->broadcastSock, SOL_SOCKET, SO_BROADCAST, &broadcastEnable, sizeof(broadcastEnable));
+
+    // socket create and verification 
+    sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+    if (sockfd == -1)
+        return;
+    bzero(&servaddr, sizeof(servaddr)); 
+  
+  
+    int optval = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+
+    // assign IP, PORT 
+    servaddr.sin_family = AF_INET; 
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); 
+    servaddr.sin_port = htons(COSV_SOCKET_PORT); 
+   // Binding newly created socket to given IP and verification 
+    if ((bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr))) != 0) { 
+        printf("socket bind failed...\n"); 
+        close(sockfd);
+        sleep(5);
+        return;
+    } 
+  
+    // Now server is ready to listen and verification 
+    if ((listen(sockfd, 5)) != 0) { 
+        close(sockfd);
+        return;
+    }
+    printf("Listening for remote servers\n");
+    core->listeningSock = sockfd;
+    Fl::add_fd(sockfd, HandleNewSock, (void *)core);
+}
 
 int main(int argc, char **argv) {
     core_t core;
 
     memset(&core, 0, sizeof(core));
     core.fd=-1;
+    core.remoteFd=-1;
+    core.broadcastSock=-1;    
 
-    
+    signal(SIGPIPE, SIG_IGN);
+
     // TODO: better CLI argument parser
     for (int x=1; x<argc; x++)
         openSerial(&core, argv[x]);
@@ -1172,6 +1299,8 @@ int main(int argc, char **argv) {
 
     if (core.fd==-1)
         return 1;
+
+    createListeningSocket(&core);
 
     Fl::add_timeout(2.0, Timer_CB, (void *)&core);
 

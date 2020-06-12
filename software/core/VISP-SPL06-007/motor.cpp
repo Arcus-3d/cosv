@@ -56,9 +56,15 @@ void encoderTriggered() // IRQ function (Future finding the perfect home)
   encoderCount++;
 }
 
+void homeTriggered() // IRQ function
+{
+  motorFound = true;
+
+  motorStop();
+}
 
 
-void hbridgeGo()
+void __NOINLINE hbridgeGo()
 {
   if (motorWasGoingForward)
   {
@@ -71,57 +77,55 @@ void hbridgeGo()
     digitalWrite(MOTOR_HBRIDGE_L_EN, 1); // Set these in opposite order of hbridgeReverse() so we don't have both pins active at the same time
 
   }
-  analogWrite(MOTOR_HBRIDGE_PWM, motorSpeed);
+  analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
   updateMotorSpeed();
 }
 
 
-void hbridgeReverseDirection()
+void __NOINLINE hbridgeReverseDirection()
 {
   motorWasGoingForward = !motorWasGoingForward;
 
   // Stop the motor
   analogWrite(MOTOR_HBRIDGE_PWM, 0);
 
-  // If it was movong, git it a bit to actually stop, so we don't fry the controlling chip
+  // If it was movong, give it a bit to actually stop, so we don't fry the controlling chip
   if (motorSpeed)
     delay(10);
 
   hbridgeGo();
 }
 
-void hbridgeStop()
+void __NOINLINE hbridgeStop()
 {
+  analogWrite(MOTOR_HBRIDGE_PWM, 0);
   digitalWrite(MOTOR_HBRIDGE_L_EN, 0);
   digitalWrite(MOTOR_HBRIDGE_R_EN, 0);
 
   motorSpeed = 0;
-  analogWrite(MOTOR_HBRIDGE_PWM, 0);
   motorIsHoming=false;
   updateMotorSpeed();
 }
 
-void hbridgeSpeedUp()
+void __NOINLINE hbridgeSpeedUp()
 {
   if (motorSpeed < 100)
   {
     motorSpeed++;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
-    updateMotorSpeed();
+    hbridgeGo();
   }
 }
 
-void hbridgeSlowDown()
+void __NOINLINE hbridgeSlowDown()
 {
   if (motorSpeed > 0)
   {
     motorSpeed--;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
-    updateMotorSpeed();
+    hbridgeGo();
   }
 }
 
@@ -129,64 +133,58 @@ void hbridgeSlowDown()
 
 
 
-
-
-void stepperReverseDirection()
-{
-  motorWasGoingForward = !motorWasGoingForward;
-  stepper_setSpeed((motorWasGoingForward ? motorSpeed : -motorSpeed));
-  updateMotorSpeed();
-}
-
-void stepperStop()
-{
-  motorSpeed = 0;
-  stepper_setSpeed(0);
-  stepper_stop(); // Stop as fast as possible: sets new target (not runSpeed)
-  motorIsHoming=false;
-  updateMotorSpeed();
-}
-
-void stepperRun()
-{
-  stepper_runSpeed();
-}
-
-void stepperGo()
+void __NOINLINE stepperGo()
 {
   int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
   stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
   updateMotorSpeed();
 }
 
-void stepperSpeedUp()
+void __NOINLINE stepperReverseDirection()
+{
+  motorWasGoingForward = !motorWasGoingForward;
+  stepperGo();
+}
+
+void __NOINLINE stepperStop()
+{
+  stepper_setSpeed(0);
+  stepper_stop(); // Stop as fast as possible: sets new target (not runSpeed)
+  motorSpeed = 0;
+  motorIsHoming=false;
+  updateMotorSpeed();
+}
+
+void __NOINLINE stepperRun()
+{
+  stepper_runSpeed();
+}
+
+
+void __NOINLINE stepperSpeedUp()
 {
   if (motorSpeed <= 100)
   {
     motorSpeed++;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
-    stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
-  updateMotorSpeed();
+    stepperGo();
   }
 }
 
-void stepperSlowDown()
+void __NOINLINE stepperSlowDown()
 {
   if (motorSpeed > 0)
   {
     motorSpeed--;
     if (motorSpeed < motorMinSpeed)
       motorSpeed = motorMinSpeed;
-    int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
-    stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
-  updateMotorSpeed();
+    stepperGo();
   }
 }
 
 
-void motorGoHomeReal()
+void __NOINLINE motorGoHomeReal()
 {
   if (digitalRead(HOME_SENSOR) == HIGH)
   {
@@ -326,9 +324,13 @@ void motorSetup()
   digitalWrite(MOTOR_PIN_C, LOW);
   digitalWrite(MOTOR_PIN_PWM, LOW);
 
+  // Setup the home sensor as an interrupt
+  // NOTE: these may be wired backwards and need to be 'identified' as such
+  pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
   pinMode(MOTOR_ENCODER_FEEDBACK, INPUT_PULLUP); // Short to ground to trigger.
   delay(5); // Give it a chance to be pulled up
   attachInterrupt(digitalPinToInterrupt(MOTOR_ENCODER_FEEDBACK), encoderTriggered, FALLING);
+  attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
 
   stepper_setAcceleration(2000);
   stepper_setMaxSpeed(STEPPER_MAX_SPEED);

@@ -177,21 +177,21 @@
 <wire x1="4.54" y1="0.1" x2="16.775" y2="0.1" width="0" layer="20"/>
 <wire x1="16.775" y1="0.1" x2="17.4" y2="3.9" width="0" layer="20"/>
 <wire x1="17.4" y1="3.9" x2="17.375" y2="14.2025" width="0" layer="20"/>
-<wire x1="17.375" y1="14.2025" x2="17.745" y2="14.7025" width="0" layer="20" curve="-90"/>
-<wire x1="17.745" y1="14.7025" x2="19.39769375" y2="13.51279375" width="0" layer="20" curve="-114.272013"/>
+<wire x1="17.375" y1="14.2025" x2="19.3975" y2="13.545" width="0" layer="20" curve="-90"/>
+<wire x1="19.3975" y1="13.545" x2="19.39769375" y2="13.51279375" width="0" layer="20" curve="-114.272013" cap="flat"/>
 <wire x1="19.39769375" y1="13.51279375" x2="19.4" y2="10.4" width="0" layer="20"/>
 <wire x1="19.4" y1="10.4" x2="19.2" y2="9.9" width="0" layer="20"/>
 <wire x1="19.2" y1="9.9" x2="19.245" y2="0.1" width="0" layer="20"/>
-<wire x1="19.245" y1="0.1" x2="21.1" y2="0.1" width="0" layer="20"/>
-<wire x1="21.1" y1="0.1" x2="21.1" y2="1.8" width="0" layer="20"/>
-<wire x1="21.1" y1="1.8" x2="20.3" y2="1.8" width="0" layer="20"/>
+<wire x1="19.245" y1="0.1" x2="21" y2="0.1" width="0" layer="20"/>
+<wire x1="21" y1="0.1" x2="21" y2="1.8" width="0" layer="20"/>
+<wire x1="21" y1="1.8" x2="20.3" y2="1.8" width="0" layer="20"/>
 <wire x1="20.3" y1="1.8" x2="20.3" y2="8.8" width="0" layer="20"/>
-<wire x1="20.3" y1="8.8" x2="21.1" y2="8.8" width="0" layer="20"/>
-<wire x1="21.1" y1="8.8" x2="21.1" y2="14.4641" width="0" layer="20"/>
-<wire x1="21.1" y1="14.4641" x2="16.955" y2="18.2975" width="0" layer="20" curve="90"/>
-<wire x1="16.955" y1="18.2975" x2="4.46" y2="18.2975" width="0" layer="20"/>
-<wire x1="4.46" y1="18.2975" x2="0.1" y2="14.62" width="0" layer="20" curve="90"/>
-<wire x1="0.1" y1="14.62" x2="0.1" y2="8.8" width="0" layer="20"/>
+<wire x1="20.3" y1="8.8" x2="21" y2="8.8" width="0" layer="20"/>
+<wire x1="21" y1="8.8" x2="21" y2="13.3641" width="0" layer="20"/>
+<wire x1="21" y1="13.3641" x2="17.055" y2="18.0975" width="0" layer="20" curve="90"/>
+<wire x1="17.055" y1="18.0975" x2="4.46" y2="18.0975" width="0" layer="20"/>
+<wire x1="4.46" y1="18.0975" x2="0.1" y2="13.42" width="0" layer="20" curve="90"/>
+<wire x1="0.1" y1="13.42" x2="0.1" y2="8.8" width="0" layer="20"/>
 <wire x1="0.1" y1="8.8" x2="0.9" y2="8.8" width="0" layer="20"/>
 <wire x1="0.9" y1="8.8" x2="0.9" y2="1.8" width="0" layer="20"/>
 <wire x1="0.9" y1="1.8" x2="0.1" y2="1.8" width="0" layer="20"/>
@@ -205,8 +205,8 @@
 <wire x1="3.74" y1="14.6025" x2="3.7" y2="3.8" width="0" layer="20"/>
 <wire x1="3.7" y1="3.8" x2="4.54" y2="0.1" width="0" layer="20"/>
 <text x="5.5" y="18.1" size="1.27" layer="26" rot="MR180">1042</text>
-<text x="11.8" y="18" size="1.27" layer="26" rot="MR180">1041</text>
-<text x="15.6" y="18" size="1.27" layer="25" rot="R180">1041</text>
+<text x="11.8" y="18.1" size="1.27" layer="26" rot="MR180">1041</text>
+<text x="15.6" y="18.1" size="1.27" layer="25" rot="R180">1041</text>
 <text x="9.4" y="18.1" size="1.27" layer="25" rot="R180">1042</text>
 <text x="17" y="0.8" size="1.27" layer="25" rot="R90">GND</text>
 <text x="5.2" y="0.8" size="1.27" layer="25" rot="R90">VCC</text>
@@ -1661,7 +1661,7 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <vertex x="4.5" y="0.1"/>
 <vertex x="16.8" y="0.1"/>
 <vertex x="17.3" y="3.9"/>
-<vertex x="17.3" y="18.2"/>
+<vertex x="17.3" y="18.3"/>
 <vertex x="3.8" y="18.3"/>
 <vertex x="3.8" y="3.7"/>
 </polygon>

@@ -604,7 +604,7 @@ int hasFocus(Fl_Group *g)
 
 void processSerialFailure(core_t *core)
 {
-  core->sentQ=false;
+  core->sentQ=0;
   Fl::remove_fd(core->fd);
   close(core->fd);
   core->fd = -1;
@@ -933,7 +933,6 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'g': // debug log output
       break;
   case 'd': // data
-      if (core->sentQ)
       switch(currentArgIndex)
       {
       case 1: // Pressure
@@ -1203,12 +1202,9 @@ void ServiceSock(int fd, void *data)
     char ch;
     core_t *core = (core_t *)data;
 
-    // Pass anything from the remote end through
-    if (1==read(fd, &ch, 1))
-    {
-        printf("=> '%c'\n", ch);
-        write(core->fd, &ch, 1);
-    }
+    // Ignore anything coming in, all remote input is ignored
+    // Remotes are view-only
+    read(fd, &ch, 1);
 }
 
 void HandleNewSock(int fd, void *data)
@@ -1233,8 +1229,8 @@ void HandleNewSock(int fd, void *data)
         }
         core->remoteFd = connfd;
         Fl::add_fd(connfd, ServiceSock, (void *)core);
-    }
-  
+        core->sentQ = 0; // Need to resend the 'Q' to populate the remote client
+    }  
 }
 
 void createListeningSocket(core_t *core)
@@ -1293,9 +1289,13 @@ int main(int argc, char **argv) {
     for (int x=1; x<argc; x++)
         openSerial(&core, argv[x]);
     if (core.fd==-1)
+        openSerial(&core,"/dev/ttyS0");
+    if (core.fd==-1)
         openSerial(&core,"/dev/ttyACM0");
     if (core.fd==-1)
         openSerial(&core,"/dev/ttyUSB0");
+    if (core.fd==-1)
+        openSerial(&core,"/dev/ttyAMA0");
 
     Fl::visual(FL_DOUBLE|FL_INDEX); // dbe support
 

@@ -5,6 +5,7 @@
 #include <SPI.h>
 
 #define hwSerial Serial1
+// Use USB serial...
 //#define hwSerial Serial
 
 #include <IntervalTimer.h>

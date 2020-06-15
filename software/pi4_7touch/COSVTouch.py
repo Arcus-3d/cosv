@@ -243,9 +243,6 @@ class ScrollGraphBoxLayout(BoxLayout):
         super(ScrollGraphBoxLayout,self).on_touch_up(touch)
 
 class COSVTouchApp(App):
-    run_state = OptionProperty("stop",options=["stop","run","calibrate"])
-    run_rate = BoundedNumericProperty(8, min=8, max=40, errorvalue=8)
-    run_mode = OptionProperty("PCV",options=["PCV","VCV"])
     def build_config(self,config):
         config.setdefaults('state', {
             'running'   : 0,
@@ -263,6 +260,7 @@ class COSVTouchApp(App):
     def build(self): 
         #availablePorts = listSerialPorts()
         self.serial = serial.Serial()
+        self.commandSerial('Q')
         self.enableCO2 = False
         self.tidalVolume=0
         layoutMain = BoxLayout(orientation='horizontal',spacing=0, padding=0)
@@ -273,7 +271,6 @@ class COSVTouchApp(App):
         self.graphs.add_graph(ScrollGraph(ylabel='Paw cmH2O', color=[1, 0, 1, 1], ymin=0, ymax=50))
         self.graphs.add_graph(ScrollGraph(ylabel='Flow L/min', color=[0, 1, 1, 1], ymin=-50, ymax=50,y_ticks_major=20))
         self.graphs.add_graph(ScrollGraph(ylabel='Vt mL', color=[1,1,0,1], ymin=0, ymax=300,size_hint=(1,0.75),y_ticks_major=100))
-        #self.graphs.add_graph(ScrollGraph(ylabel='Pressure/Volume', color=[0.5,0.5,1,1], ymin=-10, ymax=10,size_hint=(1,0.75),y_ticks_major=5))
         if (self.enableCO2):
             self.graphs.add_graph(ScrollGraph(ylabel='CO2 mmHg', color=[0.5,0.5,1,1], ymin=0, ymax=40))
         layoutLeft.add_widget(self.graphs)
@@ -281,22 +278,22 @@ class COSVTouchApp(App):
         
         # Bottom Controls
         layoutControlBottom = BoxLayout(orientation='horizontal', spacing=10, padding=(5,10),size_hint=(1,0.2))
-        buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV'),text_bottom=" ",on_change=self.sendSerial)
+        buttonMode = SelectButton(name='mode',text_top="Mode",value="PCV-VG",values=('PCV-VG','PCV'),text_bottom=" ",on_change=self.commandSerial)
         layoutControlBottom.add_widget(buttonMode);
         
-        buttonTidalVolume = SliderButton(name='volume',text_top="TidalV",min=200,max=700,value=500,text_bottom="ml",on_change=self.sendSerial);
+        buttonTidalVolume = SliderButton(name='volume',text_top="TidalV",min=200,max=700,value=500,text_bottom="ml",on_change=self.commandSerial);
         layoutControlBottom.add_widget(buttonTidalVolume);
         
-        buttonRespRate = SliderButton(name='rate',text_top="Rate",min=8,max=40,value=18,text_bottom="/min",on_change=self.sendSerial);
+        buttonRespRate = SliderButton(name='rate',text_top="Rate",min=8,max=40,value=18,text_bottom="/min",on_change=self.commandSerial);
         layoutControlBottom.add_widget(buttonRespRate);
         
-        buttonInhaleExhale = SelectButton(name='ie',text_top="I:E",value="1:2",values=('1:1','1:2','1:3','1:4'),text_bottom=" ",on_change=self.sendSerial);
+        buttonInhaleExhale = SelectButton(name='ie',text_top="I:E",value="1:2",values=('1:1','1:2','1:3','1:4'),text_bottom=" ",on_change=self.commandSerial);
         layoutControlBottom.add_widget(buttonInhaleExhale);
         
         #buttonPEEP = SliderButton(name='peep',text_top="PEEP",min=0,value="5",max=25,text_bottom="cmH2O");
         #layoutControlBottom.add_widget(buttonPEEP);
         
-        buttonPressureMax = SliderButton(name='pmax',text_top="Pmax",min=10,value="20",max=60,text_bottom="cmH2O",on_change=self.sendSerial);
+        buttonPressureMax = SliderButton(name='pmax',text_top="Pmax",min=10,value="20",max=60,text_bottom="cmH2O",on_change=self.commandSerial);
         layoutControlBottom.add_widget(buttonPressureMax);
         
         layoutLeft.add_widget(layoutControlBottom)
@@ -310,61 +307,25 @@ class COSVTouchApp(App):
         layoutControlRight.add_widget(buttonAlarmSetup);
         buttonSystemSetup = DisplayButton(value="System\nSetup");
         layoutControlRight.add_widget(buttonSystemSetup);
-        self.buttonRun = SelectButton(name='state',text_top="State",on_change=self.runButton,value="stop",values=('stop','run'),value_colors={'stop':(1,0.3,0.3,1),'calibrate':(1,1,0.3,1),'run':(0.3,1,0.3,1)})
-        layoutControlRight.add_widget(self.buttonRun)
+        #self.buttonRun = SelectButton(name='state',text_top="State",on_change=self.runButton,value="stop",values=('stop','run'),value_colors={'stop':(1,0.3,0.3,1),'calibrate':(1,1,0.3,1),'run':(0.3,1,0.3,1)})
+        #layoutControlRight.add_widget(self.buttonRun)
 
         layoutMain.add_widget(layoutControlRight)
         return layoutMain
-    def sendSerial(self,instance,value):
-        print(instance.name,value)
+    def inputSerial(self,instance,value):
         name = instance.name
-        if name == 'rate':
-            name = 'motor_speed'
-            value = int(value * 6.3)
+        self.sendSerial(name,value) 
+    def sendSerial(self,name,value):
         try:
-            if self.serial.is_open:
-                self.serial.write(bytes(str('S,'+str(name)+ ',' + str(value) + '\n').encode('ascii')))
-            else:
-                print('Serial not open')
-        except Exception as e:
-            print('sendSerial exception')
-            print(e)
-    def runButton(self,instance,value):
-        print(instance.name,value)
-        if value == 'run':
-            self.run_state = 'run'
-        else:
-            self.run_state = 'stop'
-    def on_run_state(self,instance,value):
-        print ('State:' + self.run_state)
-        if self.run_state == 'run':
-            try:
+            if ! self.serial.is_open:
                 availablePorts = listSerialPorts()
                 self.serial = serial.Serial(port=availablePorts[0], baudrate=115200,timeout=1)
                 Clock.schedule_interval(self.get_data, 1 / 50.)
-                if (self.serial.is_open): 
-                    self.serial.write(b'S,rate,')
-                    self.serial.write(bytes(self.run_rate))
-                    self.serial.write(b'\n')
-                    self.serial.write(b'run\n')
-                    self.serial.write(b'S,motor_speed,230\n')
-                    print('serial started')
-                #self.graphs.reset()
-            except Exception as e:
-                print(e)
-                #popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
-                #popup.open()
-        if self.run_state == 'stop':
-            try:
-                self.serial.write(b'stop\n')
-                self.serial.write(b'S,motor_speed,0\n')
-                self.serial.close()
-                Clock.unschedule(self.get_data)
-            except Exception as e:
-                print(e)
-                #popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
-                #popup.open()
-  
+        except Exception as e:
+            popup=Popup(title='Error',content=Label(text=str(e)),size_hint=(None,None),size=(200,200))
+            popup.open()
+            print('sendSerial exception')
+            print(e)
     def get_data(self, dt):
         try:
             if self.serial.is_open:

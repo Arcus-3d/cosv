@@ -506,7 +506,7 @@ void __NOINLINE respondSettingLimits(struct settingsEntry_s * entry)
   else
   {
     settingReply(entry->theName, PSTR("min"), entry->theMin);
-    settingReply(entry->theName, PSTR("max"), entry->theMin);
+    settingReply(entry->theName, PSTR("max"), entry->theMax);
   }
   // What group does this belong to?
   settingReply(entry->theName, PSTR("group"), (entry->verifyIt == noSet ? PSTR("status") : PSTR("button")));

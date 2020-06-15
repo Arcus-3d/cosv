@@ -303,12 +303,7 @@ t tasks[] = {
 
 
 
-void homeTriggered() // IRQ function
-{
-  motorFound = true;
 
-  motorStop();
-}
 
 void scanI2C(TwoWire *wire)
 {
@@ -355,10 +350,6 @@ void setup()
 
   motorSetup();
 
-  // Setup the home sensor as an interrupt
-  pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
-  attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
-
   busDeviceInit();
 
   vispInit();
@@ -404,7 +395,7 @@ void loop() {
   startMicros = micros();
   while (hwSerial.available())
     commandParser(hwSerial.read());
-    
+
   // Spread out the writing of the EEPROM over time
   coreSaveSettingsStateMachine();
   

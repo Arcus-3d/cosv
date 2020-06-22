@@ -182,9 +182,9 @@
 <wire x1="20.1" y1="14.4" x2="19.7" y2="13.7" width="0" layer="20"/>
 <wire x1="19.7" y1="13.7" x2="19.7" y2="0.4" width="0" layer="20"/>
 <wire x1="19.7" y1="0.4" x2="22.1" y2="0.4" width="0" layer="20"/>
-<wire x1="22.1" y1="0.4" x2="22.1" y2="5" width="0" layer="20"/>
-<wire x1="22.1" y1="5" x2="21" y2="5" width="0" layer="20"/>
-<wire x1="21" y1="5" x2="21" y2="12" width="0" layer="20"/>
+<wire x1="22.1" y1="0.4" x2="22.1" y2="5.2" width="0" layer="20"/>
+<wire x1="22.1" y1="5.2" x2="21" y2="5.2" width="0" layer="20"/>
+<wire x1="21" y1="5.2" x2="21" y2="12" width="0" layer="20"/>
 <wire x1="21" y1="12" x2="22.2" y2="12" width="0" layer="20"/>
 <wire x1="22.2" y1="12" x2="22.3" y2="16.3641" width="0" layer="20"/>
 <wire x1="22.3" y1="16.3641" x2="17.955" y2="20.8975" width="0" layer="20" curve="90"/>
@@ -192,9 +192,9 @@
 <wire x1="5.36" y1="20.8975" x2="0.3" y2="16.32" width="0" layer="20" curve="90"/>
 <wire x1="0.3" y1="16.32" x2="0.3" y2="12" width="0" layer="20"/>
 <wire x1="0.3" y1="12" x2="1.6" y2="12" width="0" layer="20"/>
-<wire x1="1.6" y1="12" x2="1.6" y2="5" width="0" layer="20"/>
-<wire x1="1.6" y1="5" x2="0.5" y2="5" width="0" layer="20"/>
-<wire x1="0.5" y1="5" x2="0.4" y2="0.4" width="0" layer="20"/>
+<wire x1="1.6" y1="12" x2="1.6" y2="5.1" width="0" layer="20"/>
+<wire x1="1.6" y1="5.1" x2="0.5" y2="5.1" width="0" layer="20"/>
+<wire x1="0.5" y1="5.1" x2="0.4" y2="0.4" width="0" layer="20"/>
 <wire x1="0.4" y1="0.4" x2="2.7" y2="0.4" width="0" layer="20"/>
 <wire x1="2.7" y1="0.4" x2="2.8" y2="13.6" width="0" layer="20"/>
 <wire x1="2.8" y1="13.6" x2="2.3" y2="14.4" width="0" layer="20"/>
@@ -204,11 +204,11 @@
 <wire x1="4.6" y1="17.0025" x2="4.6" y2="6.9" width="0" layer="20"/>
 <wire x1="4.6" y1="6.9" x2="5.14" y2="0.4" width="0" layer="20"/>
 <text x="6" y="7.5" size="1.27" layer="26" rot="MR180">1042</text>
-<text x="12.2" y="7.5" size="1.27" layer="26" rot="MR180">1041</text>
-<text x="16.8" y="14" size="1.27" layer="25" rot="R180">1041</text>
+<text x="12.2" y="7.5" size="1.27" layer="26" rot="MR180">HY870</text>
+<text x="16.8" y="14" size="1.27" layer="25" rot="R180">HY870</text>
 <text x="10.1" y="13.9" size="1.27" layer="25" rot="R180">1042</text>
-<text x="17.7" y="3.8" size="1.27" layer="25" rot="R90">GND</text>
-<text x="5.9" y="3.8" size="1.27" layer="25" rot="R90">VCC</text>
+<text x="17.5" y="1.3" size="1.27" layer="25" rot="R90">GND</text>
+<text x="6.3" y="1.4" size="1.27" layer="25" rot="R90">VCC</text>
 </plain>
 <libraries>
 <library name="PhotoInterrupter">
@@ -551,7 +551,7 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <attribute name="VERIFICATION_VERSION" value="0.0.0.3" x="8.2" y="13.4" size="1.778" layer="27" rot="R270" display="off"/>
 <attribute name="PACKAGE" value="PTH_14MM4_6MM0" x="8.2" y="13.4" size="1.778" layer="27" rot="R270" display="off"/>
 </element>
-<element name="EE-SX1041" library="PhotoInterrupter" package="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041_0" value="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041_0_0" x="14.4" y="13.4" smashed="yes" rot="R270">
+<element name="HY870-L" library="PhotoInterrupter" package="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041_0" value="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041_0_0" x="14.4" y="13.4" smashed="yes" rot="R270">
 <attribute name="MPN" value="EE-SX1041" x="14.4" y="13.4" size="1.778" layer="27" rot="R270" display="off"/>
 <attribute name="MFG_PACKAGE_IDENT" value="EE-SX1041" x="14.4" y="13.4" size="1.778" layer="27" rot="R270" display="off"/>
 <attribute name="DATASHEET" value="https://omronfs.omron.com/en_US/ecb/products/pdf/en-ee_sx1041.pdf" x="14.4" y="13.4" size="1.778" layer="27" rot="R270" display="off"/>
@@ -595,6 +595,8 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <contactref element="K3" pad="4"/>
 <wire x1="5.1" y1="6.93" x2="7.36" y2="4.67" width="1.016" layer="16"/>
 <wire x1="7.36" y1="4.67" x2="9.9" y2="2.13" width="0.6096" layer="16"/>
+<contactref element="K3" pad="2"/>
+<wire x1="7.36" y1="4.67" x2="7.36" y2="2.13" width="0.6096" layer="16"/>
 </signal>
 <signal name="GND">
 <polygon width="0.254" layer="16" isolate="0.3048" orphans="yes" thermals="no">
@@ -632,9 +634,9 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <vertex x="4.6" y="17.1"/>
 <vertex x="4.5" y="6.7"/>
 </polygon>
-<contactref element="EE-SX1041" pad="K"/>
+<contactref element="HY870-L" pad="K"/>
 <contactref element="EE-SX1042" pad="E"/>
-<contactref element="EE-SX1041" pad="E"/>
+<contactref element="HY870-L" pad="E"/>
 <wire x1="13.13" y1="17.9" x2="13.13" y2="17.17" width="1.016" layer="16"/>
 <wire x1="13.13" y1="17.17" x2="15.67" y2="14.63" width="1.016" layer="16"/>
 <wire x1="15.67" y1="8.9" x2="15.67" y2="10.9" width="1.016" layer="16"/>
@@ -647,9 +649,11 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <wire x1="14.98" y1="4.67" x2="14.98" y2="8.21" width="1.016" layer="16"/>
 <wire x1="14.98" y1="8.21" x2="15.67" y2="8.9" width="1.016" layer="16"/>
 <wire x1="14.98" y1="4.67" x2="12.44" y2="2.13" width="0.6096" layer="16"/>
+<contactref element="K3" pad="8"/>
+<wire x1="14.98" y1="4.67" x2="14.98" y2="2.13" width="0.6096" layer="16"/>
 </signal>
 <signal name="HOME">
-<contactref element="EE-SX1041" pad="C"/>
+<contactref element="HY870-L" pad="C"/>
 <wire x1="12.8775" y1="8.6475" x2="13.13" y2="8.9" width="1.016" layer="16"/>
 <contactref element="K3" pad="5"/>
 <wire x1="12.44" y1="4.67" x2="12.44" y2="8.21" width="1.016" layer="16"/>
@@ -679,7 +683,7 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 </signal>
 <signal name="N$1">
 <contactref element="EE-SX1042" pad="K"/>
-<contactref element="EE-SX1041" pad="A"/>
+<contactref element="HY870-L" pad="A"/>
 <wire x1="6.93" y1="17.9" x2="6.93" y2="19.9" width="1.016" layer="16"/>
 <wire x1="6.93" y1="19.9" x2="15.6" y2="19.9" width="1.016" layer="16"/>
 <wire x1="15.6" y1="19.9" x2="15.6" y2="17.9" width="1.016" layer="16"/>

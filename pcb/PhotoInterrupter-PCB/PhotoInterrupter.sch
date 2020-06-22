@@ -503,7 +503,7 @@ Copyright: Würth Elektronik</description>
 <part name="P+5" library="supply1" deviceset="VCC" device=""/>
 <part name="GND5" library="supply1" deviceset="GND" device=""/>
 <part name="EE-SX1042" library="PhotoInterrupter" deviceset="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041" device="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041_0_0"/>
-<part name="EE-SX1041" library="PhotoInterrupter" deviceset="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041" device="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041_0_0"/>
+<part name="HY870-L" library="PhotoInterrupter" deviceset="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041" device="OMRON_ELECTRONICS_INC-EMC_DIV_EE-SX1041_0_0"/>
 <part name="GND3" library="supply1" deviceset="GND" device=""/>
 <part name="K3" library="Wuerth_Elektronik_eiCan_05_Box_Header_IDC_Connectors_1_2" deviceset="61200821621" device=""/>
 </parts>
@@ -522,7 +522,7 @@ Dual Snap In Photo Interrupter for COSV</text>
 <instance part="P+5" gate="VCC" x="86.36" y="86.36"/>
 <instance part="GND5" gate="1" x="86.36" y="50.8"/>
 <instance part="EE-SX1042" gate="G$0" x="38.1" y="76.2"/>
-<instance part="EE-SX1041" gate="G$0" x="38.1" y="40.64"/>
+<instance part="HY870-L" gate="G$0" x="38.1" y="40.64"/>
 <instance part="GND3" gate="1" x="30.48" y="30.48"/>
 <instance part="K3" gate="G$1" x="96.52" y="71.12" rot="R270"/>
 </instances>
@@ -537,9 +537,13 @@ Dual Snap In Photo Interrupter for COSV</text>
 <pinref part="K3" gate="G$1" pin="4"/>
 <wire x1="86.36" y1="81.28" x2="86.36" y2="76.2" width="0.1524" layer="91"/>
 <wire x1="106.68" y1="71.12" x2="109.22" y2="71.12" width="0.1524" layer="91"/>
-<wire x1="109.22" y1="71.12" x2="109.22" y2="81.28" width="0.1524" layer="91"/>
+<wire x1="109.22" y1="71.12" x2="109.22" y2="76.2" width="0.1524" layer="91"/>
+<wire x1="109.22" y1="76.2" x2="109.22" y2="81.28" width="0.1524" layer="91"/>
 <wire x1="109.22" y1="81.28" x2="86.36" y2="81.28" width="0.1524" layer="91"/>
 <junction x="86.36" y="81.28"/>
+<pinref part="K3" gate="G$1" pin="2"/>
+<wire x1="106.68" y1="76.2" x2="109.22" y2="76.2" width="0.1524" layer="91"/>
+<junction x="109.22" y="76.2"/>
 </segment>
 <segment>
 <pinref part="EE-SX1042" gate="G$0" pin="A"/>
@@ -556,9 +560,13 @@ Dual Snap In Photo Interrupter for COSV</text>
 <pinref part="K3" gate="G$1" pin="6"/>
 <wire x1="86.36" y1="55.88" x2="86.36" y2="60.96" width="0.1524" layer="91"/>
 <wire x1="106.68" y1="66.04" x2="109.22" y2="66.04" width="0.1524" layer="91"/>
-<wire x1="109.22" y1="66.04" x2="109.22" y2="55.88" width="0.1524" layer="91"/>
+<wire x1="109.22" y1="66.04" x2="109.22" y2="60.96" width="0.1524" layer="91"/>
+<wire x1="109.22" y1="60.96" x2="109.22" y2="55.88" width="0.1524" layer="91"/>
 <wire x1="109.22" y1="55.88" x2="86.36" y2="55.88" width="0.1524" layer="91"/>
 <junction x="86.36" y="55.88"/>
+<pinref part="K3" gate="G$1" pin="8"/>
+<wire x1="106.68" y1="60.96" x2="109.22" y2="60.96" width="0.1524" layer="91"/>
+<junction x="109.22" y="60.96"/>
 </segment>
 <segment>
 <pinref part="GND1" gate="1" pin="GND"/>
@@ -568,12 +576,12 @@ Dual Snap In Photo Interrupter for COSV</text>
 </segment>
 <segment>
 <pinref part="GND3" gate="1" pin="GND"/>
-<pinref part="EE-SX1041" gate="G$0" pin="K"/>
+<pinref part="HY870-L" gate="G$0" pin="K"/>
 <wire x1="30.48" y1="33.02" x2="35.56" y2="33.02" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <wire x1="68.58" y1="22.86" x2="63.5" y2="22.86" width="0.1524" layer="91"/>
-<pinref part="EE-SX1041" gate="G$0" pin="E"/>
+<pinref part="HY870-L" gate="G$0" pin="E"/>
 <pinref part="GND2" gate="1" pin="GND"/>
 <wire x1="68.58" y1="12.7" x2="68.58" y2="22.86" width="0.1524" layer="91"/>
 </segment>
@@ -584,7 +592,7 @@ Dual Snap In Photo Interrupter for COSV</text>
 <wire x1="78.74" y1="35.56" x2="78.74" y2="66.04" width="0.1524" layer="91"/>
 <wire x1="78.74" y1="66.04" x2="86.36" y2="66.04" width="0.1524" layer="91"/>
 <wire x1="63.5" y1="35.56" x2="78.74" y2="35.56" width="0.1524" layer="91"/>
-<pinref part="EE-SX1041" gate="G$0" pin="C"/>
+<pinref part="HY870-L" gate="G$0" pin="C"/>
 <pinref part="K3" gate="G$1" pin="5"/>
 </segment>
 </net>
@@ -601,7 +609,7 @@ Dual Snap In Photo Interrupter for COSV</text>
 <pinref part="EE-SX1042" gate="G$0" pin="K"/>
 <wire x1="35.56" y1="68.58" x2="22.86" y2="68.58" width="0.1524" layer="91"/>
 <wire x1="22.86" y1="68.58" x2="22.86" y2="25.4" width="0.1524" layer="91"/>
-<pinref part="EE-SX1041" gate="G$0" pin="A"/>
+<pinref part="HY870-L" gate="G$0" pin="A"/>
 <wire x1="22.86" y1="25.4" x2="35.56" y2="25.4" width="0.1524" layer="91"/>
 </segment>
 </net>

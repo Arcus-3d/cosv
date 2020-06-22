@@ -1,0 +1,10 @@
+Qty,Designator,Footprint,Comment,LCSC Part # (optional),Description (optional)
+2,"C1,C3",C0805,10uF ±10% 10V,C15850,10uF ±10% 10V B 0805 Multilayer Ceramic Capacitors MLCC - SMD/SMT RoHS
+5,"C4,C5,C6,C7,C9",C0402,100nF ±10% 50V X7R,C1525,
+4,"Q1,Q2,Q3,Q4",SOT-23-3,BSS138,C78284,"N Channel 50V 220mA 1.5V @ 1mA 3.5 Ω @ 220mA,10V 360mW SOT-23(SOT-23-3) MOSFET RoHS"
+8,"R1,R2,R3,R5,R6,R7,R8,R9",R0402,10K ±1% 1/16W,C25744,10K ±1% 1/16W 0402 Chip Resistor - Surface Mount RoHS
+1,R4,R0402,47K ±1% 1/16W,C25792,47K ±1% 1/16W 0402 Chip Resistor - Surface Mount RoHS
+1,LED1,LED_0603,Light Emitting Diodes (LED) Green 520~535nm 112~258mcd@20mA,C72043,Light Emitting Diodes (LED) Green 520~535nm 112~258mcd@20mA
+1,U1,SOT-23-5,BL9198-33BAPRN,C51282,Fixed 6V 3.3V 300mA SOT-23-5 Low Dropout Regulators(LDO) RoHS
+1,U3,SO-8,M24C01-RMN6TP,C146163,SO-8 EEPROM RoHS
+4,"U5,U6,U7,U8",LGA-8,SPL06-007,C233787,SMD Pressure Sensors RoHS

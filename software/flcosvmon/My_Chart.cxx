@@ -197,13 +197,25 @@ Fl_Widget(X,Y,W,H,L) {
   Destroys the My_Chart widget and all of its data.
  */
 My_Chart::~My_Chart() {
+  for (int x=0; x<numb; x++)
+    if (entries[x].str)
+      free(entries[x].str);
   free(entries);
+  entries=NULL;
 }
 
 /**
   Removes all values from the chart.
  */
 void My_Chart::clear() {
+  for (int x=0; x<numb; x++)
+  {
+    if (entries[x].str)
+    {
+      free(entries[x].str);
+      entries[x].str=NULL;
+    }
+  }
   numb = 0;
   min = max = 0;
   redraw();
@@ -225,6 +237,7 @@ void My_Chart::add(unsigned millis, double val, const char *str, unsigned col) {
   }
 
   // Shift entries as needed (we have a max time for this chart)
+  // TODO: this can be optimized (ie: moving once)
   while (numb && ((entries[0].millis)+(maxtime_)) <= millis) {
     if (entries[0].str)
       free(entries[0].str);
@@ -235,6 +248,33 @@ void My_Chart::add(unsigned millis, double val, const char *str, unsigned col) {
   entries[numb].val = float(val);
   entries[numb].col = col;
   entries[numb].str = (str ? strdup(str) : NULL);
+
+  // TODO: Find Plateau's...
+  // Over the last 60 samples, look for the highest number
+  for (int maxval=0, valpos=1, x=0; x<=numb; x++)
+  {
+    if (entries[x].val<1.0)
+    {
+      // We have gone below the low threshold, so assume last highest is what we want to display
+      if (valpos>0)
+      {
+        if (entries[valpos].str)
+          free(entries[valpos].str);
+        asprintf(&entries[valpos].str, "%1.2f", entries[valpos].val);
+      }
+      maxval=0;
+      valpos=-1;
+    }
+    else
+    {
+      if (maxval<entries[x].val)
+      {
+        maxval=entries[x].val;
+        valpos=x;
+      }
+    }
+  }
+
   numb++;
   redraw();
 }
@@ -248,7 +288,6 @@ void My_Chart::bounds(double a, double b) {
   this->max = b;
   redraw();
 }
-
 
 //
 // End of "$Id$".

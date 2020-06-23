@@ -32,6 +32,7 @@
 struct FL_CHART_ENTRY {
    unsigned millis;                     /**< for internal use only. */
    float val;				/**< For internal use only. */
+   float avgFilter, stdFilter, filteredY;
    unsigned col;			/**< For internal use only. */
    char *str;				/**< For internal use only. */
 };
@@ -108,6 +109,11 @@ public:
     Fl_Color thresholdcolor() const {return thresholdcolor_;}
     /** gets the chart's text color to \p n. */
     void thresholdcolor(Fl_Color n) {thresholdcolor_ = n;}
+
+
+    int threshold(int position, int lag, float threshold, float influence);
+    float mean(int startPos, int len);
+    float stddev(int startPos, int len);
 
 };
 

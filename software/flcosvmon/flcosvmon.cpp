@@ -19,6 +19,7 @@
 
 
 // TODO: adjustable amount of time on the charts?  Currently fixed at 20 seconds
+// TODO: Plateau Markers on the charts (Walk the list from the chart's arraySize() and arryItem() and identify plateau's and update the items *str with a strdup() of the value
 
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>
@@ -417,9 +418,9 @@ typedef struct chart_s {
 } chart_t;
 
 chart_t charts[MAX_CHARTS] = {
-{"Pressure", -10, 40, 40, FL_YELLOW},
-{"Volume", -80, 80, 80, FL_GREEN},
-{"Tidal Volume", 0, 800, 600, FL_BLUE}
+{"Pressure",    -10,  40,  40, FL_YELLOW},
+{"Volume",      -80,  80,  80, FL_GREEN},
+{"Tidal Volume",  0, 800, 600, FL_BLUE}
 };
 
 typedef struct dictionary_s {

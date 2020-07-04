@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="7.6.0">
+<eagle version="7.7.0">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -230,6 +230,8 @@
 <text x="66.3575" y="17.145" size="1.016" layer="27" rot="R90">PWM</text>
 <text x="59.3725" y="16.8275" size="1.016" layer="27" rot="R180">vcc</text>
 <hole x="17.78" y="4.8387" drill="3.2"/>
+<text x="4.445" y="23.8125" size="1.016" layer="27">gnd</text>
+<text x="8.89" y="6.6675" size="1.016" layer="27" rot="R90">gnd</text>
 </plain>
 <libraries>
 <library name="ic-package">
@@ -3181,33 +3183,32 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <attribute name="VALUE" x="5.3975" y="21.2725" size="1.27" layer="28" rot="MR180"/>
 </element>
 <element name="BAT+" library="pinhead-2" package="1X01-S" value="" x="6.6675" y="10.4775" smashed="yes" rot="R270">
-<attribute name="NAME" x="7.8613" y="9.4488" size="1.27" layer="25" ratio="10"/>
+<attribute name="NAME" x="5.1562" y="9.1313" size="0.8128" layer="25" ratio="10" rot="R90"/>
 <attribute name="VALUE" x="3.4925" y="11.7475" size="1.27" layer="27" rot="R270"/>
 </element>
 <element name="GOLD_ORB_SM1" library="oshw" package="OSHW_8MM" value="OSHWLOGOLOGO8MM" x="27.305" y="19.05" rot="MR90"/>
 <element name="R3" library="resistor" package="R1206" value="2k2" x="82.8675" y="22.225" smashed="yes" rot="MR180">
-<attribute name="VALUE" x="86.36" y="23.495" size="1.27" layer="28" rot="MR270"/>
+<attribute name="VALUE" x="80.645" y="21.2725" size="1.27" layer="28" rot="MR180"/>
 </element>
 <element name="R4" library="resistor" package="R1206" value="2k2" x="82.8675" y="24.765" smashed="yes" rot="MR180">
-<attribute name="VALUE" x="86.36" y="26.035" size="1.27" layer="28" rot="MR270"/>
+<attribute name="VALUE" x="85.09" y="25.7175" size="1.27" layer="28" rot="MR0"/>
 </element>
 <element name="WDOG" library="pinhead" package="1X02" value="" x="6.985" y="26.035" smashed="yes">
-<attribute name="NAME" x="9.2837" y="27.5463" size="1.27" layer="25" ratio="10" rot="R90"/>
+<attribute name="NAME" x="6.5913" y="27.2288" size="0.8128" layer="25" ratio="10"/>
 <attribute name="VALUE" x="4.445" y="22.86" size="1.27" layer="27"/>
 </element>
 <element name="G" library="pinhead-2" package="1X01-S" value="" x="6.6675" y="7.9375" smashed="yes">
-<attribute name="NAME" x="5.4737" y="7.2263" size="1.27" layer="25" ratio="10" rot="R90"/>
 <attribute name="VALUE" x="5.3975" y="4.7625" size="1.27" layer="27"/>
 </element>
 <element name="LD" library="pinhead-2" package="1X01-S" value="" x="8.255" y="23.495" smashed="yes">
-<attribute name="NAME" x="9.7663" y="22.7838" size="1.27" layer="25" ratio="10"/>
+<attribute name="NAME" x="7.5438" y="21.1963" size="1.27" layer="25" ratio="10"/>
 <attribute name="VALUE" x="6.985" y="20.32" size="1.27" layer="27"/>
 </element>
-<element name="C2" library="rcl" package="C1206" value="10nf" x="75.2475" y="22.86" smashed="yes" rot="MR270">
-<attribute name="VALUE" x="76.2" y="20.32" size="1.27" layer="28" rot="MR270"/>
+<element name="C2" library="rcl" package="C1206" value="10nf" x="74.6125" y="22.86" smashed="yes" rot="MR270">
+<attribute name="VALUE" x="73.66" y="25.0825" size="1.27" layer="28" rot="MR270"/>
 </element>
-<element name="C3" library="rcl" package="C1206" value="10nf" x="78.4225" y="22.225" smashed="yes" rot="MR270">
-<attribute name="VALUE" x="79.375" y="19.685" size="1.27" layer="28" rot="MR270"/>
+<element name="C3" library="rcl" package="C1206" value="10nf" x="77.7875" y="22.225" smashed="yes" rot="MR270">
+<attribute name="VALUE" x="78.74" y="20.0025" size="1.27" layer="28" rot="MR90"/>
 </element>
 <element name="K1" library="Wuerth_Elektronik_eiCan_05_Box_Header_IDC_Connectors_1_2" package="61200821621" value="61200821621" x="65.7225" y="14.9225" smashed="yes" rot="R180">
 <attribute name="NAME" x="66.9925" y="9.8425" size="1.27" layer="25" rot="R180"/>
@@ -3304,9 +3305,9 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <contactref element="C2" pad="2"/>
 <contactref element="C3" pad="2"/>
 <wire x1="76.2" y1="20.6375" x2="76.2" y2="16.1925" width="0.6096" layer="16"/>
-<wire x1="75.2475" y1="21.46" x2="76.07" y2="20.6375" width="0.6096" layer="16"/>
-<wire x1="76.07" y1="20.6375" x2="76.2" y2="20.6375" width="0.6096" layer="16"/>
-<wire x1="78.4225" y1="20.825" x2="78.235" y2="20.6375" width="0.6096" layer="16"/>
+<wire x1="74.6125" y1="21.46" x2="74.8" y2="20.6375" width="0.6096" layer="16"/>
+<wire x1="74.8" y1="20.6375" x2="76.2" y2="20.6375" width="0.6096" layer="16"/>
+<wire x1="77.7875" y1="20.825" x2="78.235" y2="20.6375" width="0.6096" layer="16"/>
 <wire x1="78.235" y1="20.6375" x2="76.2" y2="20.6375" width="0.6096" layer="16"/>
 <contactref element="K3" pad="6"/>
 <wire x1="78.4225" y1="16.1925" x2="80.9625" y2="13.6525" width="0.6096" layer="16"/>
@@ -3398,16 +3399,16 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <contactref element="R4" pad="1"/>
 <wire x1="48.895" y1="22.5425" x2="71.12" y2="22.5425" width="0.6096" layer="16"/>
 <wire x1="71.12" y1="22.5425" x2="72.8375" y2="24.26" width="0.6096" layer="16"/>
-<wire x1="72.8375" y1="24.26" x2="75.2475" y2="24.26" width="0.6096" layer="16"/>
-<wire x1="75.2475" y1="24.26" x2="76.705" y2="25.7175" width="0.6096" layer="16"/>
-<wire x1="76.705" y1="25.7175" x2="80.3275" y2="25.7175" width="0.6096" layer="16"/>
-<wire x1="80.3275" y1="25.7175" x2="80.493" y2="25.552" width="0.6096" layer="16"/>
-<wire x1="80.493" y1="25.552" x2="81.4455" y2="24.765" width="0.6096" layer="16"/>
+<wire x1="72.8375" y1="24.26" x2="74.6125" y2="24.26" width="0.6096" layer="16"/>
+<wire x1="74.6125" y1="24.26" x2="76.3875" y2="25.4" width="0.6096" layer="16"/>
+<wire x1="76.3875" y1="25.4" x2="80.9625" y2="25.4" width="0.6096" layer="16"/>
 <wire x1="83.5025" y1="16.1925" x2="83.5025" y2="16.8275" width="0.8128" layer="16"/>
 <wire x1="83.5025" y1="16.8275" x2="82.8675" y2="17.4625" width="0.8128" layer="16"/>
 <wire x1="82.8675" y1="17.4625" x2="82.8675" y2="20.0025" width="0.8128" layer="16"/>
 <wire x1="82.8675" y1="24.765" x2="82.8675" y2="20.0025" width="0.4064" layer="16"/>
-<wire x1="82.8675" y1="24.765" x2="81.4455" y2="24.765" width="0.4064" layer="16"/>
+<wire x1="82.8675" y1="24.765" x2="81.5975" y2="24.765" width="0.4064" layer="16"/>
+<wire x1="80.9625" y1="25.4" x2="81.5975" y2="24.765" width="0.6096" layer="16"/>
+<wire x1="81.5975" y1="24.765" x2="81.4455" y2="24.765" width="0.6096" layer="16"/>
 </signal>
 <signal name="ENCODER">
 <contactref element="TEENSY40" pad="5"/>
@@ -3418,13 +3419,15 @@ Note, that not all DRC settings must be set by the manufacturer. Several can be 
 <wire x1="47.3075" y1="21.59" x2="72.0725" y2="21.59" width="0.6096" layer="16"/>
 <contactref element="R3" pad="1"/>
 <wire x1="72.0725" y1="21.59" x2="73.3425" y2="22.86" width="0.6096" layer="16"/>
-<wire x1="81.4455" y1="22.225" x2="80.8105" y2="22.86" width="0.6096" layer="16"/>
-<wire x1="80.8105" y1="22.86" x2="78.4225" y2="22.86" width="0.6096" layer="16"/>
-<wire x1="78.4225" y1="22.86" x2="73.3425" y2="22.86" width="0.4064" layer="16"/>
-<wire x1="78.4225" y1="23.625" x2="78.4225" y2="22.86" width="0.6096" layer="16"/>
-<wire x1="80.9625" y1="16.1925" x2="80.645" y2="16.51" width="0.8128" layer="16"/>
-<wire x1="80.645" y1="16.51" x2="80.645" y2="21.2725" width="0.8128" layer="16"/>
-<wire x1="80.645" y1="21.2725" x2="81.4455" y2="22.073" width="0.8128" layer="16"/>
+<wire x1="81.4455" y1="22.225" x2="80.9625" y2="22.225" width="0.6096" layer="16"/>
+<wire x1="80.9625" y1="22.225" x2="79.6925" y2="23.495" width="0.6096" layer="16"/>
+<wire x1="79.6925" y1="23.495" x2="78.4225" y2="23.495" width="0.6096" layer="16"/>
+<wire x1="78.4225" y1="23.495" x2="76.835" y2="23.495" width="0.4064" layer="16"/>
+<wire x1="76.835" y1="23.495" x2="76.2" y2="22.86" width="0.4064" layer="16"/>
+<wire x1="76.2" y1="22.86" x2="73.3425" y2="22.86" width="0.4064" layer="16"/>
+<wire x1="77.7875" y1="23.625" x2="78.4225" y2="23.495" width="0.6096" layer="16"/>
+<wire x1="80.9625" y1="16.1925" x2="80.9625" y2="22.225" width="0.8128" layer="16"/>
+<wire x1="80.9625" y1="22.225" x2="81.4455" y2="22.073" width="0.8128" layer="16"/>
 <wire x1="81.4455" y1="22.073" x2="81.4455" y2="22.225" width="0.8128" layer="16"/>
 </signal>
 <signal name="R_EN">

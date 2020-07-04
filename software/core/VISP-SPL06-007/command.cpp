@@ -285,7 +285,7 @@ void __NOINLINE actionMotorChange(struct settingsEntry_s * entry)
 void __NOINLINE updateMotorSpeed()
 {
   settingReplyValue(strMotorSpeed, motorSpeed);
-  settingReply(strMotorSpeed, PSTR("units"), motorIsHoming ? PSTR("Homing") : strPercentage);
+  settingReply(strMotorSpeed, PSTR("units"), motorRunState==MOTOR_HOMING ? PSTR("Homing") : strPercentage);
 }
 void __NOINLINE actionMotorSpeed(struct settingsEntry_s * entry)
 {

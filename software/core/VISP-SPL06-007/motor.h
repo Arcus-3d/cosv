@@ -31,7 +31,6 @@ extern volatile bool motorFound;
 void motorSetup();
 bool motorDetectionInProgress(); // calibration cannot happen while we are running motors for detection
 
-
 typedef void (*motorFunction)();
 
 extern motorFunction motorSpeedUp;
@@ -43,12 +42,16 @@ extern motorFunction motorReverseDirection;
 
 extern motorFunction motorRun; // call in loop()
 
-extern bool motorIsHoming; // Potentially send to interface as a button update
-
 extern int8_t motorType;
 extern int8_t motorHomingSpeed; // 0->100 as a percentage
 extern int8_t motorMinSpeed;    // 0->100 as a percentage
 extern int8_t motorSpeed;       // 0->100 as a percentage
 extern int16_t motorStepsPerRev;
+
+// The status of the motor is needed for fault identification
+#define MOTOR_STOPPED 0
+#define MOTOR_HOMING  1
+#define MOTOR_RUNNING 2
+extern int8_t motorRunState;
 
 #endif

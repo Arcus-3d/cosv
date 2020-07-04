@@ -22,6 +22,19 @@
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
 // TODO: 2.8" SPI display for TEENSY and BluePill
 
+// Failures left to detect
+// Low battery
+// Motor on, no pulsing
+// Motor on, no VISP data change
+// Motor on, 200+ steps & no home detected
+// Motor on, 200+ homes and 1 step pulse (improper wiring, should swap IRQ's)
+// No VISP heartbeat
+// VISP shows volume/pressure with motor off
+// TOO MUCH PRESSURE???  (How do we determine too much?)
+// TOO MUCH VOLUME???    (How do we determine too much?)
+//
+// TODO: detect patient wants to breath
+
 // Air flow is difference between the two pitot sensors
 // Relative pressure is difference between inside and outside sensors
 

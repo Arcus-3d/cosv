@@ -45,7 +45,10 @@
 
 #define SERIAL_BAUD 115200
 
-
+// Battery level resistor divider located on the carrier board
+#define B_DIV_R1 100 // K
+#define B_DIV_R2 22  // K
+  
 // System modes (This needs to be a bitmask friendly for settings validity checking (setting Volume when in Pressure mode is an error)
 #define MODE_NONE  0x00
 #define MODE_OFF   0x01

@@ -1,6 +1,6 @@
 /*
    This file is part of VISP Core.
-
+  
    VISP Core is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
@@ -22,13 +22,14 @@
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
 // TODO: 2.8" SPI display for TEENSY and BluePill
 
+// TEST: Low battery
+// TEST: No VISP heartbeat
+
 // Failures left to detect
-// Low battery
-// Motor on, no pulsing
+// Motor on, no pulsing on encoder
 // Motor on, no VISP data change
 // Motor on, 200+ steps & no home detected
 // Motor on, 200+ homes and 1 step pulse (improper wiring, should swap IRQ's)
-// No VISP heartbeat
 // VISP shows volume/pressure with motor off
 // TOO MUCH PRESSURE???  (How do we determine too much?)
 // TOO MUCH VOLUME???    (How do we determine too much?)
@@ -293,7 +294,41 @@ void timeToCheckADC()
 
 void __NOINLINE timeToSendHealthStatus()
 {
-  batteryLevel = scaleAnalog(analogRead(ADC_BATTERY), 0, 100);
+  // Analog input is a resistor divider of 100K + 22K which at 3V3 output is (and ANALOG_MAX) equal to 18.3V input  (27.725 for 5V ADC)
+  // 14.1V is charging input
+  // 12.65V fully charged
+  // 12.45V is 75%
+  // 12.24V is 50%
+  // 12.06V is 25%
+  // 11.89V is 0%
+  // MAX_ANALOG is CPU dependent, 1024 on Nano, 4096 on STM32
+  int aInput=analogRead(ADC_BATTERY);
+
+  // Compile time figure out what the max voltage we can read threough our resistor divider
+  // CPU may be 5V or 3V3...  And the board may be populated with a different R1&R2, so compute it instead of using consts
+  //
+  // Vout = MAX_ANALOG_V (The max the analog input can see when the value equals MAX_ANALOG read from the pin)
+  //
+  // Vout = (Vs x R2)/(R1+R2)
+  // Vout * (R1+R2) = Vs * R2
+  // (Vout * (R1+R2))/R2 = Vs
+  // Use Vs for max value...  
+  int batteryVoltage = scaleAnalog(aInput, 0, (((MAX_ANALOG_V*100)*(B_DIV_R1 + B_DIV_R2)) / B_DIV_R2) ); // hundredths of volts
+  
+  // info(PSTR("aInput=%d  Voltage computed is %d.%d"), aInput, batteryVoltage/100, batteryVoltage%100);
+  
+  // 1189 -> 1265 is the 0->100% range, >1265 is charging (actually, 1410 is)
+  // We only have 76 values available in the range.
+  if (batteryVoltage<1189)
+    batteryLevel=0;
+  else
+    batteryLevel = ((batteryVoltage*100)-118900) / (126500-118900); // Inline the conversion to percentage
+  if (batteryLevel>100)
+  {
+     // LINE DETECTED!   It is float charging!
+     batteryLevel=100;
+  }
+  
   sendCurrentSystemHealth();
   respondAppropriately(RESPOND_BATTERY);
 }
@@ -345,6 +380,11 @@ void setup()
 {
   hwSerial.begin(SERIAL_BAUD);
   respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
+
+#ifdef ARDUINO_TEENSY40
+  analogReadResolution(12);
+  analogReadAveraging(1);
+#endif
 
   initI2C(i2cBus1);
   initI2C(i2cBus2);

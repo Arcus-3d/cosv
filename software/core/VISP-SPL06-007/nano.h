@@ -11,11 +11,13 @@
 #define PUTINFLASH PROGMEM
 
 //#define WANT_BMP388 1 // 1858 bytes and 112bytes of ram
-#define WANT_BMP280 1 // 2306 bytes
+//#define WANT_BMP280 1 // 2306 bytes
 #define WANT_SPL06  1 // 1350 bytes
 
 #define MAX_ANALOG 1024
 #define MAX_PWM 255
+
+#define MAX_ANALOG_V 5.0
 
 
 //The Arduino has 3 timers and 6 PWM output pins. The relation between timers and PWM outputs is:

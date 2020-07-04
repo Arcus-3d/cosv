@@ -19,6 +19,7 @@
 #define MAX_ANALOG 4096
 #define MAX_PWM 65536
 
+#define MAX_ANALOG_V 3.3
 
 // If ADC_MODE is set to zero, then the display controls things
 #define ADC_VOLUME   A0 // How much volume when in VC-CMV mode, 0->1023 milliliters

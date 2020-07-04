@@ -41,6 +41,8 @@
 #define MAX_ANALOG 4096
 #define MAX_PWM 65536
 
+#define MAX_ANALOG_V 3.3
+
 // http://www.lcdwiki.com/2.8inch_SPI_Module_ILI9341_SKU:MSP2807
 
 

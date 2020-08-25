@@ -1,25 +1,25 @@
 EAGLE AutoRouter Statistics:
 
-Job           : /home/scarr/eagle/VISP-PCB/VISP-I2C-MUX/sensors.brd
+Job           : /home/scarr/cosv/pcb/VISP-PCB/VISP-I2C-MUX/sensors.brd
 
-Start at      : 00:22:29 (4/17/20)
-End at        : 00:22:47 (4/17/20)
-Elapsed time  : 00:00:14
+Start at      : 20:32:17 (8/24/20)
+End at        : 20:32:30 (8/24/20)
+Elapsed time  : 00:00:06
 
-Signals       :    18   RoutingGrid: 5.5 mil  Layers: 2
-Connections   :   138   predefined:  0 ( 0 Vias )
+Signals       :    20   RoutingGrid: 4.92126 mil  Layers: 2
+Connections   :   146   predefined:  0 ( 0 Vias )
 
-Router memory :   264960
+Router memory :   228984
 
-Passname          : TopRouter     Route Optimize1 Optimize2 Optimize3 Optimize4 Optimize5 Optimize6 Optimize7 Optimize8 Optimize9Optimize10Optimize11Optimize12
+Passname          :    Busses     Route Optimize1 Optimize2 Optimize3 Optimize4
 
-Time per pass     :  00:00:04  00:00:04  00:00:01  00:00:01  00:00:00  00:00:01  00:00:00  00:00:00  00:00:01  00:00:00  00:00:01  00:00:00  00:00:00  00:00:01
-Number of Ripups  :         0        12         0         0         0         0         0         0         0         0         0         0         0         0
-max. Level        :         0         2         0         0         0         0         0         0         0         0         0         0         0         0
-max. Total        :         0        49         0         0         0         0         0         0         0         0         0         0         0         0
+Time per pass     :  00:00:00  00:00:02  00:00:01  00:00:01  00:00:01  00:00:01
+Number of Ripups  :         0         5         0         0         0         0
+max. Level        :         0         1         0         0         0         0
+max. Total        :         0        33         0         0         0         0
 
-Routed            :        20       138       138       138       138       138       138       138       138       138       138       138       138       138
-Vias              :         0        53        47        41        41        41        41        41        40        40        40        40        40        40
-Resolution        :    14.5 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %   100.0 %
+Routed            :         1       142       146       146       146       146
+Vias              :         0       112        64        48        43        41
+Resolution        :     0.7 %    97.3 %   100.0 %   100.0 %   100.0 %   100.0 %
 
 Final             : 100.0% finished

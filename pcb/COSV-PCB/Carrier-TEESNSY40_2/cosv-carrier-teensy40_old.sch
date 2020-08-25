@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="7.6.0">
+<eagle version="9.6.2">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
+<setting keepoldvectorfont="yes"/>
 <setting verticaltext="up"/>
 </settings>
 <grid distance="0.1" unitdist="inch" unit="inch" style="lines" multiple="1" display="no" altdistance="0.01" altunitdist="inch" altunit="inch"/>
@@ -8769,6 +8770,39 @@ Copyright: Würth Elektronik</description>
 </deviceset>
 </devicesets>
 </library>
+<library name="supply1" urn="urn:adsk.eagle:library:371">
+<description>&lt;b&gt;Supply Symbols&lt;/b&gt;&lt;p&gt;
+ GND, VCC, 0V, +5V, -5V, etc.&lt;p&gt;
+ Please keep in mind, that these devices are necessary for the
+ automatic wiring of the supply signals.&lt;p&gt;
+ The pin name defined in the symbol is identical to the net which is to be wired automatically.&lt;p&gt;
+ In this library the device names are the same as the pin names of the symbols, therefore the correct signal names appear next to the supply symbols in the schematic.&lt;p&gt;
+ &lt;author&gt;Created by librarian@cadsoft.de&lt;/author&gt;</description>
+<packages>
+</packages>
+<symbols>
+<symbol name="GND" urn="urn:adsk.eagle:symbol:26925/1" library_version="1">
+<wire x1="-1.905" y1="0" x2="1.905" y2="0" width="0.254" layer="94"/>
+<text x="-2.54" y="-2.54" size="1.778" layer="96">&gt;VALUE</text>
+<pin name="GND" x="0" y="2.54" visible="off" length="short" direction="sup" rot="R270"/>
+</symbol>
+</symbols>
+<devicesets>
+<deviceset name="GND" urn="urn:adsk.eagle:component:26954/1" prefix="GND" library_version="1">
+<description>&lt;b&gt;SUPPLY SYMBOL&lt;/b&gt;</description>
+<gates>
+<gate name="1" symbol="GND" x="0" y="0"/>
+</gates>
+<devices>
+<device name="">
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+</devicesets>
+</library>
 </libraries>
 <attributes>
 </attributes>
@@ -8807,18 +8841,18 @@ Copyright: Würth Elektronik</description>
 <part name="C3" library="rcl" deviceset="C-EU" device="C1206" value="10nf"/>
 <part name="K1" library="Wuerth_Elektronik_eiCan_05_Box_Header_IDC_Connectors_1_2" deviceset="61200821621" device=""/>
 <part name="K2" library="Wuerth_Elektronik_eiCan_05_Box_Header_IDC_Connectors_1_2" deviceset="61200821621" device=""/>
-<part name="GND14" library="supply1" deviceset="GND" device=""/>
 <part name="SV2" library="con-lsta" deviceset="FE10-1" device=""/>
 <part name="P+4" library="supply1" deviceset="VCC" device=""/>
 <part name="GND3" library="supply1" deviceset="GND" device=""/>
 <part name="K3" library="Wuerth_Elektronik_eiCan_05_Box_Header_IDC_Connectors_1_2" deviceset="61200821621" device=""/>
-<part name="VCC" library="wirepad" deviceset="WIREPAD" device="3,81/1,1"/>
-<part name="GND" library="wirepad" deviceset="WIREPAD" device="3,81/1,1"/>
+<part name="PAD1" library="wirepad" deviceset="WIREPAD" device="3,81/1,1"/>
+<part name="PAD2" library="wirepad" deviceset="WIREPAD" device="3,81/1,1"/>
 <part name="P+1" library="supply1" deviceset="VCC" device=""/>
 <part name="GND1" library="supply1" deviceset="GND" device=""/>
 <part name="R5" library="resistor" deviceset="R-EU_" device="R1206" value="100"/>
 <part name="P+5" library="supply1" deviceset="VCC" device=""/>
 <part name="GND5" library="supply1" deviceset="GND" device=""/>
+<part name="GND8" library="supply1" library_urn="urn:adsk.eagle:library:371" deviceset="GND" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -8832,46 +8866,142 @@ TEENSY carrier board for COSV</text>
 <text x="2.54" y="111.76" size="1.778" layer="91">V0.1</text>
 </plain>
 <instances>
-<instance part="TEENSY40" gate="G$1" x="45.72" y="71.12"/>
-<instance part="SV5" gate="G$1" x="170.18" y="43.18" rot="R90"/>
-<instance part="P+2" gate="VCC" x="55.88" y="91.44"/>
-<instance part="GND2" gate="1" x="182.88" y="45.72"/>
-<instance part="P+3" gate="VCC" x="165.1" y="58.42"/>
-<instance part="P+6" gate="VCC" x="177.8" y="111.76"/>
-<instance part="GND6" gate="1" x="195.58" y="99.06"/>
-<instance part="GND7" gate="1" x="195.58" y="88.9"/>
-<instance part="GND4" gate="1" x="195.58" y="81.28"/>
-<instance part="GND11" gate="1" x="111.76" y="83.82"/>
-<instance part="R1" gate="G$1" x="172.72" y="20.32"/>
-<instance part="R2" gate="G$1" x="180.34" y="10.16" rot="R90"/>
-<instance part="GND19" gate="1" x="180.34" y="2.54"/>
-<instance part="C1" gate="G$1" x="190.5" y="15.24"/>
-<instance part="BAT+" gate="A" x="157.48" y="20.32" rot="R180"/>
-<instance part="GOLD_ORB_SM1" gate="G$1" x="22.86" y="104.14"/>
-<instance part="R3" gate="G$1" x="99.06" y="96.52" rot="R90"/>
-<instance part="R4" gate="G$1" x="83.82" y="101.6" rot="R90"/>
-<instance part="WDOG" gate="G$1" x="10.16" y="63.5" rot="R180"/>
-<instance part="GND20" gate="1" x="20.32" y="50.8"/>
-<instance part="G" gate="A" x="7.62" y="48.26" rot="R180"/>
-<instance part="GND21" gate="1" x="99.06" y="76.2"/>
-<instance part="GND12" gate="1" x="83.82" y="76.2"/>
-<instance part="LD" gate="A" x="10.16" y="71.12" rot="R180"/>
-<instance part="C2" gate="G$1" x="83.82" y="83.82"/>
-<instance part="C3" gate="G$1" x="99.06" y="83.82"/>
-<instance part="K1" gate="G$1" x="43.18" y="27.94" rot="R90"/>
-<instance part="K2" gate="G$1" x="88.9" y="27.94" rot="R90"/>
-<instance part="GND14" gate="1" x="71.12" y="35.56"/>
-<instance part="SV2" gate="G$1" x="165.1" y="96.52" rot="MR180"/>
-<instance part="P+4" gate="VCC" x="55.88" y="43.18"/>
-<instance part="GND3" gate="1" x="71.12" y="25.4"/>
-<instance part="K3" gate="G$1" x="129.54" y="96.52" rot="R270"/>
-<instance part="VCC" gate="G$1" x="7.62" y="17.78"/>
-<instance part="GND" gate="G$1" x="7.62" y="7.62"/>
-<instance part="P+1" gate="VCC" x="10.16" y="20.32"/>
-<instance part="GND1" gate="1" x="10.16" y="5.08"/>
-<instance part="R5" gate="G$1" x="114.3" y="106.68" rot="R90"/>
-<instance part="P+5" gate="VCC" x="114.3" y="116.84"/>
-<instance part="GND5" gate="1" x="144.78" y="88.9"/>
+<instance part="TEENSY40" gate="G$1" x="45.72" y="71.12" smashed="yes">
+<attribute name="NAME" x="41.275" y="88.265" size="1.778" layer="95"/>
+<attribute name="VALUE" x="41.275" y="49.53" size="1.778" layer="96"/>
+</instance>
+<instance part="SV5" gate="G$1" x="170.18" y="43.18" smashed="yes" rot="R90">
+<attribute name="VALUE" x="180.34" y="41.91" size="1.778" layer="96" rot="R90"/>
+<attribute name="NAME" x="161.798" y="41.91" size="1.778" layer="95" rot="R90"/>
+</instance>
+<instance part="P+2" gate="VCC" x="58.42" y="91.44" smashed="yes">
+<attribute name="VALUE" x="55.88" y="88.9" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND2" gate="1" x="182.88" y="45.72" smashed="yes">
+<attribute name="VALUE" x="180.34" y="43.18" size="1.778" layer="96"/>
+</instance>
+<instance part="P+3" gate="VCC" x="165.1" y="58.42" smashed="yes">
+<attribute name="VALUE" x="162.56" y="55.88" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="P+6" gate="VCC" x="177.8" y="111.76" smashed="yes">
+<attribute name="VALUE" x="175.26" y="109.22" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND6" gate="1" x="195.58" y="99.06" smashed="yes">
+<attribute name="VALUE" x="193.04" y="96.52" size="1.778" layer="96"/>
+</instance>
+<instance part="GND7" gate="1" x="195.58" y="88.9" smashed="yes">
+<attribute name="VALUE" x="193.04" y="86.36" size="1.778" layer="96"/>
+</instance>
+<instance part="GND4" gate="1" x="195.58" y="81.28" smashed="yes">
+<attribute name="VALUE" x="193.04" y="78.74" size="1.778" layer="96"/>
+</instance>
+<instance part="GND11" gate="1" x="111.76" y="83.82" smashed="yes">
+<attribute name="VALUE" x="109.22" y="81.28" size="1.778" layer="96"/>
+</instance>
+<instance part="R1" gate="G$1" x="172.72" y="20.32" smashed="yes">
+<attribute name="NAME" x="168.91" y="21.8186" size="1.778" layer="95"/>
+<attribute name="VALUE" x="168.91" y="17.018" size="1.778" layer="96"/>
+</instance>
+<instance part="R2" gate="G$1" x="180.34" y="10.16" smashed="yes" rot="R90">
+<attribute name="NAME" x="178.8414" y="6.35" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="183.642" y="6.35" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND19" gate="1" x="180.34" y="2.54" smashed="yes">
+<attribute name="VALUE" x="177.8" y="0" size="1.778" layer="96"/>
+</instance>
+<instance part="C1" gate="G$1" x="190.5" y="15.24" smashed="yes">
+<attribute name="NAME" x="192.024" y="15.621" size="1.778" layer="95"/>
+<attribute name="VALUE" x="192.024" y="10.541" size="1.778" layer="96"/>
+</instance>
+<instance part="BAT+" gate="A" x="157.48" y="20.32" smashed="yes" rot="R180">
+<attribute name="NAME" x="163.83" y="17.145" size="1.778" layer="95" rot="R180"/>
+<attribute name="VALUE" x="163.83" y="25.4" size="1.778" layer="96" rot="R180"/>
+</instance>
+<instance part="GOLD_ORB_SM1" gate="G$1" x="22.86" y="104.14" smashed="yes"/>
+<instance part="R3" gate="G$1" x="99.06" y="96.52" smashed="yes" rot="R90">
+<attribute name="NAME" x="97.5614" y="92.71" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="102.362" y="92.71" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="R4" gate="G$1" x="83.82" y="101.6" smashed="yes" rot="R90">
+<attribute name="NAME" x="82.3214" y="97.79" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="87.122" y="97.79" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="WDOG" gate="G$1" x="10.16" y="63.5" smashed="yes" rot="R180">
+<attribute name="NAME" x="16.51" y="57.785" size="1.778" layer="95" rot="R180"/>
+<attribute name="VALUE" x="16.51" y="68.58" size="1.778" layer="96" rot="R180"/>
+</instance>
+<instance part="GND20" gate="1" x="20.32" y="50.8" smashed="yes">
+<attribute name="VALUE" x="17.78" y="48.26" size="1.778" layer="96"/>
+</instance>
+<instance part="G" gate="A" x="7.62" y="48.26" smashed="yes" rot="R180">
+<attribute name="NAME" x="13.97" y="45.085" size="1.778" layer="95" rot="R180"/>
+<attribute name="VALUE" x="13.97" y="53.34" size="1.778" layer="96" rot="R180"/>
+</instance>
+<instance part="GND21" gate="1" x="99.06" y="76.2" smashed="yes">
+<attribute name="VALUE" x="96.52" y="73.66" size="1.778" layer="96"/>
+</instance>
+<instance part="GND12" gate="1" x="83.82" y="76.2" smashed="yes">
+<attribute name="VALUE" x="81.28" y="73.66" size="1.778" layer="96"/>
+</instance>
+<instance part="LD" gate="A" x="10.16" y="71.12" smashed="yes" rot="R180">
+<attribute name="NAME" x="16.51" y="67.945" size="1.778" layer="95" rot="R180"/>
+<attribute name="VALUE" x="16.51" y="76.2" size="1.778" layer="96" rot="R180"/>
+</instance>
+<instance part="C2" gate="G$1" x="83.82" y="83.82" smashed="yes">
+<attribute name="NAME" x="85.344" y="84.201" size="1.778" layer="95"/>
+<attribute name="VALUE" x="85.344" y="79.121" size="1.778" layer="96"/>
+</instance>
+<instance part="C3" gate="G$1" x="99.06" y="83.82" smashed="yes">
+<attribute name="NAME" x="100.584" y="84.201" size="1.778" layer="95"/>
+<attribute name="VALUE" x="100.584" y="79.121" size="1.778" layer="96"/>
+</instance>
+<instance part="K1" gate="G$1" x="43.18" y="27.94" smashed="yes" rot="R90">
+<attribute name="NAME" x="42.418" y="10.668" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="45.72" y="9.906" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="K2" gate="G$1" x="88.9" y="27.94" smashed="yes" rot="R90">
+<attribute name="NAME" x="88.138" y="10.668" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="91.44" y="9.906" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="SV2" gate="G$1" x="165.1" y="96.52" smashed="yes" rot="MR180">
+<attribute name="VALUE" x="163.83" y="111.76" size="1.778" layer="96" rot="MR180"/>
+<attribute name="NAME" x="163.83" y="80.518" size="1.778" layer="95" rot="MR180"/>
+</instance>
+<instance part="P+4" gate="VCC" x="55.88" y="43.18" smashed="yes">
+<attribute name="VALUE" x="53.34" y="40.64" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND3" gate="1" x="71.12" y="25.4" smashed="yes">
+<attribute name="VALUE" x="68.58" y="22.86" size="1.778" layer="96"/>
+</instance>
+<instance part="K3" gate="G$1" x="129.54" y="96.52" smashed="yes" rot="R270">
+<attribute name="NAME" x="130.302" y="113.792" size="1.778" layer="95" rot="R270"/>
+<attribute name="VALUE" x="127" y="114.554" size="1.778" layer="96" rot="R270"/>
+</instance>
+<instance part="PAD1" gate="G$1" x="7.62" y="17.78" smashed="yes">
+<attribute name="NAME" x="6.477" y="19.6342" size="1.778" layer="95"/>
+<attribute name="VALUE" x="6.477" y="14.478" size="1.778" layer="96"/>
+</instance>
+<instance part="PAD2" gate="G$1" x="7.62" y="7.62" smashed="yes">
+<attribute name="NAME" x="6.477" y="9.4742" size="1.778" layer="95"/>
+<attribute name="VALUE" x="6.477" y="4.318" size="1.778" layer="96"/>
+</instance>
+<instance part="P+1" gate="VCC" x="10.16" y="20.32" smashed="yes"/>
+<instance part="GND1" gate="1" x="10.16" y="5.08" smashed="yes">
+<attribute name="VALUE" x="7.62" y="2.54" size="1.778" layer="96"/>
+</instance>
+<instance part="R5" gate="G$1" x="114.3" y="106.68" smashed="yes" rot="R90">
+<attribute name="NAME" x="112.8014" y="102.87" size="1.778" layer="95" rot="R90"/>
+<attribute name="VALUE" x="117.602" y="102.87" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="P+5" gate="VCC" x="114.3" y="116.84" smashed="yes">
+<attribute name="VALUE" x="111.76" y="114.3" size="1.778" layer="96" rot="R90"/>
+</instance>
+<instance part="GND5" gate="1" x="144.78" y="88.9" smashed="yes">
+<attribute name="VALUE" x="142.24" y="86.36" size="1.778" layer="96"/>
+</instance>
+<instance part="GND8" gate="1" x="30.48" y="88.9" smashed="yes">
+<attribute name="VALUE" x="27.94" y="86.36" size="1.778" layer="96"/>
+</instance>
 </instances>
 <busses>
 </busses>
@@ -8881,7 +9011,7 @@ TEENSY carrier board for COSV</text>
 <pinref part="TEENSY40" gate="G$1" pin="28"/>
 <pinref part="P+2" gate="VCC" pin="VCC"/>
 <wire x1="53.34" y1="86.36" x2="55.88" y2="86.36" width="0.1524" layer="91"/>
-<wire x1="55.88" y1="86.36" x2="55.88" y2="88.9" width="0.1524" layer="91"/>
+<wire x1="55.88" y1="86.36" x2="58.42" y2="88.9" width="0.1524" layer="91"/>
 </segment>
 <segment>
 <pinref part="SV5" gate="G$1" pin="5"/>
@@ -8905,7 +9035,7 @@ TEENSY carrier board for COSV</text>
 <wire x1="55.88" y1="38.1" x2="55.88" y2="40.64" width="0.1524" layer="91"/>
 </segment>
 <segment>
-<pinref part="VCC" gate="G$1" pin="P"/>
+<pinref part="PAD1" gate="G$1" pin="P"/>
 <pinref part="P+1" gate="VCC" pin="VCC"/>
 </segment>
 <segment>
@@ -8966,14 +9096,12 @@ TEENSY carrier board for COSV</text>
 <pinref part="K1" gate="G$1" pin="8"/>
 </segment>
 <segment>
-<pinref part="K2" gate="G$1" pin="8"/>
-<pinref part="GND14" gate="1" pin="GND"/>
-<wire x1="78.74" y1="38.1" x2="71.12" y2="38.1" width="0.1524" layer="91"/>
-</segment>
-<segment>
 <pinref part="K2" gate="G$1" pin="4"/>
 <wire x1="78.74" y1="27.94" x2="71.12" y2="27.94" width="0.1524" layer="91"/>
 <pinref part="GND3" gate="1" pin="GND"/>
+<pinref part="K2" gate="G$1" pin="2"/>
+<wire x1="78.74" y1="22.86" x2="78.74" y2="27.94" width="0.1524" layer="91"/>
+<junction x="78.74" y="27.94"/>
 </segment>
 <segment>
 <pinref part="GND11" gate="1" pin="GND"/>
@@ -8981,7 +9109,7 @@ TEENSY carrier board for COSV</text>
 <wire x1="111.76" y1="86.36" x2="119.38" y2="86.36" width="0.1524" layer="91"/>
 </segment>
 <segment>
-<pinref part="GND" gate="G$1" pin="P"/>
+<pinref part="PAD2" gate="G$1" pin="P"/>
 <pinref part="GND1" gate="1" pin="GND"/>
 </segment>
 <segment>
@@ -8995,12 +9123,13 @@ TEENSY carrier board for COSV</text>
 <segment>
 <pinref part="K3" gate="G$1" pin="6"/>
 <pinref part="GND5" gate="1" pin="GND"/>
-<wire x1="139.7" y1="91.44" x2="142.24" y2="91.44" width="0.1524" layer="91"/>
-<pinref part="K3" gate="G$1" pin="8"/>
-<wire x1="142.24" y1="91.44" x2="144.78" y2="91.44" width="0.1524" layer="91"/>
-<wire x1="139.7" y1="86.36" x2="142.24" y2="86.36" width="0.1524" layer="91"/>
-<wire x1="142.24" y1="86.36" x2="142.24" y2="91.44" width="0.1524" layer="91"/>
-<junction x="142.24" y="91.44"/>
+<wire x1="139.7" y1="91.44" x2="144.78" y2="91.44" width="0.1524" layer="91"/>
+</segment>
+<segment>
+<pinref part="TEENSY40" gate="G$1" pin="1"/>
+<pinref part="GND8" gate="1" pin="GND"/>
+<wire x1="38.1" y1="86.36" x2="38.1" y2="91.44" width="0.1524" layer="91"/>
+<wire x1="38.1" y1="91.44" x2="30.48" y2="91.44" width="0.1524" layer="91"/>
 </segment>
 </net>
 <net name="RX1" class="0">
@@ -9140,14 +9269,12 @@ TEENSY carrier board for COSV</text>
 <label x="55.88" y="81.28" size="1.778" layer="95"/>
 </segment>
 <segment>
-<wire x1="73.66" y1="33.02" x2="78.74" y2="33.02" width="0.1524" layer="91"/>
-<label x="73.66" y="33.02" size="1.778" layer="95"/>
+<wire x1="68.58" y1="33.02" x2="78.74" y2="33.02" width="0.1524" layer="91"/>
+<label x="68.58" y="33.02" size="1.778" layer="95"/>
 <pinref part="K2" gate="G$1" pin="6"/>
-</segment>
-<segment>
-<wire x1="73.66" y1="22.86" x2="78.74" y2="22.86" width="0.1524" layer="91"/>
-<label x="73.66" y="22.86" size="1.778" layer="95"/>
-<pinref part="K2" gate="G$1" pin="2"/>
+<pinref part="K2" gate="G$1" pin="8"/>
+<wire x1="78.74" y1="38.1" x2="78.74" y2="33.02" width="0.1524" layer="91"/>
+<junction x="78.74" y="33.02"/>
 </segment>
 <segment>
 <wire x1="78.74" y1="106.68" x2="83.82" y2="106.68" width="0.1524" layer="91"/>
@@ -9230,12 +9357,7 @@ TEENSY carrier board for COSV</text>
 <wire x1="116.84" y1="109.22" x2="116.84" y2="101.6" width="0.1524" layer="91"/>
 <pinref part="K3" gate="G$1" pin="4"/>
 <wire x1="139.7" y1="96.52" x2="144.78" y2="96.52" width="0.1524" layer="91"/>
-<wire x1="144.78" y1="96.52" x2="144.78" y2="101.6" width="0.1524" layer="91"/>
-<pinref part="K3" gate="G$1" pin="2"/>
-<wire x1="144.78" y1="101.6" x2="144.78" y2="109.22" width="0.1524" layer="91"/>
-<wire x1="139.7" y1="101.6" x2="144.78" y2="101.6" width="0.1524" layer="91"/>
-<junction x="144.78" y="101.6"/>
-<junction x="116.84" y="101.6"/>
+<wire x1="144.78" y1="96.52" x2="144.78" y2="109.22" width="0.1524" layer="91"/>
 </segment>
 </net>
 </nets>
@@ -9247,6 +9369,16 @@ TEENSY carrier board for COSV</text>
 <note version="6.3" minversion="6.2.2" severity="warning">
 Since Version 6.2.2 text objects can contain more than one line,
 which will not be processed correctly with this version.
+</note>
+<note version="8.2" severity="warning">
+Since Version 8.2, EAGLE supports online libraries. The ids
+of those online libraries will not be understood (or retained)
+with this version.
+</note>
+<note version="8.3" severity="warning">
+Since Version 8.3, EAGLE supports URNs for individual library
+assets (packages, symbols, and devices). The URNs of those assets
+will not be understood (or retained) with this version.
 </note>
 </compatibility>
 </eagle>

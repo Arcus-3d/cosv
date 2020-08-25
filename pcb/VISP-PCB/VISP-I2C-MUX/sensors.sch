@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="7.7.0">
+<eagle version="7.6.0">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -5294,13 +5294,13 @@ SDI=SDA, SCK=SCL</text>
 <text x="182.88" y="35.56" size="1.778" layer="91">I2C Addr 0x77</text>
 <text x="182.88" y="2.54" size="1.778" layer="91">I2C Addr 0x77</text>
 <text x="182.88" y="5.08" size="1.778" layer="91">PITOT TUBES</text>
-<text x="17.78" y="7.62" size="1.778" layer="91">I2C BUS1</text>
+<text x="17.78" y="7.62" size="1.778" layer="91">I2C BUS3</text>
 <text x="17.78" y="38.1" size="1.778" layer="91">I2C BUS1</text>
 <text x="71.12" y="38.1" size="1.778" layer="91">I2C BUS1</text>
-<text x="71.12" y="7.62" size="1.778" layer="91">I2C BUS1</text>
+<text x="71.12" y="7.62" size="1.778" layer="91">I2C BUS3</text>
 <text x="129.54" y="40.64" size="1.778" layer="91">I2C BUS2</text>
-<text x="129.54" y="7.62" size="1.778" layer="91">I2C BUS2</text>
-<text x="182.88" y="7.62" size="1.778" layer="91">I2C BUS2</text>
+<text x="129.54" y="7.62" size="1.778" layer="91">I2C BUS4</text>
+<text x="182.88" y="7.62" size="1.778" layer="91">I2C BUS4</text>
 <text x="182.88" y="40.64" size="1.778" layer="91">I2C BUS2</text>
 </plain>
 <instances>

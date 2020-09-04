@@ -335,8 +335,8 @@ void motorSetup()
   pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
   pinMode(MOTOR_ENCODER_FEEDBACK, INPUT_PULLUP); // Short to ground to trigger.
   delay(5); // Give it a chance to be pulled up
-  attachInterrupt(digitalPinToInterrupt(MOTOR_ENCODER_FEEDBACK), encoderTriggered, FALLING);
-  attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
+  attachInterrupt(digitalPinToInterrupt(MOTOR_ENCODER_FEEDBACK), encoderTriggered, RISING);
+  attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, RISING);
 
   stepper_setAcceleration(2000);
   stepper_setMaxSpeed(STEPPER_MAX_SPEED);

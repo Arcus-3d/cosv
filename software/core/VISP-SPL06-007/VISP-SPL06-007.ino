@@ -302,6 +302,7 @@ void __NOINLINE timeToSendHealthStatus()
   // 12.06V is 25%
   // 11.89V is 0%
   // MAX_ANALOG is CPU dependent, 1024 on Nano, 4096 on STM32
+#ifdef BATTERY_MONITORING
   int aInput=analogRead(ADC_BATTERY);
 
   // Compile time figure out what the max voltage we can read threough our resistor divider
@@ -328,7 +329,9 @@ void __NOINLINE timeToSendHealthStatus()
      // LINE DETECTED!   It is float charging!
      batteryLevel=100;
   }
-  
+#else
+  batteryLevel=100;
+#endif
   sendCurrentSystemHealth();
   respondAppropriately(RESPOND_BATTERY);
 }

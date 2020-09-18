@@ -1,0 +1,18 @@
+Item #,Qty,Ref Des,Manufacturer,Mfg Part #,Dist. Part #,Description,Package,Type
+1,2,"C1,C3",Murata Electronics,GRM188R61A106KE69J ,490-14372-1-ND ,10uF ceramic capacitor,0805,SMT
+2,6,"C2,C4,C5,C6,C7,C9",Murata Electronics, GRM155R71C104KA88J ,490-6328-1-ND ,100nF ceramic capacitor,0402,SMT
+3,8,"R1,R2,R8,R9,R10,R11,R22,R23",TE Connectivity Passive Product,CRGCQ0402F2K7 ,A129632CT-ND ,2k7 resistor,0402,SMT
+4,4,"R3,R5,R6,R7",TE Connectivity Passive Product,CRGCQ0402J10K ,A130054CT-ND ,10K resistor,0402,SMT
+5,1,R4,TE Connectivity Passive Product,CRGCQ0402F47R , A129611CT-ND ,47 ohm resistor,0402,SMT
+6,1,LED1,Rohm Semiconductor,SML-D12P8WT86,511-1579-1-ND ,LED GREEN DIFFUSED 0603 SMD ,0603,SMT
+7,1,U1,Microchip Technology,MIC5225-3.3YM5-TR, 576-2980-1-ND ,IC REG LINEAR 3.3V 150MA SOT23-5 ,SOT23-5,SMT
+8,1,U2,Texas Instruments,TCA9546APWR,296-40578-1-ND ,IC I2C SW 4CH W/RESET 16TSSOP ,16TSSOP,SMT
+9,1,U3,Microchip Technology,AT24C512C-SSHD-T ,AT24C512C-SSHD-TCT-ND ,IC EEPROM 512K I2C 1MHZ 8SOIC ,SO-08M,SMT
+10,4,"U5,U6,U7,U8",Bosch Sensortec,BMP388,828-1079-1-ND ,Barometric Pressure Sensor,BMP388,SMT
+,,,,,,,,
+,,,,,,,,
+,,,,,,,,
+Unique,10,,,,,,,
+Total,29,,,,,,,
+Thru Hole,0,,,,,,,
+Has BGA,Yes,,,,,,,

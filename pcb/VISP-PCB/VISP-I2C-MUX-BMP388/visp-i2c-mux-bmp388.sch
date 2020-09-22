@@ -5168,7 +5168,7 @@ Source: www.kingbright.com</description>
 No warranty expressed or implied
 I2C MUX Sensor Package for VISP</text>
 <text x="68.58" y="144.78" size="1.778" layer="91">EEPROM to store Calibration Data</text>
-<text x="5.08" y="134.62" size="1.778" layer="91">V0.2</text>
+<text x="5.08" y="134.62" size="1.778" layer="91">V0.3</text>
 <text x="15.24" y="71.12" size="1.778" layer="91">Make U1 optional</text>
 <text x="114.3" y="-35.56" size="1.778" layer="97">For SPI set CSB low at startup
 SDO=MISO, SDI=MOSI, SCK=SCK, CSB=CS/SSEL</text>

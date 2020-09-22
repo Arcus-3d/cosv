@@ -5302,6 +5302,7 @@ SDI=SDA, SCK=SCL</text>
 <text x="129.54" y="7.62" size="1.778" layer="91">I2C BUS4</text>
 <text x="182.88" y="7.62" size="1.778" layer="91">I2C BUS4</text>
 <text x="182.88" y="40.64" size="1.778" layer="91">I2C BUS2</text>
+<text x="12.7" y="-30.48" size="1.778" layer="91">NOTE: BMP388's are swapped in addresses for the spots they are in!</text>
 </plain>
 <instances>
 <instance part="U$3" gate="G$1" x="5.08" y="15.24"/>

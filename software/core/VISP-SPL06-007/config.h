@@ -43,7 +43,7 @@
 #define __NOINLINE error 'NOINLINE' not defined for this compiler
 #endif
 
-#define SERIAL_BAUD 115200
+#define SERIAL_BAUD 921600
 
 // Battery level resistor divider located on the carrier board
 #define B_DIV_R1 100 // K

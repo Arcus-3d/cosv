@@ -119,13 +119,13 @@ PART=param_part;
 //laser_paddle(layer=0,h=material_t*3); // GROUP Laser DESC "paddles for the arms." NAME="laser_paddle_0" QTY 4
 //laser_paddle(layer=1,h=material_t*3); // GROUP Laser DESC "paddles for the arms." NAME="laser_paddle_1" QTY 2
 
-laser_nut_support(); // GROUP Laser DESC "little glue-on nut holder to eliminate a whole layer otherwise" QTY 8
+//laser_nut_support(); // GROUP Laser DESC "little glue-on nut holder to eliminate a whole layer otherwise" QTY 8
 
 //////////////////////////////////////////////////////////////////
 // FFF parts, for testing.  May be out of date!
 
 //flow_sensor_pitot_for_pcb(); // GROUP VISP DESC "Flow Sensor Pitot Style"
-//flow_sensor_venturi_for_pcb(); //  GROUP VISP DESC "Flow Sensor Venturi Style"
+flow_sensor_venturi_for_pcb(); //  GROUP VISP DESC "Flow Sensor Venturi Style"
 //flow_sensor_cover(oled=0); //  GROUP VISP DESC "Flow Sensor Cover With OLED" NAME "flow_sensor_cover_oled"
 //flow_sensor_cover(); // GROUP VISP DESC "Flow Sensor Cover"
 
@@ -266,14 +266,14 @@ tube_l=tube_d*2+(pcb_y-tube_d)+pcb_z_offset+tube_d*1.25;
 // venturi section length
 vent_l=tube_l/1.35;
 // venturi center section length
-vent_h=vent_l/8;
+vent_h=vent_l/6;
 // venturi restriction radius
-vent_r=8/2;
+vent_r=6.5/2;
 
 // pitot tube dimensions
 pitot_r=6/2;
 pitot_t=nozzle_r*2*3;
-port_r=5.25/2;
+port_r=5.5/2;
 pitot_snap_offset=.05;
 
 // visp oled dimensions
@@ -350,7 +350,7 @@ module laser_cam_center_b() {
 	projection(cut=true) cam_center();
 }
 module laser_cam_encoder() {
-	projection(cut=true) cam_encoder();
+	projection(cut=false) cam_encoder();
 }
 module laser_cam_center_t() {
 	projection(cut=true) cam_center(motor_shaft_r=6/2,d_shaft=0);
@@ -599,7 +599,7 @@ module flow_sensor_cover_model(oled=0) {
 
 module flow_sensor_venturi_for_pcb(sla=1) {
 	t=tube_or-tube_ir;
-	vent_t=t;
+	vent_t=-t/2;
 	difference() {
 		if (1) union() { // Change to 0 to see all the cutouts
 			// body bottom
@@ -663,7 +663,7 @@ module flow_sensor_venturi_for_pcb(sla=1) {
 					rotate([45,0,0]) translate([0,-pcb_b*2,0]) rotate([0,90,0]) cylinder(r=pcb_b/2,h=pcb_x,center=true);
 				}
 				// cable_crimp_cutout
-				translate([0,tube_or+t+pcb_cover_t+pcb_t+pcb_c_t,tube_l-pcb_b*5/2]) difference() {
+				translate([0,tube_or+t+pcb_t+pcb_c_t*1.1+vent_t,tube_l-pcb_b*5/2]) difference() {
 					translate([0,-pcb_t/2,0]) cube([pcb_x/3+clearance/2,pcb_c_t+pcb_cover_t,pcb_b*20+extra],center=true);
 					translate([0,-t*2.5,t]) rotate([0,90,0]) cylinder(r=t/2,h=pcb_x/3,center=true);
 					translate([0,-t*2.5,-t]) rotate([0,90,0]) cylinder(r=t/2,h=pcb_x/3,center=true);
@@ -673,7 +673,7 @@ module flow_sensor_venturi_for_pcb(sla=1) {
 					union() {
 						if (1) hull() {
 							translate([0,tube_or+t,tube_l-pcb_t-pcb_c_t-pcb_t-pcb_b]) cube([pcb_x,extra,extra],center=true);
-							translate([0,tube_or+t,tube_l-(pcb_y+pcb_b*5.5-pcb_port_z_offset)/2]) cube([pcb_x,extra,pcb_y-pcb_port_z_offset*2-vent_t-pcb_b*3+extra],center=true);
+							translate([0,tube_or+t,tube_l-(pcb_y+pcb_b*5.25-pcb_port_z_offset)/2]) cube([pcb_x,extra,pcb_y-pcb_port_z_offset*2-vent_t-pcb_b*3.5+extra],center=true);
 							translate([0,tube_or+t+pcb_t+pcb_c_t,tube_l-(pcb_y+pcb_b*3-pcb_port_z_offset)/2]) cube([pcb_x,extra,pcb_y-pcb_port_z_offset*2-pcb_b+extra],center=true);
 						}
 						if (1) hull() {
@@ -688,49 +688,49 @@ module flow_sensor_venturi_for_pcb(sla=1) {
 					rotate([90,0,0]) cylinder(r=cover_bolt_r-clearance/4,h=t*5,center=true);
 					hull() {
 						translate([0,-t*5/2,0]) rotate([90,0,0]) cylinder(r=cover_bolt_r-clearance/4,h=extra,center=true);
-						translate([0,-t*7.8/2,-t/2]) rotate([90,0,0]) cylinder(r=cover_bolt_r-clearance/4,h=extra,center=true);
+						translate([cover_bolt_r/1.25,-t*8.8/2,-t/2]) rotate([90,0,0]) cylinder(r=cover_bolt_r-clearance/4,h=extra,center=true);
 					}
 				}
 				// pitot pcb ports
 				// relative surface height of the top of the ports
 				o=tube_or+t+pcb_c_t;
-				i=-pcb_c_t-t*1.5;
+				i=-pcb_c_t-t*1.25;
 				// ports
 				translate([0,vent_t,0]) {
-					if (1) for (x=[-1,1]) translate([x*pcb_port_x_spacing,o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset]) hull() {
-						translate([0,-pcb_c_t/2,port_r]) rotate([90,0,0]) cylinder(r=port_r/8,h=pcb_c_t*4,center=true);
-						translate([0,-pcb_c_t/2,-port_r/6]) rotate([90,0,0]) cylinder(r=port_r,h=pcb_c_t,center=true);
-						translate([0,i,-port_r/8]) sphere(r=port_r,center=true);
-					}
-					for (x=[-1]) translate([x*pcb_port_x_spacing,o,tube_l-pcb_y-pcb_b+pcb_port_z_offset+pcb_port_z_spacing-pcb_z_offset]) hull() {
-						translate([0,-pcb_c_t/2,port_r]) rotate([90,0,0]) cylinder(r=port_r/8,h=pcb_c_t*4,center=true);
-						translate([0,-pcb_c_t/2,-port_r/6]) rotate([90,0,0]) cylinder(r=port_r,h=pcb_c_t,center=true);
-						translate([0,i,-port_r/8]) sphere(r=port_r,center=true);
+					translate([-pcb_port_x_spacing,o,tube_l-pcb_y-pcb_b+pcb_port_z_offset+pcb_port_z_spacing-pcb_z_offset]) hull() {
+						translate([0,-pcb_c_t/2,port_r-port_r/8]) rotate([90,0,0]) cylinder(r=port_r/8,h=pcb_c_t,center=true);
+						translate([0,-pcb_c_t/2,-port_r/8]) rotate([90,0,0]) scale([1.25,1,1]) cylinder(r=port_r,h=pcb_c_t,center=true);
+						translate([0,i,port_r/2]) sphere(r=port_r/1.5,center=true);
 					}
 					hull() {
-						translate([-pcb_port_x_spacing,i+o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset-port_r/8]) sphere(r=port_r,center=true);
-						translate([0,tube_ir-port_r/2+nozzle_r*4,tube_l/2-vent_l/4-vent_h/2-port_r]) scale([1,1,1.5]) sphere(r=port_r/2,center=true);
+						translate([-pcb_port_x_spacing,i+o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset-port_r/2]) sphere(r=port_r/1.5,center=true);
+						translate([0,tube_ir-port_r/2+nozzle_r*4+t-vent_t,tube_l/2-vent_l/4-vent_h/2-port_r]) scale([1,1,1.5]) sphere(r=port_r/2.75,center=true);
 					}
-					translate([0,tube_ir-t+nozzle_r*4,tube_l/2-vent_l/4-vent_h/2-port_r]) scale([1,1,1.5]) rotate([90,0,0]) cylinder(r=port_r/2,h=port_r/2+nozzle_r*6,center=true);
+					translate([0,tube_ir-t+nozzle_r*4+t-vent_t,tube_l/2-vent_l/4-vent_h/2-port_r]) scale([1,1,1.5]) rotate([90,0,0]) cylinder(r=port_r/2.75,h=port_r/2+nozzle_r*6,center=true);
 					hull() {
-						translate([-pcb_port_x_spacing,i+o,tube_l-pcb_y-pcb_b+pcb_port_z_offset+pcb_port_z_spacing-pcb_z_offset-port_r/8]) sphere(r=port_r,center=true);
-						translate([0,tube_ir-port_r/2+nozzle_r*4,tube_l/2+vent_l/4+vent_h/2+port_r]) scale([1,1,1.5]) sphere(r=port_r/2,center=true);
+						translate([-pcb_port_x_spacing,i+o,tube_l-pcb_y-pcb_b+pcb_port_z_offset+pcb_port_z_spacing-pcb_z_offset+port_r/2]) sphere(r=port_r/1.5,center=true);
+						translate([0,tube_ir-port_r/2+nozzle_r*4+t-vent_t,tube_l/2+vent_l/4+vent_h/2+port_r]) scale([1,1,1.5]) sphere(r=port_r/2.75,center=true);
 					}
-					translate([0,tube_ir-t+nozzle_r*4,tube_l/2+vent_l/4+vent_h/2+port_r]) scale([1,1,1.5]) rotate([90,0,0]) cylinder(r=port_r/2,h=port_r/2+nozzle_r*6,center=true);
+					translate([0,tube_ir-t+nozzle_r*4+t-vent_t,tube_l/2+vent_l/4+vent_h/2+port_r]) scale([1,1,1.5]) rotate([90,0,0]) cylinder(r=port_r/2.75,h=port_r/2+nozzle_r*6,center=true);
 					hull() {
-						translate([pcb_port_x_spacing,i+o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset-port_r/8]) sphere(r=port_r,center=true);
-						translate([pcb_port_x_spacing,-pcb_c_t/2+o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset-port_r/8+port_r]) rotate([90,0,0]) cylinder(r=port_r/8,h=pcb_c_t,center=true);
-						translate([0,-vent_t,0]) rotate([0,0,-30]) translate([0,vent_r-t+port_r+vent_t,tube_l/2]) scale([1,1,1.75]) rotate([30,-30,0]) sphere(r=port_r/2,$fn=6,center=true);
+						for (x=[1]) translate([x*pcb_port_x_spacing,o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset]) translate([0,-pcb_c_t*2.5,port_r]) rotate([90,0,0]) cylinder(r=port_r/8,h=extra,center=true);
+						translate([pcb_port_x_spacing,i+o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset+port_r/2]) sphere(r=port_r*1.25,center=true);
+						translate([0,-vent_t,tube_l/2]) rotate([0,0,-20]) translate([0,vent_r*1.5,0])  scale([1.25,1,3]) rotate([90,0,0]) cylinder(r=port_r/2,h=extra,center=true);
 					}
-					translate([0,-vent_t,0]) {
-						for (r=[-1,1]) rotate([0,0,90*r]) translate([0,vent_r-t+vent_t+port_r/2-nozzle_r,tube_l/2]) scale([1,1,1.75]) {
-							rotate([90,30,0]) cylinder(r=port_r/2,$fn=6,h=port_r+nozzle_r*2,center=true);
-							hull() translate([0,port_r/2+nozzle_r,0]) for (r=[0,90]) rotate([0,0,r]) rotate([0,90,0]) cylinder(r=port_r/2,h=extra,$fn=6,center=true);
-						}
-						intersection() {
-							translate([0,tube_or,tube_l/2,]) cube([tube_or*2,tube_or*2,tube_l],center=true);
-							rotate_extrude() translate([vent_r-t+vent_t+port_r,tube_l/2]) scale([1,1.75]) rotate([0,0,30]) circle(r=port_r/2,$fn=6,center=true);
-						}
+					translate([0,-vent_t,tube_l/2]) rotate([0,0,-20]) translate([0,vent_r*0.75,0])  scale([1.25,1,3]) rotate([90,0,0]) cylinder(r=port_r/2,h=vent_r*1.5,center=true);
+					translate([pcb_port_x_spacing,o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset]) hull() {
+						translate([0,-pcb_c_t/2,port_r-port_r/8]) rotate([90,0,0]) cylinder(r=port_r/8,h=pcb_c_t,center=true);
+						translate([0,-pcb_c_t/2,-port_r/6]) rotate([90,0,0]) scale([1.25,1,1]) cylinder(r=port_r,h=pcb_c_t,center=true);
+					}
+					translate([pcb_port_x_spacing,o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset]) hull() {
+						translate([0,-pcb_c_t,port_r-port_r/8]) rotate([90,0,0]) cylinder(r=port_r/8,h=extra,center=true);
+						translate([0,-pcb_c_t,-port_r/6]) rotate([90,0,0]) scale ([1.25,1,1]) cylinder(r=port_r,h=extra,center=true);
+						translate([0,i,port_r/2]) sphere(r=port_r*1.25,center=true);
+					}
+					translate([-pcb_port_x_spacing,o,tube_l-pcb_y-pcb_b+pcb_port_z_offset-pcb_port_z_spacing-pcb_z_offset]) hull() {
+						translate([0,-pcb_c_t/2,port_r-port_r/8]) rotate([90,0,0]) cylinder(r=port_r/8,h=pcb_c_t,center=true);
+						translate([0,-pcb_c_t/2,-port_r/6]) rotate([90,0,0]) scale([1.25,1,1]) cylinder(r=port_r,h=pcb_c_t,center=true);
+						translate([0,i,-port_r/2]) sphere(r=port_r/1.5,center=true);
 					}
 				}
 				// absolute pressure port
@@ -738,7 +738,7 @@ module flow_sensor_venturi_for_pcb(sla=1) {
 			}
 		}
 		// SLA vent hole.  Without this, sometimes the tube ends up SOLID.
-		#if (sla) for (r=[90]) rotate([0,0,r]) translate([tube_ir+t/2,0,t]) rotate([0,90,0]) cylinder(r=t/2,h=t*2,center=true);
+		if (sla) for (r=[90]) rotate([0,0,r]) translate([tube_ir+t/2,0,t]) rotate([0,90,0]) cylinder(r=t/2,h=t*2,center=true);
 	}
 }
 module flow_sensor_pitot_for_pcb() {

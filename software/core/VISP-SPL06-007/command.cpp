@@ -225,6 +225,7 @@ const char strValue[] PUTINFLASH = "value";
 const char strGood[] PUTINFLASH = "good";
 const char strBad[] PUTINFLASH = "bad";
 const char strBattery[] PUTINFLASH = "Battery";
+const char strFiO2[] PUTINFLASH = "FiO2";
 
 bool noSet(struct settingsEntry_s * entry, const char *arg);
 bool verifyDictWordToInt8(struct settingsEntry_s * entry, const char *arg);
@@ -234,6 +235,7 @@ bool verifyLimitsToInt16(struct settingsEntry_s * entry, const char *arg);
 void respondFloat(struct settingsEntry_s * entry);
 void respondInt8(struct settingsEntry_s * entry);
 void respondInt16(struct settingsEntry_s * entry);
+void respondInt8Percent(struct settingsEntry_s * entry);
 void respondInt8ToDict(struct settingsEntry_s * entry);
 void actionModeChanged(struct settingsEntry_s *);
 
@@ -312,6 +314,12 @@ void __NOINLINE handleBatteryGood(struct settingsEntry_s * entry)
   settingReplyStatus(entry->theName, batteryLevel>30);
 }
 
+// Buttons can now be good/bad to reflect what is wrong with the core
+void __NOINLINE handleFiO2Good(struct settingsEntry_s * entry)
+{
+  settingReplyStatus(entry->theName, FiO2Level>30);
+}
+
 void __NOINLINE handleVispSaveSettings(struct settingsEntry_s * entry)
 {
   saveParametersToVISP();
@@ -332,7 +340,8 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_BREATH_PRESSURE  |SAVE_THIS, (MODE_PCCMV | MODE_OFF), strBreathPressure, strCMH2O, MIN_BREATH_PRESSURE, MAX_BREATH_PRESSURE, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathPressure},
   {RESPOND_BREATH_THRESHOLD |SAVE_THIS,  MODE_NONE, strBreathThreshold, NULL, 0, 1000, NULL, verifyLimitsToInt16, respondInt16, NULL, NULL, &breathThreshold},
   {RESPOND_BODYTYPE|EXPERT,              MODE_ALL,  strBodyType, NULL, 0, 0, bodyDict, verifyDictWordToInt8, respondInt8ToDict, NULL, handleVispSaveSettings, &visp_eeprom.bodyType},
-  {RESPOND_BATTERY,                      MODE_ALL,  strBattery, NULL, 0, 100, NULL, noSet, respondInt8, NULL, handleBatteryGood, &batteryLevel},
+  {RESPOND_BATTERY,                      MODE_ALL,  strBattery, NULL, 0, 100, NULL, noSet, respondInt8Percent, NULL, handleBatteryGood, &batteryLevel},
+  {RESPOND_FI02,                         MODE_ALL,  strFiO2, NULL, 0, 100, NULL, noSet, respondInt8Percent, NULL, handleFiO2Good, &FiO2Level},
   {RESPOND_CALIB0|EXPERT,                MODE_ALL, strCalib0, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[0]},
   {RESPOND_CALIB1|EXPERT,                MODE_ALL, strCalib1, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[1]},
   {RESPOND_CALIB2|EXPERT,                MODE_ALL, strCalib2, strPascals, -1000, 1000, NULL, noSet, respondFloat, NULL, NULL, &calibrationOffsets[2]},
@@ -446,6 +455,19 @@ void __NOINLINE respondFloat(struct settingsEntry_s * entry)
   printp(entry->theName);
   printp(PSTR(",value,"));
   hwSerial.print(*(float*)entry->data, 4);
+  hwSerial.println();
+}
+
+void __NOINLINE respondInt8Percent(struct settingsEntry_s * entry)
+{
+  hwSerial.print('S');
+  hwSerial.print(',');
+  hwSerial.print(millis());
+  hwSerial.print(',');
+  printp(entry->theName);
+  printp(PSTR(",value,"));
+  hwSerial.print(*(int8_t*)entry->data);
+  hwSerial.print('%');
   hwSerial.println();
 }
 

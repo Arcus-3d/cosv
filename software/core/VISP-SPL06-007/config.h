@@ -43,7 +43,7 @@
 #define __NOINLINE error 'NOINLINE' not defined for this compiler
 #endif
 
-#define SERIAL_BAUD 921600
+#define SERIAL_BAUD 112500
 
 // Battery level resistor divider located on the carrier board
 #define B_DIV_R1 100 // K
@@ -88,7 +88,7 @@ extern uint8_t breathRate;
 extern uint8_t breathRatio;
 extern uint16_t breathThreshold;
 extern int8_t batteryLevel;
-
+extern int8_t FiO2Level;
 
 #define VERSION_MAJOR     0
 #define VERSION_MINOR     1

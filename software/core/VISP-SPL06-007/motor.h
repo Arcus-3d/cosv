@@ -47,6 +47,7 @@ extern int8_t motorHomingSpeed; // 0->100 as a percentage
 extern int8_t motorMinSpeed;    // 0->100 as a percentage
 extern int8_t motorSpeed;       // 0->100 as a percentage
 extern int16_t motorStepsPerRev;
+extern volatile bool homeHasBeenTriggered;
 
 // The status of the motor is needed for fault identification
 #define MOTOR_STOPPED 0

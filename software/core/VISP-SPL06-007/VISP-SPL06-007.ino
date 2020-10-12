@@ -1,6 +1,6 @@
 /*
    This file is part of VISP Core.
-  
+
    VISP Core is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
@@ -22,14 +22,13 @@
 // TODO: design a board that has TEENSY/NANO/MapleLeaf sockets with a missing pulse detection alarm circuit and integrated motor drivers for steppers and DC motors
 // TODO: 2.8" SPI display for TEENSY and BluePill
 
-// TEST: Low battery
-// TEST: No VISP heartbeat
-
 // Failures left to detect
-// Motor on, no pulsing on encoder
+// Low battery
+// Motor on, no pulsing
 // Motor on, no VISP data change
 // Motor on, 200+ steps & no home detected
 // Motor on, 200+ homes and 1 step pulse (improper wiring, should swap IRQ's)
+// No VISP heartbeat
 // VISP shows volume/pressure with motor off
 // TOO MUCH PRESSURE???  (How do we determine too much?)
 // TOO MUCH VOLUME???    (How do we determine too much?)
@@ -74,6 +73,7 @@ uint16_t breathThreshold;
 uint16_t motor_speed;    // For demonstration purposes, run motor at a fixed speed...
 
 int8_t batteryLevel;
+int8_t FiO2Level;
 
 // DUAL I2C VISP on a CPU with 1 I2C Bus using NPN transistors
 //
@@ -179,10 +179,9 @@ void timeToReadVISP()
 
 
 unsigned long timeToInhale = 0;
-unsigned long timeToStopInhale = -1;
-bool isInInhaleCycle = false;
+unsigned long timeToStopInhale = 0;
 
-#define isInInhaleCycle() (timeToStopInhale < 0)
+#define isInInhaleCycle() (timeToStopInhale > 0)
 
 void timeToCheckPatient()
 {
@@ -193,7 +192,11 @@ void timeToCheckPatient()
   if (currentMode == MODE_OFF)
     return;
 
-  // The patenti hasn't tried to breath on their own...
+  // Can't do stuff without the sensor package!
+  if (!sensorsFound)
+    return;
+
+  // The patient hasn't tried to breath on their own...
   if (theMillis > timeToInhale)
   {
     unsigned long nextBreathCycle = ((60.0 / (float)breathRate) * 1000.0);
@@ -201,47 +204,47 @@ void timeToCheckPatient()
     timeToStopInhale = (nextBreathCycle / breathRatio);
 
     // This info is 200 bytes long...
-    info(PSTR("brate=%d  I:E=1:%d Inhale=%l Exhale=%l millis"), breathRate, breathRatio, timeToStopInhale, nextBreathCycle-timeToStopInhale);
+    info(PSTR("brate=%d  I:E=1:%d Inhale=%l Exhale=%l millis"), breathRate, breathRatio, timeToStopInhale, nextBreathCycle - timeToStopInhale);
 
     timeToInhale += theMillis;
     timeToStopInhale += theMillis;
 
-    motorReverseDirection();
+    // motorReverseDirection();  // Go the same direction as we recently reversed
     motorSpeedUp();
   }
 
-  if (timeToStopInhale >= 0 && theMillis > timeToStopInhale)
+  if (timeToStopInhale > 0)
   {
-    motorStop();
-    motorGoHome();
-    timeToStopInhale = -1;
-  }
-
-  // TODO: if in the middle of the inhalation time, and we don't have any pressure from the VISP,
-  // TODO: either we have a motor fault or we have a disconnected tube
-
-  if (isInInhaleCycle() && sensorsFound)
-  {
-    switch (currentMode)
+    if (theMillis > timeToStopInhale)
     {
-      case MODE_MANUAL_PCCMV:
-      case MODE_PCCMV:
-        if (pressure < breathPressure)
-          motorSpeedUp();
-        if (pressure > breathPressure)
-          motorSlowDown();
-        break;
-      case MODE_MANUAL_VCCMV:
-      case MODE_VCCMV:
-        if (volume < breathVolume)
-          motorSpeedUp();
-        if (volume > breathVolume)
-          motorSlowDown();
-        break;
+      motorStop();
+      motorGoHome();
+      timeToStopInhale = 0;
+    }
+    else
+    {
+      // TODO: if in the middle of the inhalation time, and we don't have any pressure from the VISP,
+      // TODO: either we have a motor fault or we have a disconnected tube
+      switch (currentMode)
+      {
+        case MODE_MANUAL_PCCMV:
+        case MODE_PCCMV:
+          if (pressure < breathPressure)
+            motorSpeedUp();
+          if (pressure > breathPressure)
+            motorSlowDown();
+          break;
+        case MODE_MANUAL_VCCMV:
+        case MODE_VCCMV:
+          if (volume < breathVolume)
+            motorSpeedUp();
+          if (volume > breathVolume)
+            motorSlowDown();
+          break;
+      }
     }
   }
 }
-
 // NANO uses NPN switches to enable/disable a bus for DUAL_I2C with a single hardware I2C bus
 void __NOINLINE enableI2cBusA(busDevice_t *busDevice, bool enableFlag)
 {
@@ -266,6 +269,8 @@ void timeToCheckSensors()
     if (sensorsFound)
       displaySetup(i2cBus1); // Need to setup the VISP I2C OLED that just attached
   }
+
+  FiO2Level = 40; // Percentage (Hard Coded till we get BME680 supported
 }
 
 // Scales the analog input to a range.
@@ -294,44 +299,9 @@ void timeToCheckADC()
 
 void __NOINLINE timeToSendHealthStatus()
 {
-  // Analog input is a resistor divider of 100K + 22K which at 3V3 output is (and ANALOG_MAX) equal to 18.3V input  (27.725 for 5V ADC)
-  // 14.1V is charging input
-  // 12.65V fully charged
-  // 12.45V is 75%
-  // 12.24V is 50%
-  // 12.06V is 25%
-  // 11.89V is 0%
-  // MAX_ANALOG is CPU dependent, 1024 on Nano, 4096 on STM32
-#ifdef BATTERY_MONITORING
-  int aInput=analogRead(ADC_BATTERY);
+  // batteryLevel = scaleAnalog(analogRead(ADC_BATTERY), 0, 100);
 
-  // Compile time figure out what the max voltage we can read threough our resistor divider
-  // CPU may be 5V or 3V3...  And the board may be populated with a different R1&R2, so compute it instead of using consts
-  //
-  // Vout = MAX_ANALOG_V (The max the analog input can see when the value equals MAX_ANALOG read from the pin)
-  //
-  // Vout = (Vs x R2)/(R1+R2)
-  // Vout * (R1+R2) = Vs * R2
-  // (Vout * (R1+R2))/R2 = Vs
-  // Use Vs for max value...  
-  int batteryVoltage = scaleAnalog(aInput, 0, (((MAX_ANALOG_V*100)*(B_DIV_R1 + B_DIV_R2)) / B_DIV_R2) ); // hundredths of volts
-  
-  // info(PSTR("aInput=%d  Voltage computed is %d.%d"), aInput, batteryVoltage/100, batteryVoltage%100);
-  
-  // 1189 -> 1265 is the 0->100% range, >1265 is charging (actually, 1410 is)
-  // We only have 76 values available in the range.
-  if (batteryVoltage<1189)
-    batteryLevel=0;
-  else
-    batteryLevel = ((batteryVoltage*100)-118900) / (126500-118900); // Inline the conversion to percentage
-  if (batteryLevel>100)
-  {
-     // LINE DETECTED!   It is float charging!
-     batteryLevel=100;
-  }
-#else
-  batteryLevel=100;
-#endif
+  batteryLevel = 100;
   sendCurrentSystemHealth();
   respondAppropriately(RESPOND_BATTERY);
 }
@@ -356,7 +326,7 @@ t tasks[] = {
 
 
 
-void scanI2C(TwoWire *wire)
+void scanI2C(TwoWire * wire)
 {
   int error;
   if (wire)
@@ -370,7 +340,7 @@ void scanI2C(TwoWire *wire)
     }
   }
 }
-void initI2C(TwoWire *wire)
+void initI2C(TwoWire * wire)
 {
   if (wire)
   {
@@ -383,11 +353,6 @@ void setup()
 {
   hwSerial.begin(SERIAL_BAUD);
   respond('I', PSTR("VISP Core,%d,%d,%d"), VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
-
-#ifdef ARDUINO_TEENSY40
-  analogReadResolution(12);
-  analogReadAveraging(1);
-#endif
 
   initI2C(i2cBus1);
   initI2C(i2cBus2);
@@ -443,6 +408,21 @@ void loop() {
   motorRun();
   currentUtilization += micros() - startMicros;
 
+  if (homeHasBeenTriggered)
+  {
+    homeHasBeenTriggered = false;
+    motorFound = true;
+    motorRunState = MOTOR_STOPPED;
+
+    motorStop();
+    info(PSTR("Home Triggered"));
+    if (timeToStopInhale > 0)
+    {
+      info(PSTR("Inhale (%l) stopped short as we hit home!"), timeToStopInhale);
+      timeToStopInhale = 0;
+    }
+  }
+
   for (t_t *entry = tasks; entry->cbk; entry++)
     currentUtilization += tCheck(entry);
 
@@ -454,7 +434,7 @@ void loop() {
 
   // Spread out the writing of the EEPROM over time
   coreSaveSettingsStateMachine();
-  
+
   currentUtilization += micros() - startMicros;
 
   if (millis() > utilizationTimeout)

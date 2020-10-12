@@ -62,6 +62,8 @@ void updateMotorSpeed();
 #define RESPOND_MOTOR_HOMING_SPEED  1UL<<23
 #define RESPOND_MOTOR_STEPS_PER_REV 1UL<<24
 
+#define RESPOND_FI02                1UL<<25
+
 void respondAppropriately(uint32_t flags);
 
 #endif

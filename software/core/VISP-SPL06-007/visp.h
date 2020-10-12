@@ -60,7 +60,6 @@ typedef enum {
   VISP_BUS_TYPE_SPI = 's',
   VISP_BUS_TYPE_I2C = 'i',
   VISP_BUS_TYPE_MUX = 'm',
-  VISP_BUS_TYPE_XLATE = 'x'
 } vispBusType_e;
 
 typedef enum {

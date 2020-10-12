@@ -39,17 +39,19 @@ static int8_t motorDetectionState = DO_NOTHING;
 int8_t motorRunState = MOTOR_STOPPED;
 
 volatile bool motorFound = false;
+volatile bool homeHasBeenTriggered = false;
 
 static bool motorWasGoingForward = false;
 
+// Defaults for Daren's hardware
 int8_t motorSpeed = 0; // 0->100 as a percentage
-int8_t motorType = MOTOR_UNKNOWN;
-int8_t motorHomingSpeed = 0; // 0->100 as a percentage
-int8_t motorMinSpeed = 0; // 0->100 as a percentage
+int8_t motorType = MOTOR_HBRIDGE;
+int8_t motorHomingSpeed = 15; // 0->100 as a percentage
+int8_t motorMinSpeed = 11; // 0->100 as a percentage
 int16_t motorStepsPerRev = 200;
 int16_t STEPPER_MAX_SPEED = motorStepsPerRev*3;
 
-unsigned long encoderCount = 0;
+volatile unsigned long encoderCount = 0;
 
 void encoderTriggered() // IRQ function (Future finding the perfect home)
 {
@@ -58,10 +60,7 @@ void encoderTriggered() // IRQ function (Future finding the perfect home)
 
 void homeTriggered() // IRQ function
 {
-  motorFound = true;
-  motorRunState = MOTOR_STOPPED;
-
-  motorStop();
+  homeHasBeenTriggered = true;
 }
 
 
@@ -93,7 +92,7 @@ void __NOINLINE hbridgeReverseDirection()
   // If it was movong, give it a bit to actually stop, so we don't fry the controlling chip
   if (motorSpeed)
     delay(10);
-
+  info(PSTR("Motor Reversing Direction (Going home)"));
   motorRunState = MOTOR_HOMING;
   hbridgeGo();
 }
@@ -123,7 +122,7 @@ void __NOINLINE hbridgeSpeedUp()
 
 void __NOINLINE hbridgeSlowDown()
 {
-  if (motorSpeed > 0)
+  if (motorSpeed > motorMinSpeed)
   {
     motorSpeed--;
     if (motorSpeed < motorMinSpeed)
@@ -335,8 +334,8 @@ void motorSetup()
   pinMode(HOME_SENSOR, INPUT_PULLUP); // Short to ground to trigger
   pinMode(MOTOR_ENCODER_FEEDBACK, INPUT_PULLUP); // Short to ground to trigger.
   delay(5); // Give it a chance to be pulled up
-  attachInterrupt(digitalPinToInterrupt(MOTOR_ENCODER_FEEDBACK), encoderTriggered, RISING);
-  attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, RISING);
+  attachInterrupt(digitalPinToInterrupt(MOTOR_ENCODER_FEEDBACK), encoderTriggered, FALLING);
+  attachInterrupt(digitalPinToInterrupt(HOME_SENSOR), homeTriggered, FALLING);
 
   stepper_setAcceleration(2000);
   stepper_setMaxSpeed(STEPPER_MAX_SPEED);

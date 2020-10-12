@@ -120,34 +120,18 @@ bool detectMuxedSensors(TwoWire *wire, busDeviceEnableCbk enableCbk)
   detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wire, 0x76, 2, muxDevice, enableCbk);
   detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wire, 0x77, 2, muxDevice, enableCbk);
 
+  // BMP388's are on buses 3 & 4 (and U5&U6 are swapped addresses <by accident>)
+  // Detect U5, U6 (Mistake on board, these 2 are plased in reversed order)
+  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wire, 0x77, 3, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wire, 0x76, 3, muxDevice, enableCbk);
+  // Detect U7, U8
+  detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wire, 0x76, 4, muxDevice, enableCbk);
+  detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wire, 0x77, 4, muxDevice, enableCbk);
+
+
   detectedVispType = VISP_BUS_TYPE_MUX;
 
   // Do not free muxDevice, as it is shared by the sensors
-  return true;
-}
-
-// TODO: verify mapping
-bool detectXLateSensors(TwoWire * wire, busDeviceEnableCbk enableCbk)
-{
-  // XLATE version has chips at 0x74, 0x75, 0x76, and 0x77
-  // So, if we find 0x74... We are good to go
-
-  busDevice_t *seventyFour = busDeviceInitI2C(DEVICE_SENSOR_U7, wire, 0x74, 0, NULL, enableCbk);
-  if (!busDeviceDetect(seventyFour))
-    return false;
-
-  detectEEPROM(wire, 0x54, 0, NULL, enableCbk);
-
-  // Detect U5, U6
-  detectIndividualSensor(DEVICE_SENSOR_U5, SENSOR_U5, wire, 0x76, 0, NULL, enableCbk);
-  detectIndividualSensor(DEVICE_SENSOR_U6, SENSOR_U6, wire, 0x77, 0, NULL, enableCbk);
-
-  // Detect U7, U8
-  detectIndividualSensor(DEVICE_SENSOR_U7, SENSOR_U7, wire, 0x74, 0, NULL, enableCbk);
-  detectIndividualSensor(DEVICE_SENSOR_U8, SENSOR_U8, wire, 0x75, 0, NULL, enableCbk);
-
-  detectedVispType = VISP_BUS_TYPE_XLATE;
-
   return true;
 }
 
@@ -213,10 +197,8 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
 
   if (!detectMuxedSensors(i2cBusA, enableCbkA))
     if (!detectMuxedSensors(i2cBusA, enableCbkB))
-      if (!detectXLateSensors(i2cBusA, enableCbkA))
-        if (!detectXLateSensors(i2cBusA, enableCbkB))
-          if (!detectDualI2CSensors(i2cBusA, i2cBusB, enableCbkA, enableCbkB))
-            return;
+      if (!detectDualI2CSensors(i2cBusA, i2cBusB, enableCbkA, enableCbkB))
+        return;
 
   // Make sure they are all there
   missing = 0;
@@ -233,7 +215,6 @@ void detectVISP(TwoWire * i2cBusA, TwoWire * i2cBusB, busDeviceEnableCbk enableC
   }
 
   //if (detectedVispType == VISP_BUS_TYPE_I2C) debug(PSTR("DUAL I2C%S"), strBasedType);
-  //else if (detectedVispType == VISP_BUS_TYPE_XLATE) debug(PSTR("XLate%S"), strBasedType);
   //else if (detectedVispType == VISP_BUS_TYPE_MUX)  debug(PSTR("MUX%S"), strBasedType);
   //else if (detectedVispType == VISP_BUS_TYPE_SPI) debug(PSTR("SPI%S"), strBasedType);
 

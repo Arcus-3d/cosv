@@ -1162,7 +1162,7 @@ void openSerial(core_t *core, const char *name)
         core->fd=fd;
         core->title = name; // Patient name?  Bed number?
         core->serialPort = name;
-        set_interface_attribs (fd, B921600, 0);  // set speed to 921600 bps, 8n1 (no parity)
+        set_interface_attribs (fd, B115200, 0);  // set speed to 11500 bps, 8n1 (no parity)
         Fl::add_fd(fd, HandleFD, (void *)core);
     }
 }

@@ -40,6 +40,7 @@ int8_t motorRunState = MOTOR_STOPPED;
 
 volatile bool motorFound = false;
 volatile bool homeHasBeenTriggered = false;
+volatile uint32_t lastHomeTime = 0;
 
 static bool motorWasGoingForward = false;
 
@@ -60,9 +61,17 @@ void encoderTriggered() // IRQ function (Future finding the perfect home)
 
 void homeTriggered() // IRQ function
 {
-  homeHasBeenTriggered = true;
+  uint32_t currentTime = millis();
+  if ( lastHomeTime > currentTime )
+  {
+    lastHomeTime = currentTime;
+  }
+  if ( (currentTime - lastHomeTime) > 250)
+  {
+    homeHasBeenTriggered = true;
+  }
+  lastHomeTime = currentTime;
 }
-
 
 void __NOINLINE hbridgeGo()
 {

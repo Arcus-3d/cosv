@@ -383,11 +383,13 @@ void  __NOINLINE calculateTidalVolume()
 
   if (lastSampleTime)
   {
-    tidalVolume = tidalVolume + volume * (sampleTime - lastSampleTime) / 60 - 0.05; // tidal volume is the volume delivered to the patient at this time.  So it is cumulative.
+    tidalVolume = tidalVolume + volume * (sampleTime - lastSampleTime) / 60 - 0.1; // tidal volume is the volume delivered to the patient at this time.  So it is cumulative.
   }
   if (tidalVolume < 0.0)
   {
     tidalVolume = 0.0;
+  } else if (tidalVolume > 999.0) {
+    tidalVolume = 999.0;
   }
   lastSampleTime = sampleTime;
 }

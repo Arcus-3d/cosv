@@ -187,7 +187,7 @@ void timeToCheckPatient()
 {
   unsigned long theMillis = millis();
   // breathRate is in breaths per minute. timeout= 60*1000/bpm
-  // breatRation is a 1:X where 1=inhale, and X=exhale.  So a 1:2 is 50% inhaling and 50% exhaling
+  // breatRation is a 1:X where 1=inhale, and X=exhale.  So a 1:2 is 33% inhaling and 66% exhaling
 
   if (currentMode == MODE_OFF)
     return;
@@ -201,7 +201,7 @@ void timeToCheckPatient()
   {
     unsigned long nextBreathCycle = ((60.0 / (float)breathRate) * 1000.0);
     timeToInhale = nextBreathCycle;
-    timeToStopInhale = (nextBreathCycle / breathRatio);
+    timeToStopInhale = (nextBreathCycle / (1+breathRatio));
 
     // This info is 200 bytes long...
     info(PSTR("brate=%d  I:E=1:%d Inhale=%l Exhale=%l millis"), breathRate, breathRatio, timeToStopInhale, nextBreathCycle - timeToStopInhale);

@@ -1230,6 +1230,9 @@ void HandleNewSock(int fd, void *data)
         }
         core->remoteFd = connfd;
         Fl::add_fd(connfd, ServiceSock, (void *)core);
+        int flags = fcntl(fd, F_GETFL, 0);
+        if (flags >= 0)
+            fcntl(connfd, F_SETFL, flags | O_NONBLOCK);
         core->sentQ = 0; // Need to resend the 'Q' to populate the remote client
     }  
 }

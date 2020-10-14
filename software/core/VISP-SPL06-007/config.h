@@ -89,6 +89,7 @@ extern uint8_t breathRatio;
 extern uint16_t breathThreshold;
 extern int8_t batteryLevel;
 extern int8_t FiO2Level;
+extern volatile unsigned long timeToIgnoreHome;
 
 #define VERSION_MAJOR     0
 #define VERSION_MINOR     1

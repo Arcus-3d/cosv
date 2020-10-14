@@ -66,7 +66,9 @@ void homeTriggered() // IRQ function
   {
     lastHomeTime = currentTime;
   }
-  if ( (currentTime - lastHomeTime) > 250)
+
+  if ((timeToIgnoreHome < currentTime)
+  && ( (currentTime - lastHomeTime) > 250))
   {
     homeHasBeenTriggered = true;
   }

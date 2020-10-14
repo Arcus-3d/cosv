@@ -180,6 +180,7 @@ void timeToReadVISP()
 
 unsigned long timeToInhale = 0;
 unsigned long timeToStopInhale = 0;
+volatile unsigned long timeToIgnoreHome = 0;
 
 #define isInInhaleCycle() (timeToStopInhale > 0)
 
@@ -208,6 +209,8 @@ void timeToCheckPatient()
 
     timeToInhale += theMillis;
     timeToStopInhale += theMillis;
+
+    timeToIgnoreHome = theMillis + 300;
 
     // motorReverseDirection();  // Go the same direction as we recently reversed
     motorSpeedUp();

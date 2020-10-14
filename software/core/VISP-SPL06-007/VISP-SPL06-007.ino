@@ -43,6 +43,13 @@
 // are 1,000 pascals in 1 kilopascal.
 
 #include "config.h"
+#include <FastPID.h>
+
+#define PATIENT_CHECK_INTERVAL 50
+float Kp=1, Ki=0.0, Kd=0.0, Hz=(1000/PATIENT_CHECK_INTERVAL);
+int output_bits = 8;
+bool output_signed = false;
+FastPID myPID(Kp, Ki, Kd, Hz, output_bits, output_signed);
 
 #ifdef ARDUINO_TEENSY40
 TwoWire *i2cBus1 = &Wire;
@@ -232,17 +239,13 @@ void timeToCheckPatient()
       {
         case MODE_MANUAL_PCCMV:
         case MODE_PCCMV:
-          if (pressure < breathPressure)
-            motorSpeedUp();
-          if (pressure > breathPressure)
-            motorSlowDown();
+          motorSpeed = myPID.step(breathPressure, pressure); // (setpoint, feedback)
+          motorGo();
           break;
         case MODE_MANUAL_VCCMV:
         case MODE_VCCMV:
-          if (volume < breathVolume)
-            motorSpeedUp();
-          if (volume > breathVolume)
-            motorSlowDown();
+          motorSpeed = myPID.step(breathVolume, volume); // (setpoint, feedback)
+          motorGo();
           break;
       }
     }
@@ -315,7 +318,7 @@ void __NOINLINE timeToSendHealthStatus()
 // If something takes priority over another task, put it at the top of the list
 t tasks[] = {
   {0, 20, timeToReadVISP},
-  {0, 50,  timeToCheckPatient},
+  {0, PATIENT_CHECK_INTERVAL,  timeToCheckPatient},
   {0, 100, timeToPulseWatchdog},
   //  {0, 200, timeToCheckADC}, // disabled for now
   {0, 500, timeToCheckSensors},
@@ -371,6 +374,8 @@ void setup()
 #endif
   pinMode(MISSING_PULSE_PIN, OUTPUT);
   digitalWrite(MISSING_PULSE_PIN, LOW);
+
+  myPID.setOutputRange(0, 100);
 
   motorSetup();
 

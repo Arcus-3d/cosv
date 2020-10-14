@@ -48,7 +48,6 @@ static bool motorWasGoingForward = false;
 int8_t motorSpeed = 0; // 0->100 as a percentage
 int8_t motorType = MOTOR_HBRIDGE;
 int8_t motorHomingSpeed = 15; // 0->100 as a percentage
-int8_t motorMinSpeed = 11; // 0->100 as a percentage
 int16_t motorStepsPerRev = 200;
 int16_t STEPPER_MAX_SPEED = motorStepsPerRev*3;
 
@@ -124,8 +123,6 @@ void __NOINLINE hbridgeSpeedUp()
   if (motorSpeed < 100)
   {
     motorSpeed++;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     hbridgeGo();
   }
@@ -133,11 +130,9 @@ void __NOINLINE hbridgeSpeedUp()
 
 void __NOINLINE hbridgeSlowDown()
 {
-  if (motorSpeed > motorMinSpeed)
+  if (motorSpeed > 0)
   {
     motorSpeed--;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     hbridgeGo();
   }
@@ -181,8 +176,6 @@ void __NOINLINE stepperSpeedUp()
   if (motorSpeed <= 100)
   {
     motorSpeed++;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     stepperGo();
   }
@@ -193,8 +186,6 @@ void __NOINLINE stepperSlowDown()
   if (motorSpeed > 0)
   {
     motorSpeed--;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     stepperGo();
   }
@@ -264,7 +255,6 @@ void motorDetect()
         hbridgeStop();
         motorType = MOTOR_HBRIDGE;
         motorSetup();
-        motorMinSpeed = HBRIDGE_SWEEP_SPEED;
         motorHomingSpeed = HBRIDGE_SWEEP_SPEED+1;
         info(PSTR("Detected HBRIDGE Motor (%s %d)"), (motorFound ? "Home" : ""), encoderCount);
         return;
@@ -293,7 +283,6 @@ void motorDetect()
         stepper_stop();
         motorType = MOTOR_STEPPER;
         motorSetup();
-        motorMinSpeed = STEPPER_SWEEP_SPEED;
         motorHomingSpeed = STEPPER_SWEEP_SPEED+1;
         info(PSTR("Detected STEPPER Motor (%s %d)"), (motorFound ? "Home" : ""), encoderCount);
         return;

@@ -211,7 +211,6 @@ const char strCalib1 [] PUTINFLASH = "calib1";
 const char strCalib2 [] PUTINFLASH = "calib2";
 const char strCalib3 [] PUTINFLASH = "calib3";
 const char strMotorType [] PUTINFLASH = "motorType";
-const char strMotorMinSpeed[] PUTINFLASH = "motorMinSpeed";
 const char strMotorHomingSpeed[] PUTINFLASH = "motorHomingSpeed";
 const char strMotorSpeed[] PUTINFLASH = "motorSpeed";
 const char strMotorStepsPerRev[] PUTINFLASH = "motorStepsPerRev";
@@ -352,7 +351,6 @@ const struct settingsEntry_s settings[] PUTINFLASH = {
   {RESPOND_SENSOR3|EXPERT,               MODE_ALL, strSensor3, NULL, 0, 0, sensorDict, noSet, respondInt8ToDict, NULL, handleSensorGood, &sensors[3].sensorType},
   {RESPOND_MOTOR_TYPE|EXPERT|SAVE_THIS,          (MODE_ALL ^ MODE_MANUAL), strMotorType, NULL, 0, 0, motorTypeDict, verifyDictWordToInt8, respondInt8ToDict, actionMotorChange, handleMotorGood, &motorType},
   {RESPOND_MOTOR_SPEED|EXPERT,                   (MODE_ALL ^ MODE_MANUAL), strMotorSpeed, strPercentage,        0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorSpeed, NULL, &motorSpeed},
-  {RESPOND_MOTOR_MIN_SPEED|EXPERT|SAVE_THIS,     (MODE_ALL ^ MODE_MANUAL), strMotorMinSpeed, strPercentage,     0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorMinSpeed},
   {RESPOND_MOTOR_HOMING_SPEED|EXPERT|SAVE_THIS,  (MODE_ALL ^ MODE_MANUAL), strMotorHomingSpeed, strPercentage,  0, 100, NULL, verifyLimitsToInt8, respondInt8, actionMotorChange, NULL, &motorHomingSpeed},
   {RESPOND_MOTOR_STEPS_PER_REV|EXPERT|SAVE_THIS, (MODE_ALL ^ MODE_MANUAL), strMotorStepsPerRev, NULL, 0, 1600,    NULL, verifyLimitsToInt16, respondInt16, actionMotorChange, NULL, &motorStepsPerRev},
   {RESPOND_DEBUG,                                (MODE_ALL ^ MODE_MANUAL), strDebug, NULL, 0, 0, enableDict, verifyDictWordToInt8, respondInt8ToDict, actionQueryCommand, NULL, &debug},
@@ -991,11 +989,9 @@ void coreSaveSettingsStateMachine()
       CORE_SAVE_SETTINGS_STATE++;
       break;
     case 3:
-      i = coreSaveName(i, strMotorMinSpeed);
       CORE_SAVE_SETTINGS_STATE++;
       break;
     case 4:
-      i = coreSaveValue(i, motorMinSpeed);
       CORE_SAVE_SETTINGS_STATE++;
       break;
     case 5:

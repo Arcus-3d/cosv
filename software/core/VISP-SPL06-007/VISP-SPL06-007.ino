@@ -45,8 +45,8 @@
 #include "config.h"
 #include <FastPID.h>
 
-#define PATIENT_CHECK_INTERVAL 50
-float Kp=1, Ki=0.0, Kd=0.0, Hz=(1000/PATIENT_CHECK_INTERVAL);
+#define PATIENT_CHECK_INTERVAL 20
+float Kp=0.85, Ki=0.07, Kd=0.019, Hz=(1000/PATIENT_CHECK_INTERVAL);
 int output_bits = 8;
 bool output_signed = false;
 FastPID myPID(Kp, Ki, Kd, Hz, output_bits, output_signed);
@@ -240,11 +240,15 @@ void timeToCheckPatient()
         case MODE_MANUAL_PCCMV:
         case MODE_PCCMV:
           motorSpeed = myPID.step(breathPressure, pressure); // (setpoint, feedback)
+          if ( motorSpeed > motorMaxSpeed)
+            motorSpeed = motorMaxSpeed;
           motorGo();
           break;
         case MODE_MANUAL_VCCMV:
-        case MODE_VCCMV:
+        case MODE_VCCMV:          
           motorSpeed = myPID.step(breathVolume, volume); // (setpoint, feedback)
+          if ( motorSpeed > motorMaxSpeed)
+            motorSpeed = motorMaxSpeed;
           motorGo();
           break;
       }

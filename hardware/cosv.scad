@@ -68,7 +68,7 @@ PART=param_part;
 
 //////////////////////////////////////////////////////////////////
 // Assembly views, for testing
-rotate([90,0,0]) cosv_assembly_view(cam_angle=$t*180,explode=30);
+//rotate([90,0,0]) cosv_assembly_view(cam_angle=$t*180,explode=30);
 //cam_assembly_view(explode=0);
 //flow_sensor_assembly_view(rot=360*$t,explode=0.1);
 
@@ -132,7 +132,7 @@ rotate([90,0,0]) cosv_assembly_view(cam_angle=$t*180,explode=30);
 //cam(); // cam top/bottom.
 //cam_encoder(h=0.5);
 
-//paddle(); // paddle for the arms.
+paddle(); // paddle for the arms.
 
 //arm();
 
@@ -211,8 +211,8 @@ comp_rot=90;
 
 // paddle dimensions.  Low infill part.
 paddle_x=bvm_r/2;
-paddle_y=bvm_r/4;
-paddle_t=bvm_c*1.25;
+paddle_y=bvm_r/3;
+paddle_t=bvm_c*1.34;
 
 // how far the arm rotates with a full comp_rot
 arm_rot=30; 
@@ -488,7 +488,7 @@ module cosv_assembly_view(explode=0,cam_angle=0) {
 	if (1) translate([0,0,bvm_l/2]) base_battery_mount_t();
 	if (1) translate([0,0,bvm_l/2]) base_battery_mount_b();
 	if (1) translate([0,0,bvm_l/2]) %battery();
-	if (1) translate([0,-cam_y_offset,0]) rotate([0,0,-cam_angle+cam_pre_rot]) cam_assembly_view(explode=0);
+	if (1) translate([0,-cam_y_offset,0]) rotate([0,0,-cam_angle+416322cam_pre_rot]) cam_assembly_view(explode=0);
 	if (1) translate([0,0,-bvm_l/2-bvm_c*3/2]) %base_corners(x_pos=x_pos-front_recess,r=arm_bolt_r,h=bvm_l+bvm_c*3);
 	if (1) translate([arm_x_offset,0,-material_t]) {
 		translate([0,0,bearing_h/2+extra/2]) bearing();
@@ -532,7 +532,7 @@ module flow_sensor_assembly_view(explode=0,rot=0) {
 module cam_assembly_view(explode=0) {
 	translate([0,0,-explode*2-material_t*7/2]) cam(explode=explode);
 	for(i=[-1,1]) translate([0,cam_bearing_offset*i,0]) bearing();
-	translate([0,0,explode*2+material_t*7/2]) rotate([0,180,0]) 0am(h=material_t,explode=explode);
+	translate([0,0,explode*2+material_t*7/2]) rotate([0,180,0]) cam(h=material_t,explode=explode);
 	translate([0,0,explode*2+material_t*7/2+extra]) cam_encoder(h=material_t);
 }
 module flow_sensor_cover(oled=0) {
@@ -1211,7 +1211,7 @@ module paddle(paddle_x=paddle_x,paddle_y=paddle_y,laser=0,h=material_t*3) {
 			translate([x*paddle_x,y*paddle_y,-paddle_y+paddle_t]) sphere(r=paddle_y,center=true);
 			translate([x*paddle_x,y*paddle_y,paddle_t]) cylinder(r=paddle_y/2+paddle_t/4,h=paddle_t*2,center=true);
 		}
-		#translate([0,0,-bvm_c*3.3]) rotate([0,-90,0]) arm_end_mount(h=material_t*3,under=kerf);
+		#translate([0,paddle_y/4,-bvm_c*3.3]) rotate([0,-90,0]) arm_end_mount(h=material_t*3,under=kerf);
 	}
 }
 

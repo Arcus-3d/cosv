@@ -48,7 +48,7 @@ static bool motorWasGoingForward = false;
 int8_t motorSpeed = 0; // 0->100 as a percentage
 int8_t motorType = MOTOR_HBRIDGE;
 int8_t motorHomingSpeed = 15; // 0->100 as a percentage
-int8_t motorMinSpeed = 11; // 0->100 as a percentage
+int8_t motorMaxSpeed = 75; // 0->100 as a percentage
 int16_t motorStepsPerRev = 200;
 int16_t STEPPER_MAX_SPEED = motorStepsPerRev*3;
 
@@ -87,7 +87,8 @@ void __NOINLINE hbridgeGo()
     digitalWrite(MOTOR_HBRIDGE_R_EN, 0);
     digitalWrite(MOTOR_HBRIDGE_L_EN, 1); // Set these in opposite order of hbridgeReverse() so we don't have both pins active at the same time
   }
-
+  if ( motorSpeed > motorMaxSpeed)
+    motorSpeed = motorMaxSpeed;
   analogWrite(MOTOR_HBRIDGE_PWM, scaleAnalog(motorSpeed, 0, MAX_PWM));
   updateMotorSpeed();
 }
@@ -121,11 +122,9 @@ void __NOINLINE hbridgeStop()
 
 void __NOINLINE hbridgeSpeedUp()
 {
-  if (motorSpeed < 100)
+  if (motorSpeed < motorMaxSpeed)
   {
     motorSpeed++;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     hbridgeGo();
   }
@@ -133,11 +132,9 @@ void __NOINLINE hbridgeSpeedUp()
 
 void __NOINLINE hbridgeSlowDown()
 {
-  if (motorSpeed > motorMinSpeed)
+  if (motorSpeed > 0)
   {
     motorSpeed--;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     hbridgeGo();
   }
@@ -149,6 +146,8 @@ void __NOINLINE hbridgeSlowDown()
 
 void __NOINLINE stepperGo()
 {
+  if ( motorSpeed > motorMaxSpeed)
+    motorSpeed = motorMaxSpeed;
   int theSpeed = scaleAnalog(motorSpeed, 0, STEPPER_MAX_SPEED);
   stepper_setSpeed((motorWasGoingForward ? theSpeed : -theSpeed));
   updateMotorSpeed();
@@ -178,11 +177,9 @@ void __NOINLINE stepperRun()
 
 void __NOINLINE stepperSpeedUp()
 {
-  if (motorSpeed <= 100)
+  if (motorSpeed < motorMaxSpeed)
   {
     motorSpeed++;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     stepperGo();
   }
@@ -193,8 +190,6 @@ void __NOINLINE stepperSlowDown()
   if (motorSpeed > 0)
   {
     motorSpeed--;
-    if (motorSpeed < motorMinSpeed)
-      motorSpeed = motorMinSpeed;
     motorRunState = MOTOR_RUNNING;
     stepperGo();
   }
@@ -264,7 +259,7 @@ void motorDetect()
         hbridgeStop();
         motorType = MOTOR_HBRIDGE;
         motorSetup();
-        motorMinSpeed = HBRIDGE_SWEEP_SPEED;
+        motorMaxSpeed = HBRIDGE_SWEEP_SPEED;
         motorHomingSpeed = HBRIDGE_SWEEP_SPEED+1;
         info(PSTR("Detected HBRIDGE Motor (%s %d)"), (motorFound ? "Home" : ""), encoderCount);
         return;
@@ -293,7 +288,7 @@ void motorDetect()
         stepper_stop();
         motorType = MOTOR_STEPPER;
         motorSetup();
-        motorMinSpeed = STEPPER_SWEEP_SPEED;
+        motorMaxSpeed = STEPPER_SWEEP_SPEED;
         motorHomingSpeed = STEPPER_SWEEP_SPEED+1;
         info(PSTR("Detected STEPPER Motor (%s %d)"), (motorFound ? "Home" : ""), encoderCount);
         return;

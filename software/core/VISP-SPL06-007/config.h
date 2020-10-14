@@ -73,12 +73,12 @@ extern debugState_e debug;
 
 #define MIN_BREATH_RATIO 2
 #define MAX_BREATH_RATIO 5
-#define MIN_BREATH_RATE  5 // TODO: saner limits 5 breaths/minute
-#define MAX_BREATH_RATE  20 // TODO: saner limits 30 breaths/minute
+#define MIN_BREATH_RATE  10 // TODO: saner limits 5 breaths/minute
+#define MAX_BREATH_RATE  40 // TODO: saner limits 30 breaths/minute
 #define MIN_BREATH_PRESSURE 0    // TODO: saner limits
-#define MAX_BREATH_PRESSURE 100  // TODO: saner limits
+#define MAX_BREATH_PRESSURE 80  // TODO: saner limits
 #define MIN_BREATH_VOLUME   0    // TODO: saner limits 
-#define MAX_BREATH_VOLUME   1000 // TODO: saner limits
+#define MAX_BREATH_VOLUME   800 // TODO: saner limits
 
 void clearCalibrationData();
 

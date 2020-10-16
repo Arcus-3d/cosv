@@ -46,7 +46,7 @@
 #include <FastPID.h>
 
 #define PATIENT_CHECK_INTERVAL 20
-float Kp=0.85, Ki=0.07, Kd=0.019, Hz=(1000/PATIENT_CHECK_INTERVAL);
+float Kp=0.85, Ki=0.09, Kd=0.023, Hz=(1000/PATIENT_CHECK_INTERVAL);
 int output_bits = 8;
 bool output_signed = false;
 FastPID myPID(Kp, Ki, Kd, Hz, output_bits, output_signed);

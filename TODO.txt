@@ -1,0 +1,34 @@
+Cam Arms can lock up and break the machine, eliminate manual grinding step by changing profile of arm.
+Enlarge heat sink model for IBT_2 (Manufacturing tolerances, it's too tight on one of Steve's IBT_2's).
+Move IBT_2 slightly away from the wiper motor (PCB is shorting out to the motor housing)
+Enlarge wiper motor housing by a millimeter to take into consideration manufacturing differences
+Enlarge battery model slightly.  Steven has 5 batteries and none of them are the exact same size.  Tops are glued on slightly offset, etc.
+Battery removal panel.  Let's be able to take the battery out without taking the whole thing apart.
+Battery swelling: If battery is overcharged and fails, it will swell.  This should bulge/break a battery door, not destroy the whole side of the unit.
+Battery spacers (Need 10, 5 top, 5 bottom) to prevent the battery from hitting the twin nuts.   Taper the edges to the 5/16" bolts for clearance near the display. Note: this gives us room in that area to put power electronics!  Easy to get to with the battery door removed!
+Battery cage from stacking battery mounts and new mount spacers (just washers made from the laser cut material)
+Display panel screws break the display when the unit is dropped.  They are too close to the edge of the glass.
+Transparent display cover?   Removable via Magnetically attach points?  Protect the flimsy display from being broken when hauling the thing around.
+Snap in power switch
+Tombstone RJ45 hookup for VISP needs to be located somewhere better.  Hard to install on battery side unless it is in a housing on the top of the upper plate with RJ45 facing out of the side (Not a bad idea). Battery mounts may make this awkward to route the cable to the Carrier. Maybe include USB port to go to the rPi so we can attach a keyboard/mouse, or USB key for firmware updating.
+
+Internal arm guides (3 on each side)
+Handle is too close to the bag.
+Bag cover.  Any pressing of the bag WILL trigger an unwanted inhalation cycle.   We have to protect it from being bumped around in the chopper, or on the pole going down the hallway/into elevators, etc
+Pole clamp.   Need to figure out how to do this without redesigning the whole unit.  (Also, bedside hooks?)
+
+Aluminum cam-to-motor part.  Perhaps a 6MM x 25MM machined part with integrated threads for the skate bearings? At least a pair of pockets like the existing system.  If AL, maybe threaded inserts in a stronger material?
+
+Optical encoder mount?   Something (anything) to make the encoder easier to add after the cam part is put together.  Maybe a 3D printed mount?  It needs to mount to the side of the cam housing, and then permit the encoder to mount to it.  We only have 8MM to work with.  Maybe the encoder PCB should be shaped like a T with 2 mount holes on the left/right of the top of the T?
+
+Ford wiper motor cable harness.  Let's make a 3D printed spade terminal wiring harness that just works, without the end assembler getting lines crossed, or hooked up wrong inadvertantly.  Eliminate problems now, with a little bit of investment.
+Carrier (3d printed or PCB) for twin buck/boost converters for battery charging/rPi-power mounting under the motor or behind the battery on the cam plate.   Something to make assembly dirt simple.
+Somehow eliminate tuning of buck/boost boards. We cannot trust the end user/packager to do this properly.  Should 5V converter be placed on the rPi carrier board?
+Select and standardize on power jack and power supply.  Needs to be completely removable from the back of the unit, but only when wanted.  Could have a simple retaining clip/zip tie/velcro holder.
+Design the alarm circuits.  Needs 2 different alarm sounds for the Critical (Patient not exhaling) vs Warning (battery low)
+
+
+VISP board: add integrated RJ45, so we don't have to solder wires, we can use any standard ethernet cable.
+VISP board: Getting to the screw under the LCD requires that the LCD be removable, or attached via a small ribbon cable.  The ribbon cable is a PITA to assemble.
+
+Investigate "tube compliance check", might require mods to the machine.

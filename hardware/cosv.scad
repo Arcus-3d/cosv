@@ -548,7 +548,7 @@ module cosv_assembly_view(explode=0,cam_angle=0) {
 			}
 		}
 	}
-	if (1) translate([-arm_x_offset,0,-material_t]) {
+	if (0) translate([-arm_x_offset,0,-material_t]) {
 		translate([0,0,bearing_h/2+extra/2]) bearing();
 		if (cam_angle < comp_rot) {
 			translate([0,0,bearing_h/2-material_t*3/2]) rotate([0,0,-cam_angle/(comp_rot/arm_rot)]) {

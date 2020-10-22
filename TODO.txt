@@ -1,4 +1,4 @@
-Cam Arms can lock up and break the machine, eliminate manual grinding step by changing profile of arm.
+Cam Arms can lock up and break the machine, eliminate manual grinding step by changing profile of arm. - Done
 Enlarge heat sink model for IBT_2 (Manufacturing tolerances, it's too tight on one of Steve's IBT_2's).
 Move IBT_2 slightly away from the wiper motor (PCB is shorting out to the motor housing)
 Enlarge wiper motor housing by a millimeter to take into consideration manufacturing differences

@@ -261,23 +261,24 @@ Fl_Color lookupColor(const char *name)
 }     
 
 // 'X' overlay the whole window if the core is missing or reports being 'bad'
-class My_Double_Window : public Fl_Double_Window {
+class My_Group : public Fl_Group {
 public:
     bool isBad;
-    My_Double_Window(int X, int Y, int W, int H, const char*L=0) : Fl_Double_Window(X,Y,W,H,L) {
+    My_Group(int X, int Y, int W, int H, const char*L=0) : Fl_Group(X,Y,W,H,L) {
       isBad=true;
     }
     void setBad() { isBad=true; redraw(); }
     void setGood() { isBad=false; redraw(); }
     
     void draw() {
-        Fl_Double_Window::draw();
+        Fl_Group::draw();
         if (isBad)
         {
           // DRAW RED 'X'
           fl_color(FL_RED);
           int x1 = 0,       y1 = 0;
           int x2 = w()-1, y2 = h()-1;
+          fl_line_style(FL_SOLID, 5);
           fl_line(x1, y1, x2, y2);
           fl_line(x1, y2, x2, y1);
         }
@@ -472,12 +473,12 @@ typedef struct core_s {
     int remoteFd;      // If !=-1 then we have a remote monitor in control
     dynamic_button_t *button_list;
 
-    My_Double_Window *win;
+    Fl_Double_Window *win;
     Fl_Scroll *scrollButtons;
     Fl_Scroll *scrollStatusItems;
     Fl_Pack *packedButtons;
     Fl_Pack *packedStatusItems;
-
+    My_Group *groupedCharts;
     My_Chart *flCharts[MAX_CHARTS];
     MyPopupWindow *popup; // So when a 'Q' happens, we can dismiss the active popup
 } core_t;
@@ -512,7 +513,7 @@ void setHealth(core_t *core, int isGood)
 {
   // if !isGood, big red X on screen, or red banner, whatever
   core->isGood = isGood;
-  if (isGood) core->win->setGood(); else core->win->setBad();
+  if (isGood) core->groupedCharts->setGood(); else core->groupedCharts->setBad();
   if (isGood && core->criticalText)
   {
       free(core->criticalText);
@@ -1098,10 +1099,10 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     Fl::reload_scheme();
     Fl::set_color(FL_SELECTION_COLOR, 200, 200, 200); // the default selection/highlight color
 
-    core->win = new My_Double_Window((Fl::w() - w)/2, (Fl::h() - h)/2, w, h, label);
+    core->win = new Fl_Double_Window(0,0, w, h, label);
     Fl_Pack   *packedAll = new Fl_Pack(0,0,w,h);
     Fl_Pack   *packedTop = new Fl_Pack(0,0,w,(h-1)-BUTTON_HEIGHT);
-    Fl_Group  *groupedCharts = new Fl_Group(0,0,w-BUTTON_WIDTH,h-BUTTON_HEIGHT);
+    core->groupedCharts = new My_Group(0,0,w-BUTTON_WIDTH,h-BUTTON_HEIGHT);
     
     for (int x=0; x<MAX_CHARTS; x++)
     {
@@ -1130,13 +1131,13 @@ void makeWindow(core_t *core, int w, int h, const char *label)
 
     // Put everything in their groups so that the window auto sizes cleanly
     for (int x=0;x<MAX_CHARTS; x++)
-        groupedCharts->add(core->flCharts[x]);
-    groupedCharts->resizable(groupedCharts);
+        core->groupedCharts->add(core->flCharts[x]);
+    core->groupedCharts->resizable(core->groupedCharts);
     
     packedTop->type(Fl_Pack::HORIZONTAL);
-    packedTop->add(groupedCharts);
+    packedTop->add(core->groupedCharts);
     packedTop->add(core->scrollStatusItems);
-    packedTop->resizable(groupedCharts);
+    packedTop->resizable(core->groupedCharts);
     
     packedAll->type(Fl_Pack::VERTICAL);
     packedAll->add(packedTop);
@@ -1144,6 +1145,7 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     packedAll->resizable(packedTop);
     core->win->resizable(packedAll);
     core->win->show();
+    core->win->fullscreen();
 }
 
 void HandleFD(int fd, void *data)

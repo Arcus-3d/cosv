@@ -665,13 +665,13 @@ void sliderChanged(Fl_Widget *w, void *data)
 }
 
 
-// Simple slider bar set to current strtoul(b->textValue); with ninRange/maxRange values
+// Simple slider bar set to current strtoul(b->textValue); with minRange/maxRange values
 void popupRangeSelection(core_t *core, dynamic_button_t *b)
 {
-  core->popup = new MyPopupWindow(0,0,300, BUTTON_HEIGHT, b->name);
+  core->popup = new MyPopupWindow(0,0,600, BUTTON_HEIGHT*2, b->name);
   core->popup->user_data((void *)core);
 
-  Fl_Value_Slider *slider = new Fl_Value_Slider(0,0,300,BUTTON_HEIGHT);
+  Fl_Value_Slider *slider = new Fl_Value_Slider(0,0,600,BUTTON_HEIGHT*2);
   slider->bounds(b->minRange, b->maxRange);
   slider->type(FL_HOR_NICE_SLIDER);
   slider->value(atoi(b->textValue));

@@ -1118,7 +1118,7 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     Fl_Pack   *packedAll = new Fl_Pack(0,0,w,h);
     Fl_Pack   *packedTop = new Fl_Pack(0,0,w,(h-1)-BUTTON_HEIGHT);
     core->groupedCharts = new My_Group(0,0,w-BUTTON_WIDTH,h-BUTTON_HEIGHT);
-    core->titleBox = new Fl_Box(0,0,w-BUTTON_WIDTH,TITLE_HEIGHT,"Written by Steven Carr");
+    core->titleBox = new Fl_Box(0,0,w-BUTTON_WIDTH,TITLE_HEIGHT,"Version " VERSION_STAMP);
     core->titleBox->box(FL_NO_BOX);
     for (int x=0; x<MAX_CHARTS; x++)
     {

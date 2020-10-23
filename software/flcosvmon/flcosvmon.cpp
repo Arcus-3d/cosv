@@ -28,6 +28,7 @@
 #include <FL/Fl_Pack.H>
 #include <FL/Fl_Tile.H>
 #include <FL/Fl_Button.H>
+#include <FL/Fl_Box.H>
 #include <FL/Fl_Value_Slider.H>
 #include <FL/fl_draw.H>
 #include <math.h>
@@ -62,7 +63,7 @@
 
 #define BUTTON_WIDTH 100
 #define BUTTON_HEIGHT 60
-
+#define TITLE_HEIGHT  24
 
 int set_interface_attribs (int fd, int speed, int parity)
 {
@@ -480,6 +481,7 @@ typedef struct core_s {
     Fl_Pack *packedStatusItems;
     My_Group *groupedCharts;
     My_Chart *flCharts[MAX_CHARTS];
+    Fl_Box *titleBox;
     MyPopupWindow *popup; // So when a 'Q' happens, we can dismiss the active popup
 } core_t;
 
@@ -514,12 +516,23 @@ void setHealth(core_t *core, int isGood)
   // if !isGood, big red X on screen, or red banner, whatever
   core->isGood = isGood;
   if (isGood) core->groupedCharts->setGood(); else core->groupedCharts->setBad();
-  if (isGood && core->criticalText)
+  
+  if (isGood)
   {
+    if (core->criticalText)
+    {
       free(core->criticalText);
       core->criticalText=NULL;
-      core->win->label(core->title);
+    }
+    core->titleBox->label(core->title);
   }
+  else
+  {
+      if (core->criticalText)
+        core->titleBox->label(core->criticalText);
+      else
+        core->titleBox->label("Unknown Error");
+  }  
 }
 
 dynamic_button_t *buttonLookup(core_t *core, char *settingName)
@@ -613,6 +626,10 @@ void processSerialFailure(core_t *core)
   close(core->fd);
   core->fd = -1;
   // Yeah, we are bad now...
+  
+  if (core->criticalText)
+      free(core->criticalText);
+  core->criticalText = strdup("Core Serial Communication Failure");
   setHealth(core, false);
 }
 
@@ -927,12 +944,10 @@ void processCommandArgument(core_t *core, char commandByte, int currentArgIndex,
   case 'I': // Identify with version numbers (should do compatibility info here
       break;
   case 'c': // critical log output
-      // Should go titlebar?
-      // and get cleared on "good" health...
       if (core->criticalText)
           free(core->criticalText);
       core->criticalText = strdup(argBuffer->data);
-      core->win->label(core->criticalText);
+      setHealth(core, false);
       break;
   case 'i': // Infor log output
   case 'w': // warning log output
@@ -1103,10 +1118,12 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     Fl_Pack   *packedAll = new Fl_Pack(0,0,w,h);
     Fl_Pack   *packedTop = new Fl_Pack(0,0,w,(h-1)-BUTTON_HEIGHT);
     core->groupedCharts = new My_Group(0,0,w-BUTTON_WIDTH,h-BUTTON_HEIGHT);
-    
+    core->titleBox = new Fl_Box(0,0,w-BUTTON_WIDTH,TITLE_HEIGHT,"Written by Steven Carr");
+    core->titleBox->box(FL_NO_BOX);
     for (int x=0; x<MAX_CHARTS; x++)
     {
-        core->flCharts[x] = new My_Chart(0, ((h-BUTTON_HEIGHT)/3)*x, w-BUTTON_WIDTH, ((h-BUTTON_HEIGHT)/3), charts[x].name);
+        int chartHeight=(core->groupedCharts->h() - TITLE_HEIGHT)/3;
+        core->flCharts[x] = new My_Chart(0, TITLE_HEIGHT+(chartHeight*x), w-BUTTON_WIDTH, chartHeight, charts[x].name);
         core->flCharts[x]->bounds(charts[x].minRange, charts[x].maxRange);
         core->flCharts[x]->threshold(charts[x].waterLevel);
         core->flCharts[x]->thresholdcolor(FL_RED);
@@ -1130,6 +1147,7 @@ void makeWindow(core_t *core, int w, int h, const char *label)
 
 
     // Put everything in their groups so that the window auto sizes cleanly
+    core->groupedCharts->add(core->titleBox);
     for (int x=0;x<MAX_CHARTS; x++)
         core->groupedCharts->add(core->flCharts[x]);
     core->groupedCharts->resizable(core->groupedCharts);

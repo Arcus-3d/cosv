@@ -473,6 +473,8 @@ typedef struct core_s {
     dynamic_button_t *button_list;
 
     My_Double_Window *win;
+    Fl_Scroll *scrollButtons;
+    Fl_Scroll *scrollStatusItems;
     Fl_Pack *packedButtons;
     Fl_Pack *packedStatusItems;
 
@@ -761,6 +763,8 @@ void wipeIcon(core_t *core, dynamic_button_t *button)
 
 void wipeIcons(core_t *core)
 {
+  core->scrollButtons->scroll_to(0,0);
+  core->scrollStatusItems->scroll_to(0,0);
   core->packedButtons->clear();
   core->packedStatusItems->clear();
   while (core->button_list)
@@ -1110,18 +1114,18 @@ void makeWindow(core_t *core, int w, int h, const char *label)
         core->flCharts[x]->labelsize(16);
     }
 
-    Fl_Scroll *scrollButtons = new Fl_Scroll(0,(h-1)-BUTTON_HEIGHT, w, BUTTON_HEIGHT+1);
+    core->scrollButtons = new Fl_Scroll(0,(h-1)-BUTTON_HEIGHT, w, BUTTON_HEIGHT+1);
     core->packedButtons = new Fl_Pack(0,h-BUTTON_HEIGHT,w, BUTTON_HEIGHT);
     core->packedButtons->type(Fl_Pack::HORIZONTAL);
     core->packedButtons->spacing(10);
-    scrollButtons->add(core->packedButtons);
+    core->scrollButtons->add(core->packedButtons);
 
-    Fl_Scroll *scrollStatusItems = new Fl_Scroll((w-1)-BUTTON_WIDTH, 0, BUTTON_WIDTH+1, h-BUTTON_HEIGHT);
+    core->scrollStatusItems = new Fl_Scroll((w-1)-BUTTON_WIDTH, 0, BUTTON_WIDTH+1, h-BUTTON_HEIGHT);
     core->packedStatusItems = new Fl_Pack(w-BUTTON_WIDTH, 0, BUTTON_WIDTH, h-BUTTON_HEIGHT);
     core->packedStatusItems->type(Fl_Pack::VERTICAL);
     core->packedStatusItems->spacing(10);
     core->packedStatusItems->resizable(core->packedStatusItems);
-    scrollStatusItems->add(core->packedStatusItems);
+    core->scrollStatusItems->add(core->packedStatusItems);
 
 
     // Put everything in their groups so that the window auto sizes cleanly
@@ -1131,12 +1135,12 @@ void makeWindow(core_t *core, int w, int h, const char *label)
     
     packedTop->type(Fl_Pack::HORIZONTAL);
     packedTop->add(groupedCharts);
-    packedTop->add(scrollStatusItems);
+    packedTop->add(core->scrollStatusItems);
     packedTop->resizable(groupedCharts);
     
     packedAll->type(Fl_Pack::VERTICAL);
     packedAll->add(packedTop);
-    packedAll->add(scrollButtons);
+    packedAll->add(core->scrollButtons);
     packedAll->resizable(packedTop);
     core->win->resizable(packedAll);
     core->win->show();
